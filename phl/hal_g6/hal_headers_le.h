@@ -296,7 +296,15 @@ static inline u8 hal_sdio_read_cia_r8(struct rtw_hal_com_t *h, u32 addr)
 #define hal_mem_alloc(h, buf_sz) _os_mem_alloc(halcom_to_drvpriv(h), buf_sz)
 #define hal_mem_free(h, buf, buf_sz)	_os_mem_free(halcom_to_drvpriv(h), buf, buf_sz)
 #define hal_mem_set(h, buf, value, size)	_os_mem_set(halcom_to_drvpriv(h), buf, value, size)
-#define hal_mem_cpy(h, dest, src, size)	_os_mem_cpy(halcom_to_drvpriv(h), dest, src, size)
+#define hal_mem_cpy(h, dest, src, size)	\
+	{ \
+		int __size = size; \
+		if (__size > sizeof(src) \
+			__size = sizeof(src); \
+		if (__size > sizeof(dst) \
+			__size = sizeof(dst); \
+		_os_mem_cpy(halcom_to_drvpriv(h), dest, src, i__size); \
+	}
 #define hal_mem_cmp(h, dest, src, size)	_os_mem_cmp(halcom_to_drvpriv(h), dest, src, size)
 
 #define hal_mutex_init(h, mutex)	_os_mutex_init(halcom_to_drvpriv(h), mutex)
