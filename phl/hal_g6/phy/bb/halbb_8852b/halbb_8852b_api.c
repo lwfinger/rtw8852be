@@ -1604,6 +1604,7 @@ void halbb_dump_bb_reg_8852b(struct bb_info *bb, u32 *_used, char *output,
 				  {0x7800, 0x7FFC}};
 	u32 table_len = sizeof(dump_cr_table)/(sizeof(u32) * 2);
 
+	return;
 	BB_TRACE("BBCR: dump all ==>\n");
 	BB_TRACE("table_len=%d\n", table_len);
 
@@ -1657,6 +1658,7 @@ void halbb_dbgport_dump_all_8852b(struct bb_info *bb, u32 *_used, char *output,
 	u32 j;
 	u32 dbg_start = 0, dbg_end = 0;
 
+	return;
 	table_len = sizeof(dump_dbgport_table) / (sizeof(u32) * 3);
 
 	BB_DBG_VAST(*_out_len, *_used, output + *_used, *_out_len - *_used,
