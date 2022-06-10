@@ -864,7 +864,7 @@ struct cfg80211_bss *rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_net
 	size_t buf_size = MAX_BSSINFO_LEN;
 	size_t len, bssinf_len = 0;
 	struct rtw_ieee80211_hdr *pwlanhdr;
-	unsigned short *fctrl;
+	__le16 *fctrl;
 	u8	bc_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 	struct wireless_dev *wdev = padapter->rtw_wdev;
@@ -903,12 +903,12 @@ struct cfg80211_bss *rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_net
 	notify_channel = ieee80211_get_channel(wiphy, freq);
 
 	if (0)
-		notify_timestamp = le64_to_cpu(*(u64 *)rtw_get_timestampe_from_ie(pnetwork->network.IEs));
+		notify_timestamp = le64_to_cpu(*(__le64 *)rtw_get_timestampe_from_ie(pnetwork->network.IEs));
 	else
 		notify_timestamp = rtw_get_systime_us();
 
-	notify_interval = le16_to_cpu(*(u16 *)rtw_get_beacon_interval_from_ie(pnetwork->network.IEs));
-	notify_capability = le16_to_cpu(*(u16 *)rtw_get_capability_from_ie(pnetwork->network.IEs));
+	notify_interval = le16_to_cpu(*(__le16 *)rtw_get_beacon_interval_from_ie(pnetwork->network.IEs));
+	notify_capability = le16_to_cpu(*(__le16 *)rtw_get_capability_from_ie(pnetwork->network.IEs));
 
 	notify_ie = pnetwork->network.IEs + _FIXED_IE_LENGTH_;
 	notify_ielen = pnetwork->network.IELength - _FIXED_IE_LENGTH_;
@@ -961,7 +961,7 @@ struct cfg80211_bss *rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_net
 	/* pbuf += sizeof(struct rtw_ieee80211_hdr_3addr); */
 	len = sizeof(struct rtw_ieee80211_hdr_3addr);
 	_rtw_memcpy((pbuf + len), pnetwork->network.IEs, pnetwork->network.IELength);
-	*((u64 *)(pbuf + len)) = cpu_to_le64(notify_timestamp);
+	*((__le64 *)(pbuf + len)) = cpu_to_le64(notify_timestamp);
 
 	len += pnetwork->network.IELength;
 
@@ -2254,7 +2254,7 @@ static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev
 	}
 
 	if (pn) {
-		*((u64 *)pn_val) = cpu_to_le64(*pn);
+		*((__le64 *)pn_val) = cpu_to_le64(*pn);
 		pn_len = 6;
 	}
 
@@ -4918,9 +4918,9 @@ static int rtw_cfg80211_monitor_if_xmit_entry(struct sk_buff *skb, struct net_de
 		/* Check if this ia a Wireless Distribution System (WDS) frame
 		 * which has 4 MAC addresses
 		 */
-		if (dot11_hdr->frame_ctl & 0x0080)
+		if (le16_to_cpu(dot11_hdr->frame_ctl) & 0x0080)
 			qos_len = 2;
-		if ((dot11_hdr->frame_ctl & 0x0300) == 0x0300)
+		if ((le16_to_cpu(dot11_hdr->frame_ctl) & 0x0300) == 0x0300)
 			dot11_hdr_len += 6;
 
 		_rtw_memcpy(dst_mac_addr, dot11_hdr->addr1, sizeof(dst_mac_addr));
@@ -9442,7 +9442,7 @@ static int rtw_cfg80211_set_probe_resp_wpsp2pie(struct net_device *net, char *bu
 		wps_ie = rtw_get_wps_ie(buf, len, NULL, &wps_ielen);
 		if (wps_ie) {
 			uint	attr_contentlen = 0;
-			u16	uconfig_method, *puconfig_method = NULL;
+			__be16	uconfig_method, *puconfig_method = NULL;
 
 			#ifdef CONFIG_DEBUG_CFG80211
 			RTW_INFO("probe_resp_wps_ielen=%d\n", wps_ielen);
@@ -9475,7 +9475,7 @@ static int rtw_cfg80211_set_probe_resp_wpsp2pie(struct net_device *net, char *bu
 			}
 
 			/* add PUSH_BUTTON config_method by driver self in wpsie of probe_resp at GO Mode */
-			puconfig_method = (u16 *)rtw_get_wps_attr_content(wps_ie, wps_ielen, WPS_ATTR_CONF_METHOD , NULL, &attr_contentlen);
+			puconfig_method = (__be16 *)rtw_get_wps_attr_content(wps_ie, wps_ielen, WPS_ATTR_CONF_METHOD , NULL, &attr_contentlen);
 			if (puconfig_method != NULL) {
 				/* struct registry_priv *pregistrypriv = &padapter->registrypriv; */
 				struct wireless_dev *wdev = padapter->rtw_wdev;
@@ -9487,8 +9487,7 @@ static int rtw_cfg80211_set_probe_resp_wpsp2pie(struct net_device *net, char *bu
 				#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
 				/* for WIFI-DIRECT LOGO 4.2.2, AUTO GO can't set PUSH_BUTTON flags */
 				if (wdev->iftype == NL80211_IFTYPE_P2P_GO) {
-					uconfig_method = WPS_CM_PUSH_BUTTON;
-					uconfig_method = cpu_to_be16(uconfig_method);
+					uconfig_method = cpu_to_be16(WPS_CM_PUSH_BUTTON);
 
 					*puconfig_method &= ~uconfig_method;
 				}
@@ -9508,7 +9507,8 @@ static int rtw_cfg80211_set_probe_resp_wpsp2pie(struct net_device *net, char *bu
 		if (p2p_ie) {
 			u8 is_GO = _FALSE;
 			u32 attr_contentlen = 0;
-			u16 cap_attr = 0;
+			__le16 le_cap_attr = 0;
+			u16 cap_attr;
 
 			#ifdef CONFIG_DEBUG_CFG80211
 			RTW_INFO("probe_resp_p2p_ielen=%d\n", p2p_ielen);
@@ -9516,10 +9516,10 @@ static int rtw_cfg80211_set_probe_resp_wpsp2pie(struct net_device *net, char *bu
 
 			/* Check P2P Capability ATTR */
 			attr_contentlen = sizeof(cap_attr);
-			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CAPABILITY, (u8 *)&cap_attr, (uint *) &attr_contentlen)) {
+			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CAPABILITY, (u8 *)&le_cap_attr, (uint *) &attr_contentlen)) {
 				u8 grp_cap = 0;
 				/* RTW_INFO( "[%s] Got P2P Capability Attr!!\n", __FUNCTION__ ); */
-				cap_attr = le16_to_cpu(cap_attr);
+				cap_attr = le16_to_cpu(le_cap_attr);
 				grp_cap = (u8)((cap_attr >> 8) & 0xff);
 
 				is_GO = (grp_cap & BIT(0)) ? _TRUE : _FALSE;

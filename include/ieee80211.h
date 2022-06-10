@@ -358,58 +358,58 @@ struct ieee_ibss_seq {
 #if defined(PLATFORM_LINUX) || defined(PLATFORM_FREEBSD)
 
 struct rtw_ieee80211_hdr {
-	u16 frame_ctl;
-	u16 duration_id;
+	__le16 frame_ctl;
+	__le16 duration_id;
 	u8 addr1[ETH_ALEN];
 	u8 addr2[ETH_ALEN];
 	u8 addr3[ETH_ALEN];
-	u16 seq_ctl;
+	__le16 seq_ctl;
 	u8 addr4[ETH_ALEN];
 } __attribute__((packed));
 
 struct rtw_ieee80211_hdr_3addr {
-	u16 frame_ctl;
-	u16 duration_id;
+	__le16 frame_ctl;
+	__le16 duration_id;
 	u8 addr1[ETH_ALEN];
 	u8 addr2[ETH_ALEN];
 	u8 addr3[ETH_ALEN];
-	u16 seq_ctl;
+	__le16 seq_ctl;
 } __attribute__((packed));
 
 
 struct rtw_ieee80211_hdr_qos {
-	u16 frame_ctl;
-	u16 duration_id;
+	__le16 frame_ctl;
+	__le16 duration_id;
 	u8 addr1[ETH_ALEN];
 	u8 addr2[ETH_ALEN];
 	u8 addr3[ETH_ALEN];
-	u16 seq_ctl;
+	__le16 seq_ctl;
 	u8 addr4[ETH_ALEN];
-	u16	qc;
+	__le16	qc;
 }  __attribute__((packed));
 
 struct rtw_ieee80211_hdr_3addr_qos {
-	u16 frame_ctl;
-	u16 duration_id;
+	__le16 frame_ctl;
+	__le16 duration_id;
 	u8 addr1[ETH_ALEN];
 	u8 addr2[ETH_ALEN];
 	u8 addr3[ETH_ALEN];
-	u16 seq_ctl;
-	u16     qc;
+	__le16 seq_ctl;
+	__le16     qc;
 }  __attribute__((packed));
 
 struct eapol {
 	u8 snap[6];
-	u16 ethertype;
+	__le16 ethertype;
 	u8 version;
 	u8 type;
-	u16 length;
+	__le16 length;
 } __attribute__((packed));
 
 struct rtw_ieee80211s_hdr {
 	u8 flags;
 	u8 ttl;
-	u32 seqnum;
+	__le32 seqnum;
 	u8 eaddr1[ETH_ALEN];
 	u8 eaddr2[ETH_ALEN];
 } __attribute__((packed));
