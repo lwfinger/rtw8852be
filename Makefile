@@ -26,6 +26,8 @@ EXTRA_CFLAGS += -I$(src)/include
 
 CONFIG_AUTOCFG_CP = n
 
+MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/realtek/rtw89
+
 ########################## WIFI IC ############################
 CONFIG_RTL8852A = n
 CONFIG_RTL8852B = y
@@ -778,6 +780,7 @@ strip:
 install:
 	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
 	/sbin/depmod -a ${KVER}
+	@cp rtl8852bu*.bin /lib/firmware/rtl_bt/.
 
 uninstall:
 	rm -f $(MODDESTDIR)/$(MODULE_NAME).ko
