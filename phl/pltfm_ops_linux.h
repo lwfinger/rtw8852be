@@ -446,7 +446,10 @@ static inline void _os_mem_set(void *d, void *buf, s8 value, u32 size)
 }
 static inline void _os_mem_cpy(void *d, void *dest, void *src, u32 size)
 {
-	_rtw_memcpy(dest, src, size);
+	u32 __size = min_t(u32, size, sizeof(dest));
+
+	__size = min_t(u32, __size, sizeof(src));
+	_rtw_memcpy(dest, src, __size);
 }
 /*Return Value
  * <0 :the first byte that does not match in both memory blocks has a lower value in ptr1 than in ptr2 (if evaluated as unsigned char values)
