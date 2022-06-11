@@ -694,7 +694,9 @@ static char *translate_scan(_adapter *padapter,
 		char *start, char *stop)
 {
 	struct iw_event iwe;
-	u16 cap = 0;
+	__le16 le_cap = 0;
+	u16 cap;
+
 	_rtw_memset(&iwe, 0, sizeof(iwe));
 
 	start = iwe_stream_mac_addr_proess(padapter, info, pnetwork, start, stop, &iwe);
@@ -703,8 +705,8 @@ static char *translate_scan(_adapter *padapter,
 	if (pnetwork->network.Reserved[0] == BSS_TYPE_PROB_REQ) /* Probe Request */
 		cap = 0;
 	else {
-		_rtw_memcpy((u8 *)&cap, rtw_get_capability_from_ie(pnetwork->network.IEs), 2);
-		cap = le16_to_cpu(cap);
+		_rtw_memcpy((u8 *)&le_cap, rtw_get_capability_from_ie(pnetwork->network.IEs), 2);
+		cap = le16_to_cpu(le_cap);
 	}
 
 	start = iwe_stream_mode_process(padapter, info, pnetwork, start, stop, &iwe, cap);
