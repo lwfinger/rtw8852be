@@ -5,91 +5,29 @@ FIRMWAREDIR := /lib/firmware/
 PWD := $(shell pwd)
 CLR_MODULE_FILES := *.mod.c *.mod *.o .*.cmd *.ko *~ .tmp_versions* modules.order Module.symvers
 SYMBOL_FILE := Module.symvers
-# Handle the move of the entire rtw88 tree
-ifneq ("","$(wildcard /lib/modules/$(KVER)/kernel/drivers/net/wireless/realtek)")
-MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/realtek/rtw89
-else
-MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/rtw89
-endif
-
-#Handle the compression option for modules in 3.18+
-ifneq ("","$(wildcard $(MODDESTDIR)/*.ko.gz)")
-COMPRESS_GZIP := y
-endif
-ifneq ("","$(wildcard $(MODDESTDIR)/*.ko.xz)")
-COMPRESS_XZ := y
-endif
+MODDESTDIR := /lib/modules/$(KVER)/kernel/bluetooth
 ifeq ("","$(wildcard MOK.der)")
 NO_SKIP_SIGN := y
 endif
 
 EXTRA_CFLAGS += -O2
-EXTRA_CFLAGS += -DCONFIG_RTW89_DEBUGMSG
-EXTRA_CFLAGS += -DCONFIG_RTW89_DEBUGFS
 KEY_FILE ?= MOK.der
 
-obj-m += rtw89core.o
-rtw89core-y +=  core.o \
-		mac80211.o \
-		mac.o \
-		phy.o \
-		fw.o \
-		cam.o \
-		efuse.o \
-		regd.o \
-		sar.o \
-		coex.o \
-		ps.o \
-		debug.o \
-		ser.o
-
-obj-m += rtw_8852a.o
-rtw_8852a-y := rtw8852a.o \
-		    rtw8852a_table.o \
-		    rtw8852a_rfk.o \
-		    rtw8852a_rfk_table.o
-
-obj-m += rtw_8852ae.o
-rtw_8852ae-y := rtw8852ae.o
-
-#obj-m += rtw89debug.o
-#rtw89debug-y := debug.o
-
-obj-m += rtw89pci.o
-rtw89pci-y := pci.o
-
-ccflags-y += -D__CHECK_ENDIAN__
-
-.PHONY: all install uninstall clean sign sign-install
+obj-m	+= btusb.o
+obj-m	+= btrtl.o
+.PHONY: all install clean sign sign-install
 
 all:
 	$(MAKE) -C $(KSRC) M=$(PWD) modules
 install: all
-	@rm -f $(MODDESTDIR)/rtw89*.ko
-
 	@mkdir -p $(MODDESTDIR)
 	@install -p -D -m 644 *.ko $(MODDESTDIR)
-ifeq ($(COMPRESS_GZIP), y)
-	@gzip -f $(MODDESTDIR)/*.ko
-endif
-ifeq ($(COMPRESS_XZ), y)
-	@xz -f $(MODDESTDIR)/*.ko
-endif
 	@depmod -a $(KVER)
 
-	@mkdir -p /lib/firmware/rtw89/
-	@cp rtw8852a_fw.bin /lib/firmware/rtw89/.
 	@mkdir -p /lib/firmware/rtl_bt/
-	@cp rtl8852au*.bin /lib/firmware/rtl_bt/.
+	@cp *.bin /lib/firmware/rtl_bt/.
 
-	@echo "Install rtw89 SUCCESS"
-
-uninstall:
-	@rm -f $(MODDESTDIR)/rtw89*.ko
-
-	@depmod -a
-
-	@echo "Uninstall rtw89 SUCCESS"
+	@echo "Install modified btusb/btrtl SUCCESS"
 
 clean:
 	@rm -fr *.mod.c *.mod *.o .*.cmd .*.o.cmd *.ko *~ .*.o.d .cache.mk
@@ -106,10 +44,8 @@ ifeq ($(NO_SKIP_SIGN), y)
 else
 	echo "Skipping key creation"
 endif
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89core.ko
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89pci.ko
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852a.ko
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852ae.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der btusb.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der btrtl.ko
 
 sign-install: all sign install
 
