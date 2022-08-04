@@ -94,9 +94,3 @@ These drivers will not build for kernels older than 4.14. If you must use an old
 submit a GitHub issue with a listing of the build errors. Without the errors, the issue
 will be ignored. I am not a mind reader.
 
-When you have problems where the driver builds and loads correctly, but fails to work, a GitHub
-issue is NOT the best place to report it. I have no idea of the internal workings of any of the
-chips, and the Realtek engineers who do will not read these issues. To reach them, send E-mail to
-linux-wireless@vger.kernel.org. Include a detailed description of any messages in the kernel
-logs and any steps that you have taken to analyze or fix the problem. If your description is
-not complete, you are unlikely to get any satisfaction.
