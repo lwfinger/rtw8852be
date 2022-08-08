@@ -99,6 +99,11 @@ CONFIG_DBG_AX_CAM = y
 USE_TRUE_PHY = y
 CONFIG_I386_BUILD_VERIFY = n
 CONFIG_RTW_MBO = n
+
+ifeq ("","$(wildcard MOK.der)")
+NO_SKIP_SIGN := y
+endif
+
 ########################## Android ###########################
 # CONFIG_RTW_ANDROID - 0: no Android, 4/5/6/7/8/9/10 : Android version
 CONFIG_RTW_ANDROID = 0
@@ -844,4 +849,15 @@ clean:
 	rm -fr *.mod.c *.mod *.o .*.cmd *.ko *~
 	rm -fr .tmp_versions
 endif
+
+sign:
+ifeq ($(NO_SKIP_SIGN), y)
+	@openssl req -new -x509 -newkey rsa:2048 -keyout MOK.priv -outform DER -out MOK.der -nodes -days 36500 -subj "/CN=Custom MOK/"
+	@mokutil --import MOK.der
+else
+	echo "Skipping key creation"
+endif
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der 8852be.ko
+
+sign-install: all sign install
 
