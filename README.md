@@ -1,6 +1,17 @@
 # rtw8852be
 Linux driver for RTW8852BE PCIe card
 
+---
+The Bluetooth and Wifi devices are **separate interfaces on the same chip**. 
+ more information is available [here](https://wikidevi.wi-cat.ru/Realtek_RTL8852BE_Combo_Module).
+
+
+for WiFi: https://github.com/lwfinger/rtw8852be
+
+for Bluetooth: https://github.com/lwfinger/rtw89-BT
+
+---
+
 ### Installation instruction
 ##### Requirements
 ```bash
@@ -93,4 +104,3 @@ Remember, this MUST be done whenever you get a new kernel - no exceptions.
 These drivers will not build for kernels older than 4.14. If you must use an older kernel,
 submit a GitHub issue with a listing of the build errors. Without the errors, the issue
 will be ignored. I am not a mind reader.
-
