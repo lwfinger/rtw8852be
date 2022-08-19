@@ -3068,7 +3068,17 @@ static void _action_wl_scan(struct rtw89_dev *rtwdev)
 	struct rtw89_btc_wl_info *wl = &btc->cx.wl;
 	struct rtw89_btc_wl_dbcc_info *wl_dinfo = &wl->dbcc_info;
 
-	if (rtwdev->dbcc_en) {
+	if (RTW89_CHK_FW_FEATURE(SCAN_OFFLOAD, &rtwdev->fw)) {
+		_set_ant(rtwdev, NM_EXEC, BTC_PHY_ALL, BTC_ANT_W25G);
+		if (btc->mdinfo.ant.type == BTC_ANT_SHARED)
+			_set_policy(rtwdev, BTC_CXP_OFFE_DEF,
+				    BTC_RSN_NTFY_SCAN_START);
+		else
+			_set_policy(rtwdev, BTC_CXP_OFF_EQ0,
+				    BTC_RSN_NTFY_SCAN_START);
+
+		rtw89_debug(rtwdev, RTW89_DBG_BTC, "[BTC], Scan offload!\n");
+	} else if (rtwdev->dbcc_en) {
 		if (wl_dinfo->real_band[RTW89_PHY_0] != RTW89_BAND_2G &&
 		    wl_dinfo->real_band[RTW89_PHY_1] != RTW89_BAND_2G)
 			_action_wl_5g(rtwdev);
@@ -4169,6 +4179,7 @@ void rtw89_btc_ntfy_role_info(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif
 
 		rtw89_debug(rtwdev, RTW89_DBG_BTC,
 			    "[BTC], STA support HE=%d VHT=%d HT=%d\n",
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,19,0)
 			    sta->he_cap.has_he,
 			    sta->vht_cap.vht_supported,
 			    sta->ht_cap.ht_supported);
@@ -4178,7 +4189,17 @@ void rtw89_btc_ntfy_role_info(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif
 			mode |= BIT(BTC_WL_MODE_VHT);
 		if (sta->ht_cap.ht_supported)
 			mode |= BIT(BTC_WL_MODE_HT);
-
+#else
+			    sta->deflink.he_cap.has_he,
+			    sta->deflink.vht_cap.vht_supported,
+			    sta->deflink.ht_cap.ht_supported);
+		if (sta->deflink.he_cap.has_he)
+			mode |= BIT(BTC_WL_MODE_HE);
+		if (sta->deflink.vht_cap.vht_supported)
+			mode |= BIT(BTC_WL_MODE_VHT);
+		if (sta->deflink.ht_cap.ht_supported)
+			mode |= BIT(BTC_WL_MODE_HT);
+#endif
 		r.mode = mode;
 	}
 
@@ -4623,12 +4644,12 @@ static void _show_cx_info(struct rtw89_dev *rtwdev, struct seq_file *m)
 	ver_hotfix = FIELD_GET(GENMASK(15, 8), chip->wlcx_desired);
 	seq_printf(m, "(%s, desired:%d.%d.%d), ",
 		   (wl->ver_info.fw_coex >= chip->wlcx_desired ?
-		   "Match" : "Mis-Match"), ver_main, ver_sub, ver_hotfix);
+		   "Match" : "Mismatch"), ver_main, ver_sub, ver_hotfix);
 
 	seq_printf(m, "BT_FW_coex:%d(%s, desired:%d)\n",
 		   bt->ver_info.fw_coex,
 		   (bt->ver_info.fw_coex >= chip->btcx_desired ?
-		   "Match" : "Mis-Match"), chip->btcx_desired);
+		   "Match" : "Mismatch"), chip->btcx_desired);
 
 	if (bt->enable.now && bt->ver_info.fw == 0)
 		rtw89_btc_fw_en_rpt(rtwdev, RPT_EN_BT_VER_INFO, true);
@@ -5075,7 +5096,7 @@ static void _show_dm_info(struct rtw89_dev *rtwdev, struct seq_file *m)
 	seq_printf(m, "leak_ap:%d, fw_offload:%s%s\n", dm->leak_ap,
 		   (BTC_CX_FW_OFFLOAD ? "Y" : "N"),
 		   (dm->wl_fw_cx_offload == BTC_CX_FW_OFFLOAD ?
-		    "" : "(Mis-Match!!)"));
+		    "" : "(Mismatch!!)"));
 
 	if (dm->rf_trx_para.wl_tx_power == 0xff)
 		seq_printf(m,
