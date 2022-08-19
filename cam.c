@@ -615,14 +615,19 @@ int rtw89_cam_fill_bssid_cam_info(struct rtw89_dev *rtwdev,
 	struct rtw89_bssid_cam_entry *bssid_cam = rtw89_get_bssid_cam_of(rtwvif, rtwsta);
 	u8 bss_color = vif->bss_conf.he_bss_color.color;
 #else
+	struct rtw89_bssid_cam_entry *bssid_cam = &rtwvif->bssid_cam;
 	u8 bss_color = 0;
 #endif
 	u8 bss_mask;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
 	if (vif->bss_conf.nontransmitted)
 		bss_mask = RTW89_BSSID_MATCH_5_BYTES;
 	else
 		bss_mask = RTW89_BSSID_MATCH_ALL;
+#else
+	bss_mask = RTW89_BSSID_MATCH_ALL;
+#endif
 
 	FWCMD_SET_ADDR_BSSID_IDX(cmd, bssid_cam->bssid_cam_idx);
 	FWCMD_SET_ADDR_BSSID_OFFSET(cmd, bssid_cam->offset);
