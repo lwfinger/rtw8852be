@@ -80,7 +80,6 @@ endif
 	@mkdir -p /lib/firmware/rtw89/
 	@cp rtw8852a_fw.bin /lib/firmware/rtw89/.
 	@mkdir -p /lib/firmware/rtl_bt/
-	@cp rtl8852au*.bin /lib/firmware/rtl_bt/.
 
 	@echo "Install rtw89 SUCCESS"
 
