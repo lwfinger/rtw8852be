@@ -81,7 +81,7 @@ endif
 	@cp rtw8852a_fw.bin /lib/firmware/rtw89/.
 	@mkdir -p /lib/firmware/rtl_bt/
 
-	@echo "Install rtw89 SUCCESS"
+	@echo "Install rtw8852be SUCCESS"
 
 uninstall:
 	@rm -f $(MODDESTDIR)/rtw89*.ko
@@ -105,10 +105,7 @@ ifeq ($(NO_SKIP_SIGN), y)
 else
 	echo "Skipping key creation"
 endif
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89core.ko
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89pci.ko
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852a.ko
-	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852ae.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der 8852be.ko
 
 sign-install: all sign install
 
