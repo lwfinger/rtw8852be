@@ -24,6 +24,10 @@ EXTRA_CFLAGS += -I$(src)/include
 
 EXTRA_LDFLAGS += --strip-debug
 
+ifeq ("","$(wildcard MOK.der)")
+NO_SKIP_SIGN := y
+endif
+
 CONFIG_AUTOCFG_CP = n
 
 ########################## WIFI IC ############################
@@ -196,21 +200,6 @@ else
 DRV_PATH = $(TopDIR)
 endif
 
-########### HAL_RTL8852A #################################
-ifeq ($(CONFIG_RTL8852A), y)
-IC_NAME := rtl8852a
-ifeq ($(CONFIG_USB_HCI), y)
-MODULE_NAME = 8852au
-endif
-ifeq ($(CONFIG_PCI_HCI), y)
-MODULE_NAME = 8852ae
-endif
-ifeq ($(CONFIG_SDIO_HCI), y)
-MODULE_NAME = 8852as
-endif
-
-endif
-
 ########### HAL_RTL8852B #################################
 ifeq ($(CONFIG_RTL8852B), y)
 IC_NAME := rtl8852b
@@ -222,21 +211,6 @@ MODULE_NAME = 8852be
 endif
 ifeq ($(CONFIG_SDIO_HCI), y)
 MODULE_NAME = 8852bs
-endif
-
-endif
-
-########### HAL_RTL8852C #################################
-ifeq ($(CONFIG_RTL8852C), y)
-IC_NAME := rtl8852c
-ifeq ($(CONFIG_USB_HCI), y)
-MODULE_NAME = 8852cu
-endif
-ifeq ($(CONFIG_PCI_HCI), y)
-MODULE_NAME = 8852ce
-endif
-ifeq ($(CONFIG_SDIO_HCI), y)
-MODULE_NAME = 8852cs
 endif
 
 endif
@@ -702,4 +676,15 @@ clean:
 	rm -fr *.mod.c *.mod *.o .*.cmd *.ko *~
 	rm -fr .tmp_versions
 endif
+
+sign:
+ifeq ($(NO_SKIP_SIGN), y)
+	@openssl req -new -x509 -newkey rsa:2048 -keyout MOK.priv -outform DER -out MOK.der -nodes -days 36500 -subj "/CN=Custom MOK/"
+	@mokutil --import MOK.der
+else
+	echo "Skipping key creation"
+endif
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der 8852be.ko
+
+sign-install: all sign install
 
