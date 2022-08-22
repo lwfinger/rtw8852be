@@ -5,12 +5,6 @@ FIRMWAREDIR := /lib/firmware/
 PWD := $(shell pwd)
 CLR_MODULE_FILES := *.mod.c *.mod *.o .*.cmd *.ko *~ .tmp_versions* modules.order Module.symvers
 SYMBOL_FILE := Module.symvers
-# Handle the move of the entire rtw88 tree
-ifneq ("","$(wildcard /lib/modules/$(KVER)/kernel/drivers/net/wireless/realtek)")
-MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/realtek/rtw89
-else
-MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/rtw89
-endif
 
 #Handle the compression option for modules in 3.18+
 ifneq ("","$(wildcard $(MODDESTDIR)/*.ko.gz)")
@@ -65,7 +59,7 @@ ccflags-y += -D__CHECK_ENDIAN__
 all:
 	$(MAKE) -C $(KSRC) M=$(PWD) modules
 install: all
-	@rm -f $(MODDESTDIR)/rtw89*.ko
+	@rm -f $(MODDESTDIR)/8852be.ko
 
 	@mkdir -p $(MODDESTDIR)
 	@install -p -D -m 644 *.ko $(MODDESTDIR)
@@ -78,17 +72,15 @@ endif
 	@depmod -a $(KVER)
 
 	@mkdir -p /lib/firmware/rtw89/
-	@cp rtw8852a_fw.bin /lib/firmware/rtw89/.
-	@mkdir -p /lib/firmware/rtl_bt/
 
 	@echo "Install rtw8852be SUCCESS"
 
 uninstall:
-	@rm -f $(MODDESTDIR)/rtw89*.ko
+	@rm -f $(MODDESTDIR)/8852be.ko
 
 	@depmod -a
 
-	@echo "Uninstall rtw89 SUCCESS"
+	@echo "Uninstall rtw8852be SUCCESS"
 
 clean:
 	@rm -fr *.mod.c *.mod *.o .*.cmd .*.o.cmd *.ko *~ .*.o.d .cache.mk
