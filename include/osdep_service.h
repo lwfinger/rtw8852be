@@ -27,20 +27,12 @@
 
 /* #define RTW_STATUS_TIMEDOUT -110 */
 
-
-
-#ifdef PLATFORM_FREEBSD
-	#include <osdep_service_bsd.h>
-#endif
-
-#ifdef PLATFORM_LINUX
 	#include <linux/version.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
 	#include <linux/sched/signal.h>
 	#include <linux/sched/types.h>
 #endif
 	#include <osdep_service_linux.h>
-#endif
 
 /* #include <rtw_byteorder.h> */
 
@@ -98,9 +90,7 @@
 
 extern int RTW_STATUS_CODE(int error_code);
 
-#ifndef RTK_DMP_PLATFORM
-	#define CONFIG_USE_VMALLOC
-#endif
+#define CONFIG_USE_VMALLOC
 
 /* flags used for rtw_mstat_update() */
 enum mstat_f {

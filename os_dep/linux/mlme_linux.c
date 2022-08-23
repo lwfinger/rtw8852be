@@ -18,39 +18,6 @@
 
 #include <drv_types.h>
 
-
-#ifdef RTK_DMP_PLATFORM
-void Linkup_workitem_callback(struct work_struct *work)
-{
-	struct mlme_priv *pmlmepriv = container_of(work, struct mlme_priv, Linkup_workitem);
-	_adapter *padapter = container_of(pmlmepriv, _adapter, mlmepriv);
-
-
-
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
-	kobject_uevent(&padapter->pnetdev->dev.kobj, KOBJ_LINKUP);
-#else
-	kobject_hotplug(&padapter->pnetdev->class_dev.kobj, KOBJ_LINKUP);
-#endif
-
-}
-
-void Linkdown_workitem_callback(struct work_struct *work)
-{
-	struct mlme_priv *pmlmepriv = container_of(work, struct mlme_priv, Linkdown_workitem);
-	_adapter *padapter = container_of(pmlmepriv, _adapter, mlmepriv);
-
-
-
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
-	kobject_uevent(&padapter->pnetdev->dev.kobj, KOBJ_LINKDOWN);
-#else
-	kobject_hotplug(&padapter->pnetdev->class_dev.kobj, KOBJ_LINKDOWN);
-#endif
-
-}
-#endif
-
 extern void rtw_indicate_wx_assoc_event(_adapter *padapter);
 extern void rtw_indicate_wx_disassoc_event(_adapter *padapter);
 
@@ -77,12 +44,6 @@ void rtw_os_indicate_connect(_adapter *adapter)
 
 	if (adapter->pid[2] != 0)
 		rtw_signal_process(adapter->pid[2], SIGALRM);
-
-#ifdef RTK_DMP_PLATFORM
-	_set_workitem(&adapter->mlmepriv.Linkup_workitem);
-#endif
-
-
 }
 
 extern void indicate_wx_scan_complete_event(_adapter *padapter);
@@ -176,9 +137,6 @@ void rtw_os_indicate_disconnect(_adapter *adapter,  u16 reason, u8 locally_gener
 
 	rtw_indicate_wx_disassoc_event(adapter);
 
-#ifdef RTK_DMP_PLATFORM
-	_set_workitem(&adapter->mlmepriv.Linkdown_workitem);
-#endif
 	rtw_reset_securitypriv(adapter);
 }
 

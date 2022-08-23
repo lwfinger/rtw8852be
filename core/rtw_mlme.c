@@ -29,11 +29,6 @@ void rtw_init_mlme_timer(_adapter *padapter)
 #ifdef CONFIG_SET_SCAN_DENY_TIMER
 	rtw_init_timer(&(pmlmepriv->set_scan_deny_timer), rtw_set_scan_deny_timer_hdl, padapter);
 #endif
-
-#ifdef RTK_DMP_PLATFORM
-	_init_workitem(&(pmlmepriv->Linkup_workitem), Linkup_workitem_callback, padapter);
-	_init_workitem(&(pmlmepriv->Linkdown_workitem), Linkdown_workitem_callback, padapter);
-#endif
 }
 
 sint	_rtw_init_mlme_priv(_adapter *padapter)

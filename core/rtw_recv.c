@@ -2313,20 +2313,6 @@ sint validate_recv_frame(_adapter *adapter, union recv_frame *precv_frame)
 		ptdlsinfo->collect_pkt_num[ptdlsinfo->cur_channel - 1]++;
 #endif /* CONFIG_TDLS */
 
-#ifdef RTK_DMP_PLATFORM
-	if (0) {
-		RTW_INFO("++\n");
-		{
-			int i;
-			for (i = 0; i < 64; i = i + 8)
-				RTW_INFO("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:", *(ptr + i),
-					*(ptr + i + 1), *(ptr + i + 2) , *(ptr + i + 3) , *(ptr + i + 4), *(ptr + i + 5), *(ptr + i + 6), *(ptr + i + 7));
-
-		}
-		RTW_INFO("--\n");
-	}
-#endif /* RTK_DMP_PLATFORM */
-
 	/* add version chk */
 	if (ver != 0) {
 		retval = _FAIL;

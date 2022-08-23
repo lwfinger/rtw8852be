@@ -436,7 +436,7 @@ static irqreturn_t rtw_pci_interrupt(int irq, void *priv, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-#if defined(RTK_DMP_PLATFORM) || defined(CONFIG_PLATFORM_RTL8197D)
+#if defined(CONFIG_PLATFORM_RTL8197D)
 	#define pci_iounmap(x, y) iounmap(y)
 #endif
 
@@ -579,11 +579,9 @@ static struct dvobj_priv *pci_dvobj_init(struct pci_dev *pdev,
 		RTW_ERR("%s: No MMIO resource found, abort!\n", __func__);
 		goto release_regions;
 	}
-#endif /* RTK_DMP_PLATFORM */
+#endif /* RTK_129X_PLATFORM */
 
-#ifdef RTK_DMP_PLATFORM
-	pci_data->pci_mem_start = (unsigned long)ioremap_nocache(pmem_start, pmem_len);
-#elif defined(RTK_129X_PLATFORM)
+#if defined(RTK_129X_PLATFORM)
 	if (pdev->bus->number == 0x00)
 		pci_data->ctrl_start =
 			(unsigned long)ioremap(PCIE_SLOT1_CTRL_START, 0x200);
@@ -643,9 +641,7 @@ static struct dvobj_priv *pci_dvobj_init(struct pci_dev *pdev,
 
 iounmap:
 	if (status != _SUCCESS && pci_data->pci_mem_start != 0) {
-#if 1/* def RTK_DMP_PLATFORM */
 		pci_iounmap(pdev, (void *)pci_data->pci_mem_start);
-#endif
 		pci_data->pci_mem_start = 0;
 	}
 
@@ -689,9 +685,7 @@ static void pci_dvobj_deinit(struct pci_dev *pdev)
 		}
 
 		if (pci_data->pci_mem_start != 0) {
-#if 1/* def RTK_DMP_PLATFORM */
 			pci_iounmap(pdev, (void *)pci_data->pci_mem_start);
-#endif
 			pci_data->pci_mem_start = 0;
 		}
 

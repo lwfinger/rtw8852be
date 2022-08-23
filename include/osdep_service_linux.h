@@ -72,13 +72,6 @@
 #include <linux/limits.h>
 #endif
 
-#ifdef RTK_DMP_PLATFORM
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
-#include <linux/pageremap.h>
-#endif
-#include <asm/io.h>
-#endif
-
 #ifdef CONFIG_NET_RADIO
 #define CONFIG_WIRELESS_EXT
 #endif
@@ -192,12 +185,7 @@ static inline void *_rtw_malloc(u32 sz)
 {
 	void *pbuf = NULL;
 
-	#ifdef RTK_DMP_PLATFORM
-	if (sz > 0x4000)
-		pbuf = dvr_malloc(sz);
-	else
-	#endif
-		pbuf = kmalloc(sz, in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+	pbuf = kmalloc(sz, in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 
 #ifdef DBG_MEMORY_LEAK
 	if (pbuf != NULL) {
@@ -227,12 +215,7 @@ static inline void *_rtw_zmalloc(u32 sz)
 
 static inline void _rtw_mfree(void *pbuf, u32 sz)
 {
-	#ifdef RTK_DMP_PLATFORM
-	if (sz > 0x4000)
-		dvr_free(pbuf);
-	else
-	#endif
-		kfree(pbuf);
+	kfree(pbuf);
 
 #ifdef DBG_MEMORY_LEAK
 	atomic_dec(&_malloc_cnt);

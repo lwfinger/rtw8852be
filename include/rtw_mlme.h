@@ -695,12 +695,6 @@ struct mlme_priv {
 	struct mbo_attr_info mbo_attr;
 #endif
 
-#ifdef RTK_DMP_PLATFORM
-	/* DMP kobject_hotplug function  signal need in passive level */
-	_workitem	Linkup_workitem;
-	_workitem	Linkdown_workitem;
-#endif
-
 #ifdef RTW_BUSY_DENY_SCAN
 	systime lastscantime;
 #endif
