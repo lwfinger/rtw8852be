@@ -381,12 +381,6 @@ static inline void _os_free_netbuf(void *d, u8 *vir_addr, u32 buf_sz, void *os_p
 /*virtually contiguous memory*/
 static inline void *_os_mem_alloc(void *d, u32 buf_sz)
 {
-	#ifdef DBG_PHL_MEM_ALLOC
-	struct dvobj_priv *obj = (struct dvobj_priv *)d;
-
-	ATOMIC_ADD_RETURN(&obj->phl_mem, buf_sz);
-	#endif
-
 	#ifdef CONFIG_PHL_USE_KMEM_ALLOC
 	return rtw_zmalloc(buf_sz);
 	#else
@@ -402,12 +396,6 @@ static inline void *_os_mem_alloc(void *d, u32 buf_sz)
 /*virtually contiguous memory*/
 static inline void _os_mem_free(void *d, void *buf, u32 buf_sz)
 {
-	#ifdef DBG_PHL_MEM_ALLOC
-	struct dvobj_priv *obj = (struct dvobj_priv *)d;
-
-	ATOMIC_SUB(&obj->phl_mem, buf_sz);
-	#endif
-
 	#ifdef CONFIG_PHL_USE_KMEM_ALLOC
 	rtw_mfree(buf, buf_sz);
 	#else
@@ -423,23 +411,15 @@ static inline void _os_mem_free(void *d, void *buf, u32 buf_sz)
 /*physically contiguous memory if the buffer will be accessed by a DMA device*/
 static inline void *_os_kmem_alloc(void *d, u32 buf_sz)
 {
-	#ifdef DBG_PHL_MEM_ALLOC
-	struct dvobj_priv *obj = (struct dvobj_priv *)d;
-	ATOMIC_ADD_RETURN(&obj->phl_mem, buf_sz);
-	#endif
 	return rtw_zmalloc(buf_sz);
 }
 
 /*physically contiguous memory if the buffer will be accessed by a DMA device*/
 static inline void _os_kmem_free(void *d, void *buf, u32 buf_sz)
 {
-	#ifdef DBG_PHL_MEM_ALLOC
-	struct dvobj_priv *obj = (struct dvobj_priv *)d;
-	ATOMIC_SUB(&obj->phl_mem, buf_sz);
-	#endif
-
 	rtw_mfree(buf, buf_sz);
 }
+
 static inline void _os_mem_set(void *d, void *buf, s8 value, u32 size)
 {
 	_rtw_memset(buf, value, size);

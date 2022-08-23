@@ -405,11 +405,6 @@ void rtw_hw_deinit(struct dvobj_priv *dvobj)
 		rtw_clear_phl_regulation_ctx(dvobj);
 		rtw_phl_deinit(dvobj->phl);
 	}
-
-	#ifdef DBG_PHL_MEM_ALLOC
-	RTW_INFO("[PHL-MEM] %s PHL memory :%d\n", __func__,
-					ATOMIC_READ(&(dvobj->phl_mem)));
-	#endif
 }
 
 #if 0
@@ -781,10 +776,6 @@ u8 rtw_hw_init(struct dvobj_priv *dvobj)
 	enum rtw_phl_status phl_status;
 	struct rtw_ic_info ic_info;
 	struct rtw_phl_evt_ops *evt_ops;
-
-#ifdef DBG_PHL_MEM_ALLOC
-	ATOMIC_SET(&dvobj->phl_mem, 0);
-#endif
 
 	_hw_ic_info_cfg(dvobj, &ic_info);
 	phl_status = rtw_phl_init(dvobj, &(dvobj->phl), &ic_info);

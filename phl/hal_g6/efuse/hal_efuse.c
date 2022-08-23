@@ -786,10 +786,10 @@ u32 rtw_efuse_init(struct rtw_phl_com_t *phl_com,
 		hal_status = RTW_HAL_STATUS_RESOURCE;
 		goto error_efuse_init;
 	}
-	if (!efuse_info->log_efuse_size) {
-		pr_info("******************** log_efuse_size is zero\n");
-		goto error_efuse_shadow_init;
-	}
+//	if (!efuse_info->log_efuse_size) {
+//		pr_info("******************** log_efuse_size is zero\n");
+//		goto error_efuse_shadow_init;
+//	}
 	/* Allocate shadow map memory */
 	hal_status = rtw_hal_mac_get_log_efuse_size(hal_com,
 						    &(efuse_info->log_efuse_size),

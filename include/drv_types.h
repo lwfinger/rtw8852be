@@ -1145,9 +1145,6 @@ struct dvobj_priv {
 	/*CONFIG_PHL_ARCH*/
 	void *phl;
 	struct rtw_phl_com_t *phl_com;
-	#ifdef DBG_PHL_MEM_ALLOC
-	ATOMIC_T phl_mem;
-	#endif
 
 	struct rf_ctl_t rf_ctl;
 	/* move to phl */
