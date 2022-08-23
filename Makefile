@@ -22,7 +22,7 @@ endif
 
 EXTRA_CFLAGS += -I$(src)/include
 
-EXTRA_LDFLAGS += --strip-debug
+#EXTRA_LDFLAGS += --strip-debug
 
 ifeq ("","$(wildcard MOK.der)")
 NO_SKIP_SIGN := y

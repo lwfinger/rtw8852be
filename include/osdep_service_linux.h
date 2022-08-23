@@ -148,6 +148,8 @@ static inline void *_rtw_vmalloc(u32 sz)
 {
 	void *pbuf;
 
+	if (!sz)
+		return NULL;
 	pbuf = vmalloc(sz);
 
 #ifdef DBG_MEMORY_LEAK
