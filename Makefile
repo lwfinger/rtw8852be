@@ -611,11 +611,11 @@ strip:
 	$(CROSS_COMPILE)strip $(MODULE_NAME).ko --strip-unneeded
 
 install:
-	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)/realtek/rtw89/
+	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)realtek/rtw89/
 	/sbin/depmod -a ${KVER}
 
 uninstall:
-	rm -f $(MODDESTDIR)/realtek/rtw89/$(MODULE_NAME).ko
+	rm -f $(MODDESTDIR)realtek/rtw89/$(MODULE_NAME).ko
 	/sbin/depmod -a ${KVER}
 
 config_r:
