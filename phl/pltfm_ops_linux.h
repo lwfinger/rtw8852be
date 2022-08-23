@@ -381,31 +381,23 @@ static inline void _os_free_netbuf(void *d, u8 *vir_addr, u32 buf_sz, void *os_p
 /*virtually contiguous memory*/
 static inline void *_os_mem_alloc(void *d, u32 buf_sz)
 {
-	#ifdef CONFIG_PHL_USE_KMEM_ALLOC
-	return rtw_zmalloc(buf_sz);
-	#else
 	if (in_atomic()) {
 		RTW_ERR("Call rtw_zvmalloc in atomic @%s:%u\n",
 			__FUNCTION__, __LINE__);
 		dump_stack();
 	}
 	return rtw_zvmalloc(buf_sz);
-	#endif
 }
 
 /*virtually contiguous memory*/
 static inline void _os_mem_free(void *d, void *buf, u32 buf_sz)
 {
-	#ifdef CONFIG_PHL_USE_KMEM_ALLOC
-	rtw_mfree(buf, buf_sz);
-	#else
 	if (in_atomic()) {
 		RTW_ERR("Call rtw_vmfree in atomic @%s:%u\n",
 			__FUNCTION__, __LINE__);
 		dump_stack();
 	}
 	rtw_vmfree(buf, buf_sz);
-	#endif
 }
 
 /*physically contiguous memory if the buffer will be accessed by a DMA device*/

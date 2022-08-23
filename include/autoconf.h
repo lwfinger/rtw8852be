@@ -25,7 +25,6 @@
 #define CONFIG_SIGNAL_STAT_PROCESS
 #endif
 
-/*#define CONFIG_PHL_USE_KMEM_ALLOC*/
 #define CONFIG_HW_RTS
 
 /*
