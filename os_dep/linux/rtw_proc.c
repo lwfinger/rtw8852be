@@ -155,14 +155,6 @@ static ssize_t proc_set_log_level(struct file *file, const char __user *buffer, 
 	return count;
 }
 
-#ifdef DBG_MEM_ALLOC
-static int proc_get_mstat(struct seq_file *m, void *v)
-{
-	rtw_mstat_dump(m);
-	return 0;
-}
-#endif /* DBG_MEM_ALLOC */
-
 static bool regd_info;
 static int proc_get_country_chplan_map(struct seq_file *m, void *v)
 {
@@ -268,9 +260,6 @@ const struct rtw_proc_hdl drv_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("ver_info", proc_get_drv_version, NULL),
 	RTW_PROC_HDL_SSEQ("log_level", proc_get_log_level, proc_set_log_level),
 	RTW_PROC_HDL_SSEQ("drv_cfg", proc_get_drv_cfg, NULL),
-#ifdef DBG_MEM_ALLOC
-	RTW_PROC_HDL_SSEQ("mstat", proc_get_mstat, NULL),
-#endif /* DBG_MEM_ALLOC */
 	RTW_PROC_HDL_SSEQ("country_chplan_map", proc_get_country_chplan_map, proc_set_country_chplan_map),
 	RTW_PROC_HDL_SSEQ("country_list", proc_get_country_list, NULL),
 	RTW_PROC_HDL_SSEQ("chplan_id_list", proc_get_chplan_id_list, NULL),

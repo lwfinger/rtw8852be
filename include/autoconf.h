@@ -25,13 +25,6 @@
 #define CONFIG_SIGNAL_STAT_PROCESS
 #endif
 
-#ifndef DBG_MEM_ALLOC
-#define DBG_MEM_ALLOC
-
-#define DBG_PHL_MEM_ALLOC
-#define DBG_HAL_MAC_MEM_MOINTOR
-#define DBG_HAL_MEM_MOINTOR
-#endif
 /*#define CONFIG_PHL_USE_KMEM_ALLOC*/
 #define CONFIG_HW_RTS
 
@@ -282,7 +275,6 @@
 
 /* #define DBG_IO */
 /* #define DBG_DELAY_OS */
-/* #define DBG_MEM_ALLOC */
 /* #define DBG_IOCTL */
 
 /* #define DBG_TX */

@@ -41,108 +41,6 @@
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 #endif
 
-#ifdef DBG_MEM_ALLOC
-extern bool match_mstat_sniff_rules(const enum mstat_f flags, const size_t size);
-struct sk_buff *dbg_rtw_cfg80211_vendor_event_alloc(struct wiphy *wiphy, struct wireless_dev *wdev, int len, int event_id, gfp_t gfp
-		, const enum mstat_f flags, const char *func, const int line)
-{
-	struct sk_buff *skb;
-	unsigned int truesize = 0;
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0))
-	skb = cfg80211_vendor_event_alloc(wiphy, len, event_id, gfp);
-#else
-	skb = cfg80211_vendor_event_alloc(wiphy, wdev, len, event_id, gfp);
-#endif
-
-	if (skb)
-		truesize = skb->truesize;
-
-	if (!skb || truesize < len || match_mstat_sniff_rules(flags, truesize))
-		RTW_INFO("DBG_MEM_ALLOC %s:%d %s(%d), skb:%p, truesize=%u\n", func, line, __FUNCTION__, len, skb, truesize);
-
-	rtw_mstat_update(
-		flags
-		, skb ? MSTAT_ALLOC_SUCCESS : MSTAT_ALLOC_FAIL
-		, truesize
-	);
-
-	return skb;
-}
-
-void dbg_rtw_cfg80211_vendor_event(struct sk_buff *skb, gfp_t gfp
-		   , const enum mstat_f flags, const char *func, const int line)
-{
-	unsigned int truesize = skb->truesize;
-
-	if (match_mstat_sniff_rules(flags, truesize))
-		RTW_INFO("DBG_MEM_ALLOC %s:%d %s, truesize=%u\n", func, line, __FUNCTION__, truesize);
-
-	cfg80211_vendor_event(skb, gfp);
-
-	rtw_mstat_update(
-		flags
-		, MSTAT_FREE
-		, truesize
-	);
-}
-
-struct sk_buff *dbg_rtw_cfg80211_vendor_cmd_alloc_reply_skb(struct wiphy *wiphy, int len
-		, const enum mstat_f flags, const char *func, const int line)
-{
-	struct sk_buff *skb;
-	unsigned int truesize = 0;
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, len);
-
-	if (skb)
-		truesize = skb->truesize;
-
-	if (!skb || truesize < len || match_mstat_sniff_rules(flags, truesize))
-		RTW_INFO("DBG_MEM_ALLOC %s:%d %s(%d), skb:%p, truesize=%u\n", func, line, __FUNCTION__, len, skb, truesize);
-
-	rtw_mstat_update(
-		flags
-		, skb ? MSTAT_ALLOC_SUCCESS : MSTAT_ALLOC_FAIL
-		, truesize
-	);
-
-	return skb;
-}
-
-int dbg_rtw_cfg80211_vendor_cmd_reply(struct sk_buff *skb
-	      , const enum mstat_f flags, const char *func, const int line)
-{
-	unsigned int truesize = skb->truesize;
-	int ret;
-
-	if (match_mstat_sniff_rules(flags, truesize))
-		RTW_INFO("DBG_MEM_ALLOC %s:%d %s, truesize=%u\n", func, line, __FUNCTION__, truesize);
-
-	ret = cfg80211_vendor_cmd_reply(skb);
-
-	rtw_mstat_update(
-		flags
-		, MSTAT_FREE
-		, truesize
-	);
-
-	return ret;
-}
-
-#define rtw_cfg80211_vendor_event_alloc(wiphy, wdev, len, event_id, gfp) \
-	dbg_rtw_cfg80211_vendor_event_alloc(wiphy, wdev, len, event_id, gfp, MSTAT_FUNC_CFG_VENDOR | MSTAT_TYPE_SKB, __FUNCTION__, __LINE__)
-
-#define rtw_cfg80211_vendor_event(skb, gfp) \
-	dbg_rtw_cfg80211_vendor_event(skb, gfp, MSTAT_FUNC_CFG_VENDOR | MSTAT_TYPE_SKB, __FUNCTION__, __LINE__)
-
-#define rtw_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, len) \
-	dbg_rtw_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, len, MSTAT_FUNC_CFG_VENDOR | MSTAT_TYPE_SKB, __FUNCTION__, __LINE__)
-
-#define rtw_cfg80211_vendor_cmd_reply(skb) \
-	dbg_rtw_cfg80211_vendor_cmd_reply(skb, MSTAT_FUNC_CFG_VENDOR | MSTAT_TYPE_SKB, __FUNCTION__, __LINE__)
-#else
-
 struct sk_buff *rtw_cfg80211_vendor_event_alloc(
 	struct wiphy *wiphy, struct wireless_dev *wdev, int len, int event_id, gfp_t gfp)
 {
@@ -164,7 +62,6 @@ struct sk_buff *rtw_cfg80211_vendor_event_alloc(
 
 #define rtw_cfg80211_vendor_cmd_reply(skb) \
 	cfg80211_vendor_cmd_reply(skb)
-#endif /* DBG_MEM_ALLOC */
 
 /*
  * This API is to be used for asynchronous vendor events. This
