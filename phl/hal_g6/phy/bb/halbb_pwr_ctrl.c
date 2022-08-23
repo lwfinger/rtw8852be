@@ -430,10 +430,8 @@ void halbb_pwr_ctrl_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			 "{Modify LV1(H)~LV3(L) TH} [pwr_ctrl] [2] [LV1] [LV2] [LV3]\n");
 		return;
 	}
-	for (i = 0; i < 8; i++) {
-		if (input[i + 1])
-			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
-	}
+	for (i = 0; i < 8; i++)
+		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
 	switch (val[0]) {
 	case 0:
 		halbb_pwr_ctrl_para_init(bb);
