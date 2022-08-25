@@ -363,7 +363,7 @@ int hostapd_mode_init(_adapter *padapter)
 	mac[5] = 0x12;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-        eth_hw_addr_set(pnetdev, mac);
+        deev_addr_set(pnetdev, 0, mac, ETH_ALEN);
 #else
 	_rtw_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
 #endif

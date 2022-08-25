@@ -202,6 +202,7 @@
 #ifdef CONFIG_NEW_HALMAC_INTERFACE
 
 	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_ALWAYS)
+	#undef PLTFM_MSG_ALWAYS
 	#define PLTFM_MSG_ALWAYS(...)                                         \
 		_os_dbgdump("[MAC][LOG] " fmt, ##__VA_ARGS__)
 	#else
@@ -232,6 +233,7 @@
 
 #else
 
+	#undef PLTFM_MSG_ALWAYS
 	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_ALWAYS)
 	#define PLTFM_MSG_ALWAYS(...)                                         \
 		adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_ALWAYS_, __VA_ARGS__)

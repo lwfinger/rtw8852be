@@ -815,7 +815,7 @@ int rtw_change_ifname(_adapter *padapter, const char *ifname)
 	rtw_init_netdev_name(pnetdev, ifname);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-	eth_hw_addr_set(pnetdev, adapter_mac_addr(padapter));
+	dev_addr_mod(pnetdev, 0, adapter_mac_addr(padapter), ETH_ALEN);
 #else
 	_rtw_memcpy(pnetdev->dev_addr, adapter_mac_addr(padapter), ETH_ALEN);
 #endif

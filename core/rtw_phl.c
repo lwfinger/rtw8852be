@@ -54,52 +54,52 @@ void rtw_hw_dump_hal_spec(void *sel, struct dvobj_priv *dvobj)
 	struct hal_spec_t *hal_spec = GET_HAL_SPEC(dvobj);
 	int i;
 
-	RTW_PRINT_SEL(sel, "%s ic_name:%s\n", hw_cap_str, hal_spec->ic_name);
-	RTW_PRINT_SEL(sel, "%s macid_num:%u\n", hw_cap_str, hal_spec->macid_num);
-	RTW_PRINT_SEL(sel, "%s sec_cap:0x%02x\n", hw_cap_str, hal_spec->sec_cap);
-	RTW_PRINT_SEL(sel, "%s sec_cam_ent_num:%u\n", hw_cap_str, hal_spec->sec_cam_ent_num);
+	RTW_INFO("%s ic_name:%s\n", hw_cap_str, hal_spec->ic_name);
+	RTW_INFO("%s macid_num:%u\n", hw_cap_str, hal_spec->macid_num);
+	RTW_INFO("%s sec_cap:0x%02x\n", hw_cap_str, hal_spec->sec_cap);
+	RTW_INFO("%s sec_cam_ent_num:%u\n", hw_cap_str, hal_spec->sec_cam_ent_num);
 
-	RTW_PRINT_SEL(sel, "%s rfpath_num_2g:%u\n", hw_cap_str, hal_spec->rfpath_num_2g);
-	RTW_PRINT_SEL(sel, "%s rfpath_num_5g:%u\n", hw_cap_str, hal_spec->rfpath_num_5g);
-	RTW_PRINT_SEL(sel, "%s rf_reg_path_num:%u\n", hw_cap_str, hal_spec->rf_reg_path_num);
-	RTW_PRINT_SEL(sel, "%s max_tx_cnt:%u\n", hw_cap_str, hal_spec->max_tx_cnt);
+	RTW_INFO("%s rfpath_num_2g:%u\n", hw_cap_str, hal_spec->rfpath_num_2g);
+	RTW_INFO("%s rfpath_num_5g:%u\n", hw_cap_str, hal_spec->rfpath_num_5g);
+	RTW_INFO("%s rf_reg_path_num:%u\n", hw_cap_str, hal_spec->rf_reg_path_num);
+	RTW_INFO("%s max_tx_cnt:%u\n", hw_cap_str, hal_spec->max_tx_cnt);
 
-	RTW_PRINT_SEL(sel, "%s band_cap:", hw_cap_str);
+	RTW_INFO("%s band_cap:", hw_cap_str);
 	for (i = 0; i < BAND_CAP_BIT_NUM; i++) {
 		if (((hal_spec->band_cap) >> i) & BIT0 && _band_cap_str[i])
-			_RTW_PRINT_SEL(sel, "%s ", _band_cap_str[i]);
+			_RTW_INFO("%s ", _band_cap_str[i]);
 	}
-	_RTW_PRINT_SEL(sel, "\n");
+	_RTW_INFO("\n");
 
-	RTW_PRINT_SEL(sel, "%s bw_cap:", hw_cap_str);
+	RTW_INFO("%s bw_cap:", hw_cap_str);
 	for (i = 0; i < BW_CAP_BIT_NUM; i++) {
 		if (((hal_spec->bw_cap) >> i) & BIT0 && _bw_cap_str[i])
-			_RTW_PRINT_SEL(sel, "%s ", _bw_cap_str[i]);
+			_RTW_INFO("%s ", _bw_cap_str[i]);
 	}
-	_RTW_PRINT_SEL(sel, "\n");
+	_RTW_INFO("\n");
 
-	RTW_PRINT_SEL(sel, "%s proto_cap:", hw_cap_str);
+	RTW_INFO("%s proto_cap:", hw_cap_str);
 	for (i = 0; i < PROTO_CAP_BIT_NUM; i++) {
 		if (((hal_spec->proto_cap) >> i) & BIT0 && _proto_cap_str[i])
-			_RTW_PRINT_SEL(sel, "%s ", _proto_cap_str[i]);
+			_RTW_INFO("%s ", _proto_cap_str[i]);
 	}
-	_RTW_PRINT_SEL(sel, "\n");
+	_RTW_INFO("\n");
 
 #if 0 /*GEORGIA_TODO_FIXIT*/
-	RTW_PRINT_SEL(sel, "%s txgi_max:%u\n", hw_cap_str, hal_spec->txgi_max);
-	RTW_PRINT_SEL(sel, "%s txgi_pdbm:%u\n", hw_cap_str, hal_spec->txgi_pdbm);
+	RTW_INFO("%s txgi_max:%u\n", hw_cap_str, hal_spec->txgi_max);
+	RTW_INFO("%s txgi_pdbm:%u\n", hw_cap_str, hal_spec->txgi_pdbm);
 #endif
-	RTW_PRINT_SEL(sel, "%s wl_func:", hw_cap_str);
+	RTW_INFO("%s wl_func:", hw_cap_str);
 	for (i = 0; i < WL_FUNC_BIT_NUM; i++) {
 		if (((hal_spec->wl_func) >> i) & BIT0 && _wl_func_str[i])
-			_RTW_PRINT_SEL(sel, "%s ", _wl_func_str[i]);
+			_RTW_INFO("%s ", _wl_func_str[i]);
 	}
-	_RTW_PRINT_SEL(sel, "\n");
+	_RTW_INFO("\n");
 	
 #if 0 /*GEORGIA_TODO_FIXIT*/
 
-	RTW_PRINT_SEL(sel, "%s pg_txpwr_saddr:0x%X\n", hw_cap_str, hal_spec->pg_txpwr_saddr);
-	RTW_PRINT_SEL(sel, "%s pg_txgi_diff_factor:%u\n", hw_cap_str, hal_spec->pg_txgi_diff_factor);
+	RTW_INFO("%s pg_txpwr_saddr:0x%X\n", hw_cap_str, hal_spec->pg_txpwr_saddr);
+	RTW_INFO("%s pg_txgi_diff_factor:%u\n", hw_cap_str, hal_spec->pg_txgi_diff_factor);
 #endif
 }
 
@@ -107,16 +107,16 @@ void rtw_dump_phl_sta_info(void *sel, struct sta_info *sta)
 {	
 	struct rtw_phl_stainfo_t *phl_sta = sta->phl_sta;
 
-	RTW_PRINT_SEL(sel, "[PHL STA]- role-idx: %d\n", phl_sta->wrole->id);
+	RTW_INFO("[PHL STA]- role-idx: %d\n", phl_sta->wrole->id);
 
-	RTW_PRINT_SEL(sel, "[PHL STA]- mac_addr:"MAC_FMT"\n", MAC_ARG(phl_sta->mac_addr));
-	RTW_PRINT_SEL(sel, "[PHL STA]- aid: %d\n", phl_sta->aid);
-	RTW_PRINT_SEL(sel, "[PHL STA]- macid: %d\n", phl_sta->macid);
+	RTW_INFO("[PHL STA]- mac_addr:"MAC_FMT"\n", MAC_ARG(phl_sta->mac_addr));
+	RTW_INFO("[PHL STA]- aid: %d\n", phl_sta->aid);
+	RTW_INFO("[PHL STA]- macid: %d\n", phl_sta->macid);
 	
-	RTW_PRINT_SEL(sel, "[PHL STA]- wifi_band: %d\n", phl_sta->chandef.band);
-	RTW_PRINT_SEL(sel, "[PHL STA]- bw: %d\n", phl_sta->chandef.bw);
-	RTW_PRINT_SEL(sel, "[PHL STA]- chan: %d\n", phl_sta->chandef.chan);
-	RTW_PRINT_SEL(sel, "[PHL STA]- offset: %d\n", phl_sta->chandef.offset);
+	RTW_INFO("[PHL STA]- wifi_band: %d\n", phl_sta->chandef.band);
+	RTW_INFO("[PHL STA]- bw: %d\n", phl_sta->chandef.bw);
+	RTW_INFO("[PHL STA]- chan: %d\n", phl_sta->chandef.chan);
+	RTW_INFO("[PHL STA]- offset: %d\n", phl_sta->chandef.offset);
 }
 
 inline bool rtw_hw_chk_band_cap(struct dvobj_priv *dvobj, u8 cap)
@@ -2189,8 +2189,8 @@ void rtw_dump_env_rpt(struct _ADAPTER *a, void *sel)
 
 	rtw_phl_get_env_rpt(phl, &rpt, a->phl_role);
 
-	RTW_PRINT_SEL(sel, "clm_ratio:%d (%%)\n", rpt.nhm_cca_ratio);
-	RTW_PRINT_SEL(sel, "nhm_ratio:%d (%%)\n", rpt.nhm_ratio);
+	RTW_INFO("clm_ratio:%d (%%)\n", rpt.nhm_cca_ratio);
+	RTW_INFO("nhm_ratio:%d (%%)\n", rpt.nhm_ratio);
 }
 
 void rtw_dump_rfe_type(struct dvobj_priv *d)
@@ -2810,19 +2810,19 @@ void rtw_dump_phl_tx_power_ext_info(void *sel, _adapter *adapter)
 
 	band_idx = adapter->phl_role->hw_band;
 
-	RTW_PRINT_SEL(sel, "tx_power_by_rate: %s, %s, %s\n"
+	RTW_INFO("tx_power_by_rate: %s, %s, %s\n"
 		, phl_com->dev_cap.pwrbyrate_off == RTW_PW_BY_RATE_ON ? "enabled" : "disabled"
 		, phl_com->dev_cap.pwrbyrate_off == RTW_PW_BY_RATE_ON ? "loaded" : "unloaded"
 		, phl_com->phy_sw_cap[0].rf_txpwr_byrate_info.para_src == RTW_PARA_SRC_EXTNAL ? "file" : "default"
 	);
 
-	RTW_PRINT_SEL(sel, "tx_power_limit: %s, %s, %s\n"
+	RTW_INFO("tx_power_limit: %s, %s, %s\n"
 		, rtw_phl_get_pwr_lmt_en(phl_info, band_idx) ? "enabled" : "disabled"
 		, rtw_phl_get_pwr_lmt_en(phl_info, band_idx) ? "loaded" : "unloaded"
 		, phl_com->phy_sw_cap[0].rf_txpwrlmt_info.para_src == RTW_PARA_SRC_EXTNAL ? "file" : "default"
 	);
 
-	RTW_PRINT_SEL(sel, "tx_power_limit_ru: %s, %s, %s\n"
+	RTW_INFO("tx_power_limit_ru: %s, %s, %s\n"
 		, rtw_phl_get_pwr_lmt_en(phl_info, band_idx) ? "enabled" : "disabled"
 		, rtw_phl_get_pwr_lmt_en(phl_info, band_idx) ? "loaded" : "unloaded"
 		, phl_com->phy_sw_cap[0].rf_txpwrlmt_ru_info.para_src == RTW_PARA_SRC_EXTNAL ? "file" : "default"

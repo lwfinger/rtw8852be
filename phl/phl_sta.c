@@ -1933,19 +1933,9 @@ rtw_phl_get_stainfo_self(void *phl, struct rtw_wifi_role_t *wrole)
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct rtw_phl_stainfo_t *sta = NULL;
 
-	#if 0
-	if ((wrole->type == PHL_RTYPE_STATION) &&
-		(wrole->mstate == MLME_LINKED))
-			//????
-		else
-			sta = phl_stainfo_queue_search(phl_info,
-				&wrole->assoc_sta_queue, wrole->mac_addr);
-	}
-	#else
 	sta = phl_stainfo_queue_get_first(phl_info, &wrole->assoc_sta_queue);
-	if (sta == NULL)
-		PHL_ERR("%s sta == NULL\n", __func__);
-	#endif
+//	if (sta == NULL)
+//		PHL_ERR("%s sta == NULL\n", __func__);
 	return sta;
 }
 

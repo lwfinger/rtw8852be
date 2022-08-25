@@ -77,7 +77,7 @@ static int rtw_net_set_mac_address(struct net_device *pnetdev, void *addr)
 
 	_rtw_memcpy(adapter_mac_addr(padapter), sa->sa_data, ETH_ALEN); /* set mac addr to adapter */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-        eth_hw_addr_set(pnetdev, sa->sa_data);
+        dev_addr_mod(pnetdev, 0, sa->sa_data, ETH_ALEN);
 #else
 	_rtw_memcpy(pnetdev->dev_addr, sa->sa_data, ETH_ALEN); /* set mac addr to net_device */
 #endif
@@ -625,7 +625,7 @@ int rtw_os_ndev_register(_adapter *adapter, const char *name)
 	rtw_init_netdev_name(ndev, name);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-        eth_hw_addr_set(ndev, adapter_mac_addr(adapter));
+        dev_addr_mod(ndev, 0, adapter_mac_addr(adapter), ETH_ALEN);
 #else
 	_rtw_memcpy(ndev->dev_addr, adapter_mac_addr(adapter), ETH_ALEN);
 #endif

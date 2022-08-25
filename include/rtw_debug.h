@@ -18,12 +18,12 @@
 /* driver log level*/
 enum {
 	_DRV_NONE_ = 0,
-	_DRV_ALWAYS_ = 1,
-	_DRV_ERR_ = 2,
-	_DRV_WARNING_ = 3,
-	_DRV_INFO_ = 4,
-	_DRV_DEBUG_ = 5,
-	_DRV_MAX_ = 6
+	_DRV_ALWAYS_,
+	_DRV_ERR_,
+	_DRV_WARNING_,
+	_DRV_INFO_,
+	_DRV_DEBUG_,
+	_DRV_MAX_
 };
 
 #define DRIVER_PREFIX "RTW: "
@@ -49,52 +49,41 @@ enum {
 
 #define RTW_DBGDUMP 0 /* 'stream' for _dbgdump */
 
-
-
 #undef _dbgdump
 #undef _seqdump
 
-#if defined(PLATFORM_LINUX)
-	#ifdef DBG_THREAD_PID
-	#define T_PID_FMT	"(%5u) "
-	#define T_PID_ARG	current->pid
-	#else /* !DBG_THREAD_PID */
-	#define T_PID_FMT	"%s"
-	#define T_PID_ARG	""
-	#endif /* !DBG_THREAD_PID */
+#ifdef DBG_THREAD_PID
+#define T_PID_FMT	"(%5u) "
+#define T_PID_ARG	current->pid
+#else /* !DBG_THREAD_PID */
+#define T_PID_FMT	"%s"
+#define T_PID_ARG	""
+#endif /* !DBG_THREAD_PID */
 
-	#ifdef DBG_CPU_INFO
-	#define CPU_INFO_FMT	"[%u] "
-	#define CPU_INFO_ARG	task_cpu(current)
-	#else /* !DBG_CPU_INFO */
-	#define CPU_INFO_FMT	"%s"
-	#define CPU_INFO_ARG	""
-	#endif /* !DBG_CPU_INFO */
+#ifdef DBG_CPU_INFO
+#define CPU_INFO_FMT	"[%u] "
+#define CPU_INFO_ARG	task_cpu(current)
+#else /* !DBG_CPU_INFO */
+#define CPU_INFO_FMT	"%s"
+#define CPU_INFO_ARG	""
+#endif /* !DBG_CPU_INFO */
 
-	/* Extra information in prefix */
-	#define EX_INFO_FMT	T_PID_FMT CPU_INFO_FMT
-	#define EX_INFO_ARG	T_PID_ARG, CPU_INFO_ARG
+/* Extra information in prefix */
+#define EX_INFO_FMT	T_PID_FMT CPU_INFO_FMT
+#define EX_INFO_ARG	T_PID_ARG, CPU_INFO_ARG
 
-	#define _dbgdump(fmt, arg...)	printk(EX_INFO_FMT fmt, EX_INFO_ARG, ##arg)
+#define _dbgdump(fmt, arg...)	printk(EX_INFO_FMT fmt, EX_INFO_ARG, ##arg)
 
-	#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
-	#define KERN_CONT
-	#endif
-	/*
-	 * _dbgdump_c() default use KERN_CONT flag, so it would not print
-	 * messages with a new line. Usually use it if you want to continue
-	 * a line.
-	 */
-	#define _dbgdump_c(fmt, arg...)	printk(KERN_CONT fmt, ##arg)
-	#define _seqdump seq_printf
-#elif defined(PLATFORM_FREEBSD)
-	#define _dbgdump printf
-	#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
-	#define KERN_CONT
-	#endif
-	#define _dbgdump_c(fmt, arg...)	printf(KERN_CONT fmt, ##arg)
-	#define _seqdump(sel, fmt, arg...) _dbgdump(fmt, ##arg)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
+#define KERN_CONT
 #endif
+/*
+ * _dbgdump_c() default use KERN_CONT flag, so it would not print
+ * messages with a new line. Usually use it if you want to continue
+ * a line.
+ */
+#define _dbgdump_c(fmt, arg...)	printk(KERN_CONT fmt, ##arg)
+#define _seqdump seq_printf
 
 void RTW_BUF_DUMP_SEL(uint _loglevel, void *sel, u8 *_titlestring,
 			bool _idx_show, const u8 *_hexdata, int _hexdatalen);

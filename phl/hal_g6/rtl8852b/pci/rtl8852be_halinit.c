@@ -440,12 +440,6 @@ hal_wow_init_8852be(struct rtw_phl_com_t *phl_com, struct hal_info_t *hal_info,
 	else
 		trx_info->trx_mode = MAC_AX_TRX_HW_MODE;
 	trx_info->qta_mode = MAC_AX_QTA_SCC;
-	/*
-	if (hal_info->hal_com->dbcc_en == false)
-		trx_info->qta_mode = MAC_AX_QTA_SCC;
-	else
-		trx_info->qta_mode = MAC_AX_QTA_DBCC;
-	*/
 	init_52be.ic_name = "rtl8852be";
 
 	hal_status = hal_wow_init_8852b(phl_com, hal_info, sta, &init_52be);
