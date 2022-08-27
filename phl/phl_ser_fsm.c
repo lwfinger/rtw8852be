@@ -1127,14 +1127,7 @@ struct fsm_main *phl_ser_new_fsm(struct fsm_root *root,
 
 	_os_mem_set(d, &tb, 0, sizeof(tb));
 
-	if (phl_info->phl_com->hci_type == RTW_HCI_PCIE)
-		tb.state_tbl = ser_pci_state_tbl;
-	else if (phl_info->phl_com->hci_type == RTW_HCI_USB)
-		tb.state_tbl = ser_usb_state_tbl;
-	else if (phl_info->phl_com->hci_type == RTW_HCI_SDIO)
-		tb.state_tbl = ser_sdio_state_tbl;
-	else
-		return NULL;
+	tb.state_tbl = ser_pci_state_tbl;
 
 	tb.max_state = sizeof(ser_pci_state_tbl)/sizeof(ser_pci_state_tbl[0]);
 	tb.max_event = sizeof(ser_event_tbl)/sizeof(ser_event_tbl[0]);

@@ -15,7 +15,7 @@
 #define _PHL_TRX_MIT_C_
 #include "phl_headers.h"
 
-#if defined(CONFIG_PCI_HCI) && defined(PCIE_TRX_MIT_EN)
+#if defined(PCIE_TRX_MIT_EN)
 enum rtw_phl_status phl_pcie_trx_mit_start(struct phl_info_t *phl_info,
 					   u8 dispr_idx)
 {
@@ -131,5 +131,5 @@ void phl_pcie_trx_mit_watchdog(struct phl_info_t *phl_info)
 	else
 		phl_pcie_trx_mit(phl_info, 0, 0, 0, 0);
 }
-#endif /*defined(CONFIG_PCI_HCI) && defined(PCIE_TRX_MIT_EN)*/
+#endif /* defined(PCIE_TRX_MIT_EN)*/
 

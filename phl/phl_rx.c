@@ -1218,14 +1218,6 @@ out:
 
 enum rtw_rx_status rtw_phl_get_rx_status(void *phl)
 {
-#ifdef CONFIG_USB_HCI
-	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
-	enum rtw_hci_type hci_type = phl_info->phl_com->hci_type;
-
-	if (hci_type & RTW_HCI_USB)
-		return rtw_hal_get_usb_status(phl_info->hal);
-#endif
-
 	return RTW_STATUS_RX_OK;
 }
 

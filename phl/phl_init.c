@@ -347,9 +347,6 @@ static enum rtw_phl_status phl_hci_init(struct phl_info_t *phl_info,
 		phl_status = RTW_PHL_STATUS_RESOURCE;
 		goto error_hci_mem;
 	}
-#ifdef CONFIG_USB_HCI
-	phl_info->hci->usb_bulkout_size = ic_info->usb_info.usb_bulkout_size;
-#endif
 
 	/* init variable of hci_info_t struct */
 
@@ -481,7 +478,6 @@ static enum rtw_phl_status _phl_hci_ops_check(struct phl_info_t *phl_info)
 		status = RTW_PHL_STATUS_FAILURE;
 	}
 
-#ifdef CONFIG_PCI_HCI
 	if (!trx_ops->recycle_busy_wd) {
 		phl_ops_error_msg("recycle_busy_wd");
 		status = RTW_PHL_STATUS_FAILURE;
@@ -495,38 +491,13 @@ static enum rtw_phl_status _phl_hci_ops_check(struct phl_info_t *phl_info)
 		status = RTW_PHL_STATUS_FAILURE;
 	}
 
-#endif
-
-#ifdef CONFIG_USB_HCI
-	if (!trx_ops->pend_rxbuf) {
-		phl_ops_error_msg("pend_rxbuf");
-		status = RTW_PHL_STATUS_FAILURE;
-	}
-	if (!trx_ops->recycle_tx_buf) {
-		phl_ops_error_msg("recycle_tx_buf");
-		status = RTW_PHL_STATUS_FAILURE;
-	}
-#endif
-
 	return status;
 }
 
 static enum rtw_phl_status phl_set_hci_ops(struct phl_info_t *phl_info)
 {
-	#ifdef CONFIG_PCI_HCI
 	if (phl_get_hci_type(phl_info->phl_com) == RTW_HCI_PCIE)
 		phl_hook_trx_ops_pci(phl_info);
-	#endif
-
-	#ifdef CONFIG_USB_HCI
-	if (phl_get_hci_type(phl_info->phl_com) == RTW_HCI_USB)
-		phl_hook_trx_ops_usb(phl_info);
-	#endif
-
-	#ifdef CONFIG_SDIO_HCI
-	if (phl_get_hci_type(phl_info->phl_com) == RTW_HCI_SDIO)
-		phl_hook_trx_ops_sdio(phl_info);
-	#endif
 
 	return _phl_hci_ops_check(phl_info);
 }
@@ -2210,15 +2181,8 @@ enum rtw_phl_status rtw_phl_interrupt_handler(void *phl)
 
 	/* rx interrupt */
 	if (int_hdler_msk & BIT1) {
-#if defined(CONFIG_SDIO_HCI) && defined(CONFIG_PHL_SDIO_READ_RXFF_IN_INT)
-		phl_info->hci_trx_ops->recv_rxfifo(phl);
-#else
-
-#if defined(CONFIG_PCI_HCI)
 		phl_info->hci_trx_ops->read_hw_rx(phl, RX_CH);
-#endif
 		phl_status = rtw_phl_start_rx_process(phl);
-#endif
 	}
 
 	/* tx interrupt */

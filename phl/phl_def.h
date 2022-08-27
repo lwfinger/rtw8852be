@@ -101,53 +101,9 @@ struct rtw_chan_ctx {
 };
 
 
-#ifdef CONFIG_PCI_HCI
 struct rtw_pci_info {
 	u8 dummy;
 };
-#endif
-
-
-#ifdef CONFIG_USB_HCI
-struct rtw_usb_info {
-	enum rtw_usb_speed usb_speed; /* USB 1.1, 2.0 or 3.0 */
-	u16 usb_bulkout_size;
-	u8 outep_num;
-	u8 inep_num;
-};
-
-enum phl_usb_rx_agg_mode {
-	PHL_RX_AGG_DISABLE,
-	PHL_RX_AGG_DEFAULT,
-	PHL_RX_AGG_SMALL_PKT,
-	PHL_RX_AGG_USER_DEFINE,
-};
-/*
- * refers to _usb.h
- * #define SWITCHMODE           0x2
- * #define FORCEUSB3MODE        0x1
- * #define FORCEUSB2MODE        0x0
-*/
-enum rtw_usb_sw_ability {
-	RTW_USB2_ONLY = 0,
-	RTW_USB3_ONLY,
-	RTW_USB_SUPPORT_SWITCH,
-	RTW_USB_SUPPORT_MAX
-};
-#endif
-
-#ifdef CONFIG_SDIO_HCI
-struct rtw_sdio_info {
-	unsigned int clock;
-	unsigned int timing;
-	u8 sd3_bus_mode;
-	u16 block_sz;
-	u16 io_align_sz;
-	u16 tx_align_sz;
-	bool tx_512_by_byte_mode;	/* Send 512 bytes by cmd53 byte or */
-					/* block mode. */
-};
-#endif
 
 enum rtw_rx_status {
 	RTW_STATUS_RX_OK,
@@ -158,17 +114,7 @@ enum rtw_rx_status {
 struct rtw_ic_info {
 	enum rtl_ic_id ic_id;
 	enum rtw_hci_type hci_type;
-	#ifdef CONFIG_SDIO_HCI
-	struct rtw_sdio_info sdio_info;
-	#endif
-
-	#ifdef CONFIG_USB_HCI
-	struct rtw_usb_info usb_info;
-	#endif
-
-	#ifdef CONFIG_PCI_HCI
 	struct rtw_pci_info pci_info;
-	#endif
 };
 
 enum rtw_proc_cmd_type {
@@ -1136,7 +1082,6 @@ struct rtw_pcie_trx_mit_info_t {
 };
 
 struct bus_sw_cap_t {
-#ifdef CONFIG_PCI_HCI
 	enum rtw_pcie_bus_func_cap_t l0s_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1ss_ctrl;
@@ -1165,28 +1110,9 @@ struct bus_sw_cap_t {
 	#ifdef RTW_WKARD_GET_PROCESSOR_ID
 	u64 proc_id; /* processor id */
 	#endif
-#elif defined (CONFIG_USB_HCI)
-	u32 tx_buf_size;
-	u32 tx_buf_num;
-	u32 tx_mgnt_buf_size;
-	u32 tx_mgnt_buf_num;
-	u32 tx_h2c_buf_num;
-	u32 rx_buf_size;
-	u32 rx_buf_num;
-	u32 in_token_num;
-#elif defined(CONFIG_SDIO_HCI)
-	u32 tx_buf_size;
-	u32 tx_buf_num;
-	u32 tx_mgnt_buf_size;
-	u32 tx_mgnt_buf_num;
-	u32 rx_buf_size;
-	u32 rx_buf_num;
-#else
-	u8 temp_for_struct_empty; /* for undefined interface */
-#endif
 };
+
 struct bus_cap_t {
-#ifdef CONFIG_PCI_HCI
 	enum rtw_pcie_bus_func_cap_t l0s_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1ss_ctrl;
@@ -1209,25 +1135,6 @@ struct bus_cap_t {
 	#ifdef RTW_WKARD_GET_PROCESSOR_ID
 	u64 proc_id; /* processor id */
 	#endif
-#elif defined (CONFIG_USB_HCI)
-	u32 tx_buf_size;
-	u32 tx_buf_num;
-	u32 tx_mgnt_buf_size;
-	u32 tx_mgnt_buf_num;
-	u32 tx_h2c_buf_num;
-	u32 rx_buf_size;
-	u32 rx_buf_num;
-	u32 in_token_num;
-#elif defined(CONFIG_SDIO_HCI)
-	u32 tx_buf_size;
-	u32 tx_buf_num;
-	u32 tx_mgnt_buf_size;
-	u32 tx_mgnt_buf_num;
-	u32 rx_buf_size;
-	u32 rx_buf_num;
-#else
-	u8 temp_for_struct_empty; /* for undefined interface */
-#endif
 };
 
 #ifdef CONFIG_PHL_TWT
@@ -1992,16 +1899,10 @@ struct hal_spec_t {
 	u8 rx_bd_info_sz;
 
 	u16 rx_tag[2];
-	#ifdef CONFIG_USB_HCI
-	u8 max_bulkin_num;
-	u8 max_bulkout_num;
-	#endif
-	#ifdef CONFIG_PCI_HCI
 	u16 txbd_multi_tag;
 	u8 txbd_upd_lmt;
 	#ifdef RTW_WKARD_BUSCAP_IN_HALSPEC
 	u8 phyaddr_num;
-	#endif
 	#endif
 	u8 cts2_thres_en;
 	u16 cts2_thres;

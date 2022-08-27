@@ -2051,7 +2051,6 @@ rtw_phl_txsts_rpt_config(void *phl, struct rtw_phl_stainfo_t *phl_sta)
 	return phl_sts;
 }
 
-#if defined(CONFIG_USB_HCI) || defined(CONFIG_PCI_HCI)
 /**
  * rtw_phl_get_tx_ok_rpt() - get txok info.
  * @phl:		struct phl_info_t *
@@ -2227,7 +2226,6 @@ rtw_phl_get_tx_retry_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_r
 	}
 	return phl_sts;
 }
-#endif /* defined(CONFIG_USB_HCI) || defined(CONFIG_PCI_HCI) */
 
 /*
  * Get next idx

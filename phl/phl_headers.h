@@ -107,19 +107,8 @@
 #include "phl_chan_info.h"
 #endif /* CONFIG_PHL_CHANNEL_INFO */
 
-#ifdef CONFIG_PCI_HCI
 #include "hci/phl_trx_def_pcie.h"
 #include "hci/phl_trx_pcie.h"
-#endif
-#ifdef CONFIG_USB_HCI
-#include "hci/phl_trx_def_usb.h"
-#include "hci/phl_trx_usb.h"
-#endif
-#ifdef CONFIG_SDIO_HCI
-#include "hci/phl_trx_def_sdio.h"
-#include "hci/phl_trx_sdio.h"
-#endif
-
 
 /******************************************************************************
  * Driver layer shall pass wifi configuration flag to PHL for feature category

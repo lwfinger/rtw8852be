@@ -210,7 +210,7 @@ _phl_cmd_general_post_phase_msg_hdlr(struct phl_info_t *phl_info, void *dispr,
 		psts = phl_cmd_set_ch_bw_hdl(phl_info, phl_cmd->buf);
 	break;
 
-	#if defined(CONFIG_PCI_HCI) && defined(PCIE_TRX_MIT_EN)
+	#if defined(PCIE_TRX_MIT_EN)
 	case MSG_EVT_PCIE_TRX_MIT:
 		psts = phl_evt_pcie_trx_mit_hdlr(phl_info, phl_cmd->buf);
 	break;
@@ -245,18 +245,6 @@ _phl_cmd_general_post_phase_msg_hdlr(struct phl_info_t *phl_info, void *dispr,
 		psts = phl_watchdog_hw_cmd_hdl(phl_info, psts);
 	}
 	break;
-
-#if defined(CONFIG_USB_HCI)
-	case MSG_EVT_FORCE_USB_SW:
-		psts = phl_force_usb_switch(phl_info, *(u32*)(phl_cmd->buf));
-	break;
-	case MSG_EVT_GET_USB_SPEED:
-		psts = phl_get_cur_usb_speed(phl_info, (u32*)(phl_cmd->buf));
-	break;
-	case MSG_EVT_GET_USB_SW_ABILITY:
-		psts = phl_get_usb_support_ability(phl_info, (u32*)(phl_cmd->buf));
-	break;
-#endif
 	case MSG_EVT_CFG_AMPDU:
 		psts = phl_cmd_cfg_ampdu_hdl(phl_info, phl_cmd->buf);
 	break;
@@ -272,13 +260,10 @@ _phl_cmd_general_post_phase_msg_hdlr(struct phl_info_t *phl_info, void *dispr,
 		psts = phl_role_suspend(phl_info);
 	break;
 
-#if defined(CONFIG_PCI_HCI)
 	case MSG_EVT_HAL_SET_L2_LEAVE:
 		if (rtw_hal_set_l2_leave(phl_info->hal) == RTW_HAL_STATUS_SUCCESS)
 			psts = RTW_PHL_STATUS_SUCCESS;
 	break;
-#endif
-
 	case MSG_EVT_NOTIFY_HAL:
 		psts = phl_notify_cmd_hdl(phl_info, phl_cmd->buf);
 	break;
@@ -355,7 +340,7 @@ static enum phl_mdl_ret_code _phl_cmd_general_start(void *dispr, void *priv)
 	if (RTW_PHL_STATUS_SUCCESS != phl_dispr_get_idx(dispr, &dispr_idx))
 		return MDL_RET_FAIL;
 
-	#if defined(CONFIG_PCI_HCI) && defined(PCIE_TRX_MIT_EN)
+	#if defined(PCIE_TRX_MIT_EN)
 	{
 		struct phl_info_t *phl_info = (struct phl_info_t *)priv;
 

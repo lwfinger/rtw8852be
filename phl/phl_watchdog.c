@@ -28,13 +28,11 @@ void rtw_phl_watchdog_callback(void *phl)
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	do {
 		_phl_datapath_watchdog(phl_info);
-		#ifdef CONFIG_PCI_HCI
 		#ifdef RTW_WKARD_DYNAMIC_LTR
 		phl_ltr_ctrl_watchdog(phl_info);
 		#endif
 		#ifdef PCIE_TRX_MIT_EN
 		phl_pcie_trx_mit_watchdog(phl_info);
-		#endif
 		#endif
 		phl_mr_watchdog(phl_info);
 		rtw_hal_watchdog(phl_info->hal);
@@ -57,13 +55,11 @@ static void _phl_watchdog_hw(struct phl_info_t *phl)
 	#endif
 
 	/* I/O, tx behavior, request power, ... */
-	#ifdef CONFIG_PCI_HCI
 	#ifdef RTW_WKARD_DYNAMIC_LTR
 	phl_ltr_ctrl_watchdog(phl);
 	#endif
 	#ifdef PCIE_TRX_MIT_EN
 	phl_pcie_trx_mit_watchdog(phl);
-	#endif
 	#endif
 
 	phl_mr_watchdog(phl);

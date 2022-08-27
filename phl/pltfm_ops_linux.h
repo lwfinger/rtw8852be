@@ -131,7 +131,6 @@ static inline u32 _os_div_round_up(u32 x, u32 y)
 	return RTW_DIV_ROUND_UP(x, y);
 }
 
-#ifdef CONFIG_PCI_HCI
 static inline void _os_cache_inv(void *d, _dma *bus_addr_l,
 			_dma *bus_addr_h, u32 buf_sz, u8 direction)
 {
@@ -200,17 +199,13 @@ static inline void _os_shmem_free(void *d, void *pool, u8 *vir_addr, _dma *bus_a
 	else
 		return pci_free_cache_mem(pdev, vir_addr, bus_addr_l, buf_sz, direction);
 }
-#endif /*CONFIG_PCI_HCI*/
 
 static inline void *_os_pkt_buf_unmap_rx(void *d, _dma bus_addr_l, _dma bus_addr_h, u32 buf_sz)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
-#ifdef CONFIG_PCI_HCI
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
-#endif /*CONFIG_PCI_HCI*/
 
-#ifdef CONFIG_PCI_HCI
 #ifdef CONFIG_PLATFORM_AML_S905
 	if (g_pcie_reserved_mem_dev)
 		pdev->dev.dma_mask = NULL;
@@ -219,7 +214,6 @@ static inline void *_os_pkt_buf_unmap_rx(void *d, _dma bus_addr_l, _dma bus_addr
 	pci_unmap_single(pdev, bus_addr_l, buf_sz, PCI_DMA_FROMDEVICE);
 #else
 	dma_unmap_single(&pdev->dev, bus_addr_l, buf_sz, DMA_FROM_DEVICE);
-#endif
 #endif
 
 #ifdef RTW_CORE_RECORD
@@ -232,7 +226,6 @@ static inline void *_os_pkt_buf_map_rx(void *d, _dma *bus_addr_l, _dma *bus_addr
 					u32 buf_sz, void *os_priv)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
-#ifdef CONFIG_PCI_HCI
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
 	struct sk_buff *skb = os_priv;
@@ -247,12 +240,10 @@ static inline void *_os_pkt_buf_map_rx(void *d, _dma *bus_addr_l, _dma *bus_addr
 	*bus_addr_l = dma_map_single(&pdev->dev, skb->data, buf_sz, DMA_FROM_DEVICE);
 #endif
 	/* *bus_addr_h = NULL;*/
-#endif /*CONFIG_PCI_HCI*/
 
 	return NULL;
 }
 
-#ifdef CONFIG_PCI_HCI
 static inline struct sk_buff *_os_alloc_noncashe_skb(struct pci_dev *pdev, u32 buf_sz)
 {
 	struct sk_buff *skb = NULL;
@@ -289,7 +280,6 @@ static inline void _os_free_noncashe_skb(struct pci_dev *pdev,
 	/* skb */
 	rtw_mfree(skb, sizeof(struct sk_buff));
 }
-#endif /*CONFIG_PCI_HCI*/
 
 /* rxbuf */
 #define PHL_RX_HEADROOM 0
@@ -297,28 +287,18 @@ static inline void *_os_pkt_buf_alloc_rx(void *d, _dma *bus_addr_l,
 			_dma *bus_addr_h, u32 buf_sz, u8 cache, void **os_priv)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
-#ifdef CONFIG_PCI_HCI
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
-#endif /*CONFIG_PCI_HCI*/
 	struct sk_buff *skb = NULL;
 	u32 rxbuf_size = buf_sz + PHL_RX_HEADROOM;
 
 	if (cache)
 		skb = rtw_skb_alloc(rxbuf_size);
-#ifdef CONFIG_PCI_HCI
 	else
 		skb = _os_alloc_noncashe_skb(pdev, rxbuf_size);
-#endif
 	if (!skb)
 		return NULL;
 
-	//skb_pull(skb, PHL_RX_HEADROOM);
-#ifdef CONFIG_PCI_HCI
-#ifdef CONFIG_PLATFORM_AML_S905
-	if (g_pcie_reserved_mem_dev)
-		pdev->dev.dma_mask = NULL;
-#endif
 	if (cache)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 		*bus_addr_l = pci_map_single(pdev, skb->data,
@@ -329,8 +309,6 @@ static inline void *_os_pkt_buf_alloc_rx(void *d, _dma *bus_addr_l,
 #endif
 	else
 		*bus_addr_l = *(dma_addr_t *)skb->cb;
-	/* *bus_addr_h = NULL;*/
-#endif /*CONFIG_PCI_HCI*/
 	*os_priv = skb;
 
 	return skb->data;
@@ -340,17 +318,10 @@ static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, _dma bus_addr_l,
 				_dma bus_addr_h, u32 buf_sz, u8 cache, void *os_priv)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
-#ifdef CONFIG_PCI_HCI
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
-#endif /*CONFIG_PCI_HCI*/
 	struct sk_buff *skb = (struct sk_buff *)os_priv;
 
-#ifdef CONFIG_PCI_HCI
-#ifdef CONFIG_PLATFORM_AML_S905
-	if (g_pcie_reserved_mem_dev)
-		pdev->dev.dma_mask = NULL;
-#endif
 	if (cache)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 		pci_unmap_single(pdev, bus_addr_l, buf_sz, PCI_DMA_FROMDEVICE);
@@ -361,7 +332,6 @@ static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, _dma bus_addr_l,
 	if (!cache)
 		_os_free_noncashe_skb(pdev, skb, buf_sz);
 	else
-#endif /*CONFIG_PCI_HCI*/
 		rtw_skb_free(skb);
 }
 
@@ -795,7 +765,6 @@ static inline u32 _os_read_file(const char *path, u8 *buf, u32 sz)
 }
 
 /*BUS*/
-#ifdef CONFIG_PCI_HCI
 #include <pci_ops_linux.h>
 static inline u8 _os_read8_pcie(void *d, u32 addr)
 {
@@ -823,246 +792,5 @@ static inline int _os_write32_pcie(void *d, u32 addr, u32 val)
 {
 	return os_pci_write32((struct dvobj_priv *)d, addr, val);
 }
-#endif/*#ifdef CONFIG_PCI_HCI*/
 
-#ifdef CONFIG_USB_HCI
-#include <usb_ops_linux.h>
-static inline int _os_usbctrl_vendorreq(void *d, u8 request, u16 value,
-				u16 index, void *pdata, u16 len, u8 requesttype)
-{
-	return usbctrl_vendorreq((struct dvobj_priv *)d, request, value,
-				index, pdata, len, requesttype);
-}
-static __inline u8 os_out_token_alloc(void *drv_priv)
-{
-	return 0; // RTW_PHL_STATUS_SUCCESS
-}
-
-static __inline void os_out_token_free(void *drv_priv)
-{
-}
-
-static inline int os_usb_tx(void *d, u8 *tx_buf_ptr,
-			u8 bulk_id, u32 len, u8 *pkt_data_buf)
-{
-	return rtw_usb_write_port((struct dvobj_priv *)d, tx_buf_ptr,
-			bulk_id, len, pkt_data_buf);
-}
-
-static __inline void os_enable_usb_out_pipes(void *drv_priv)
-{
-}
-
-static __inline void os_disable_usb_out_pipes(void *drv_priv)
-{
-	/* Free bulkout urb */
-	rtw_usb_write_port_cancel(drv_priv);
-}
-
-static __inline u8 os_in_token_alloc(void *drv_priv)
-{
-	// Allocate in token (pUrb) list
-	return 0;
-}
-
-static __inline void os_in_token_free(void *drv_priv)
-{
-	// free in token memory
-	/*rtw_usb_read_port_free(drv_priv);*/
-}
-
-
-static __inline u8 os_send_usb_in_token(void *drv_priv, void *rxobj, u8 *inbuf, u32 inbuf_len, u8 pipe_idx, u8 minLen)
-{
-	return rtw_usb_read_port(drv_priv, rxobj, inbuf, inbuf_len, pipe_idx, minLen);
-}
-
-static __inline void os_enable_usb_in_pipes(void *drv_priv)
-{
-}
-
-static __inline void os_disable_usb_in_pipes(void *drv_priv)
-{
-	// Cancel Pending IN IRPs.
-	rtw_usb_read_port_cancel(drv_priv);
-}
-
-
-#endif /*CONFIG_USB_HCI*/
-
-#ifdef CONFIG_SDIO_HCI
-#include <rtw_sdio.h>
-#include <sdio_ops_linux.h>
-#include <rtw_debug.h>
-
-static inline u8 _os_sdio_cmd52_r8(void *d, u32 offset)
-{
-	u8 val = SDIO_ERR_VAL8;
-
-	if (rtw_sdio_read_cmd52((struct dvobj_priv *)d, offset, &val, 1) == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-
-	return val;
-}
-
-static inline u8 _os_sdio_cmd53_r8(void *d, u32 offset)
-{
-	u8 val = SDIO_ERR_VAL8;
-
-
-	if (rtw_sdio_read_cmd53((struct dvobj_priv *)d, offset, &val, 1) == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-
-	return val;
-}
-
-static inline u16 _os_sdio_cmd53_r16(void *d, u32 offset)
-{
-	u16 val = SDIO_ERR_VAL16;
-
-
-	if (rtw_sdio_read_cmd53((struct dvobj_priv *)d, offset, &val, 2) == _FAIL) {
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-		goto exit;
-	}
-	val = le16_to_cpu(val);
-
-exit:
-	return val;
-}
-
-static inline u32 _os_sdio_cmd53_r32(void *d, u32 offset)
-{
-	u32 val = SDIO_ERR_VAL32;
-
-
-	if (rtw_sdio_read_cmd53((struct dvobj_priv *)d, offset, &val, 4) == _FAIL) {
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-		goto exit;
-	}
-	val = le32_to_cpu(val);
-
-exit:
-	return val;
-}
-
-static inline u8 _os_sdio_cmd53_rn(void *d, u32 offset, u32 size, u8 *data)
-{
-	struct dvobj_priv *dv = d;
-	struct sdio_data *sdio = dvobj_to_sdio(dv);
-	u8 *pbuf = data;
-	u32 sdio_read_size;
-
-	if (!data)
-		return _FAIL;
-
-	sdio_read_size = RND4(size);
-	sdio_read_size = rtw_sdio_cmd53_align_size(dv, sdio_read_size);
-
-	if (sdio_read_size > sdio->tmpbuf_sz) {
-		pbuf = rtw_malloc(sdio_read_size);
-		if (!pbuf)
-			return _FAIL;
-	}
-
-	if (rtw_sdio_read_cmd53(dv, offset, pbuf, sdio_read_size) == _FAIL) {
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-		goto exit;
-	}
-
-	if (pbuf != data)
-		_rtw_memcpy(data, pbuf, size);
-
-exit:
-	if (pbuf != data)
-		rtw_mfree(pbuf, sdio_read_size);
-
-	return _SUCCESS;
-}
-
-static inline u8 _os_sdio_cmd53_r(void *d, u32 offset, u32 size, u8 *data)
-{
-	u8 ret;
-
-	ret = rtw_sdio_read_cmd53((struct dvobj_priv *)d, offset, data, size);
-	if (ret == _FAIL) {
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-		return _FAIL;
-	}
-
-	return _SUCCESS;
-}
-
-static inline void _os_sdio_cmd52_w8(void *d, u32 offset, u8 val)
-{
-	if (rtw_sdio_write_cmd52((struct dvobj_priv *)d, offset, &val, 1) == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-}
-
-static inline void _os_sdio_cmd53_w8(void *d, u32 offset, u8 val)
-{
-	if (rtw_sdio_write_cmd53((struct dvobj_priv *)d, offset, &val, 1) == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-}
-
-static inline void _os_sdio_cmd53_w16(void *d, u32 offset, u16 val)
-{
-	val = cpu_to_le16(val);
-	if (rtw_sdio_write_cmd53((struct dvobj_priv *)d, offset, &val, 2) == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-}
-
-static inline void _os_sdio_cmd53_w32(void *d, u32 offset, u32 val)
-{
-	val = cpu_to_le32(val);
-	if (rtw_sdio_write_cmd53((struct dvobj_priv *)d, offset, &val, 4) == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-}
-
-static inline void _os_sdio_cmd53_wn(void *d, u32 offset, u32 size, u8 *data)
-{
-	struct dvobj_priv *dv = d;
-	struct sdio_data *sdio = dvobj_to_sdio(dv);
-	u8 *pbuf = data;
-
-
-	if (size > sdio->tmpbuf_sz) {
-		pbuf = rtw_malloc(size);
-		if (!pbuf)
-			return;
-		_rtw_memcpy(pbuf, data, size);
-	}
-
-	if (rtw_sdio_write_cmd53(dv, offset, pbuf, size) == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-
-	if (pbuf != data)
-		rtw_mfree(pbuf, size);
-}
-
-static inline void _os_sdio_cmd53_w(void *d, u32 offset, u32 size, u8 *data)
-{
-	u8 ret;
-
-	ret = rtw_sdio_write_cmd53((struct dvobj_priv *)d, offset, data, size);
-	if (ret == _FAIL)
-		RTW_ERR("%s: I/O FAIL!\n", __FUNCTION__);
-}
-
-static inline u8 _os_sdio_f0_read(void *d, u32 addr, void *buf, size_t len)
-{
-	return rtw_sdio_f0_read((struct dvobj_priv *)d, addr, buf, len);
-}
-
-static inline u8 _os_sdio_read_cia_r8(void *d, u32 addr)
-{
-	u8 data = 0;
-
-	if (rtw_sdio_f0_read((struct dvobj_priv *)d, addr, &data, 1) == _FAIL)
-		RTW_ERR("%s: read sdio cia FAIL!\n", __FUNCTION__);
-
-	return data;
-}
-
-#endif /*CONFIG_SDIO_HCI*/
 #endif /*_PLTFM_OPS_LINUX_H_*/

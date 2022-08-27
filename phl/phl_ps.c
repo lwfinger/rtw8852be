@@ -101,14 +101,14 @@ static void _ps_ntfy_before_pwr_cfg(struct phl_info_t *phl_info, u8 ps_mode,
 			#ifdef CONFIG_BTCOEX
 			rtw_hal_btc_radio_state_ntfy(phl_info->hal, BTC_RFCTRL_WL_OFF);
 			#endif
-			#if defined(CONFIG_PCI_HCI) && defined(RTW_WKARD_DYNAMIC_LTR)
+			#if defined(RTW_WKARD_DYNAMIC_LTR)
 			phl_ltr_sw_ctrl_ntfy(phl_info->phl_com, false);
 			#endif
 		} else if (req_pwr_lvl <= PS_PWR_LVL_RF_OFF) {
 			#ifdef CONFIG_BTCOEX
 			rtw_hal_btc_radio_state_ntfy(phl_info->hal, BTC_RFCTRL_FW_CTRL);
 			#endif
-			#if defined(CONFIG_PCI_HCI) && defined(RTW_WKARD_DYNAMIC_LTR)
+			#if defined(RTW_WKARD_DYNAMIC_LTR)
 			if (req_pwr_lvl == PS_PWR_LVL_PWR_GATED)
 				phl_ltr_sw_ctrl_ntfy(phl_info->phl_com, false);
 			#endif
@@ -127,7 +127,7 @@ static void _ps_ntfy_after_pwr_cfg(struct phl_info_t *phl_info, u8 ps_mode,
 				#ifdef CONFIG_BTCOEX
 				rtw_hal_btc_radio_state_ntfy(phl_info->hal, BTC_RFCTRL_WL_ON);
 				#endif
-				#if defined(CONFIG_PCI_HCI) && defined(RTW_WKARD_DYNAMIC_LTR)
+				#if defined(RTW_WKARD_DYNAMIC_LTR)
 				phl_ltr_sw_ctrl_ntfy(phl_info->phl_com, true);
 				#endif
 			} else { /* fw control */
@@ -137,7 +137,7 @@ static void _ps_ntfy_after_pwr_cfg(struct phl_info_t *phl_info, u8 ps_mode,
 				else
 					rtw_hal_btc_radio_state_ntfy(phl_info->hal, BTC_RFCTRL_WL_ON);
 				#endif
-				#if defined(CONFIG_PCI_HCI) && defined(RTW_WKARD_DYNAMIC_LTR)
+				#if defined(RTW_WKARD_DYNAMIC_LTR)
 				phl_ltr_sw_ctrl_ntfy(phl_info->phl_com, true);
 				#endif
 			}
@@ -149,7 +149,7 @@ static void _ps_ntfy_after_pwr_cfg(struct phl_info_t *phl_info, u8 ps_mode,
 					#ifdef CONFIG_BTCOEX
 					rtw_hal_btc_radio_state_ntfy(phl_info->hal, BTC_RFCTRL_WL_ON);
 					#endif
-					#if defined(CONFIG_PCI_HCI) && defined(RTW_WKARD_DYNAMIC_LTR)
+					#if defined(RTW_WKARD_DYNAMIC_LTR)
 					phl_ltr_sw_ctrl_ntfy(phl_info->phl_com, true);
 					#endif
 				}
@@ -161,7 +161,7 @@ static void _ps_ntfy_after_pwr_cfg(struct phl_info_t *phl_info, u8 ps_mode,
 					else
 						rtw_hal_btc_radio_state_ntfy(phl_info->hal, BTC_RFCTRL_WL_ON);
 					#endif
-					#if defined(CONFIG_PCI_HCI) && defined(RTW_WKARD_DYNAMIC_LTR)
+					#if defined(RTW_WKARD_DYNAMIC_LTR)
 					phl_ltr_sw_ctrl_ntfy(phl_info->phl_com, true);
 					#endif
 				}

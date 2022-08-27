@@ -655,7 +655,6 @@ u8 rtw_phl_get_sta_mgnt_rssi(struct rtw_phl_stainfo_t *psta);
 enum rtw_phl_status
 rtw_phl_txsts_rpt_config(void *phl, struct rtw_phl_stainfo_t *phl_sta);
 
-#if defined(CONFIG_USB_HCI) || defined(CONFIG_PCI_HCI)
 /* tx_ok/tx_fail are from release report*/
 enum rtw_phl_status
 rtw_phl_get_tx_ok_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_ok_cnt,
@@ -669,7 +668,6 @@ rtw_phl_get_tx_fail_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_fa
 enum rtw_phl_status
 rtw_phl_get_tx_retry_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_retry_cnt,
  enum phl_ac_queue qsel);
-#endif /* CONFIG_USB_HCI */
 
 enum rtw_rx_status rtw_phl_get_rx_status(void *phl);
 

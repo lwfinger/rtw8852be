@@ -912,7 +912,6 @@ void phl_record_wow_stat(struct phl_wow_info *wow_info)
 		++wow_stat->aoac_rpt_fail_cnt;
 }
 
-#ifdef CONFIG_PCI_HCI
 enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
 {
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
@@ -958,27 +957,6 @@ enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
 
 	return RTW_PHL_STATUS_SUCCESS;
 }
-#elif defined(CONFIG_USB_HCI)
-enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-
-#elif defined(CONFIG_SDIO_HCI)
-enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-
-#endif
 
 static enum rtw_phl_status _init_precfg_set_rxfltr(struct phl_info_t *phl_info)
 {
@@ -1133,12 +1111,7 @@ enum rtw_phl_status phl_wow_init_postcfg(struct phl_wow_info *wow_info)
 	pstatus = _init_postcfg_set_rxfltr(phl_info);
 
 	/* reset trx */
-#ifdef CONFIG_USB_HCI
-	trx_ops->trx_stop(phl_info);
-#else
 	trx_ops->trx_reset(phl_info, PHL_CTRL_TX | PHL_CTRL_RX);
-#endif
-
 
 	/* notify reorder sleep */
 	phl_notify_reorder_sleep(phl_info, sta);
@@ -1215,7 +1188,6 @@ void phl_wow_handle_wake_rsn(struct phl_wow_info *wow_info, u8 *reset)
 	_phl_indic_wake_rsn(wow_info);
 }
 
-#ifdef CONFIG_PCI_HCI
 enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
 {
 #ifdef DBG_RST_BDRAM_TIME
@@ -1242,17 +1214,6 @@ enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
 
 	return RTW_PHL_STATUS_SUCCESS;
 }
-#elif defined(CONFIG_USB_HCI)
-enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-#elif defined(CONFIG_SDIO_HCI)
-enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-#endif
 
 void _deinit_precfg_set_intr(struct phl_info_t *phl_info)
 {
@@ -1283,11 +1244,7 @@ enum rtw_phl_status phl_wow_deinit_precfg(struct phl_wow_info *wow_info)
 	_phl_handle_aoac_rpt_action(wow_info, false);
 
 	/* resume sw rx */
-#ifdef CONFIG_USB_HCI
-	trx_ops->trx_cfg(phl_info);
-#else
 	trx_ops->trx_resume(phl_info, PHL_CTRL_RX);
-#endif
 
 	_deinit_precfg_set_intr(phl_info);
 

@@ -15,7 +15,6 @@
 #ifndef _PHL_DM_H_
 #define _PHL_DM_H_
 
-#ifdef CONFIG_PCI_HCI
 #ifdef RTW_WKARD_DYNAMIC_LTR
 enum rtw_phl_status
 phl_ltr_sw_trigger(struct rtw_phl_com_t *phl_com, void *hal,
@@ -30,7 +29,6 @@ u32 phl_ltr_get_last_trigger_time(struct rtw_phl_com_t *phl_com);
 u32 phl_ltr_get_tri_cnt(struct rtw_phl_com_t *phl_com,
 	enum rtw_pcie_ltr_state state);
 void phl_ltr_ctrl_watchdog(struct phl_info_t *phl_info);
-#endif
 #endif
 
 #endif /*_PHL_DM_H_*/

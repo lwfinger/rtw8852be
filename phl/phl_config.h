@@ -72,9 +72,7 @@
 		#define CONFIG_PHL_CMD_SER
 		#define CONFIG_PHL_CMD_BTC
 	#endif
-	#ifdef CONFIG_PCI_HCI
-		#define PCIE_TRX_MIT_EN
-	#endif
+	#define PCIE_TRX_MIT_EN
 	#define CONFIG_PHL_P2PPS
 	#define CONFIG_6GHZ
 	#define RTW_WKARD_BFEE_SET_AID
@@ -271,10 +269,8 @@
 #ifdef CONFIG_TX_DBG
 #define CONFIG_PHL_TX_DBG
 #endif
-#ifdef CONFIG_PCI_HCI
 #ifdef CONFIG_PCIE_TRX_MIT
 #define PCIE_TRX_MIT_EN
-#endif
 #endif
 #ifdef CONFIG_THERMAL_PROTECT
 #define CONFIG_PHL_THERMAL_PROTECT
@@ -287,15 +283,6 @@
 #ifdef CONFIG_TDLS
 #define CONFIG_PHL_TDLS
 #endif
-
-#ifdef CONFIG_SDIO_HCI
-/* For SDIO TX TP TST - START */
-#ifdef CONFIG_SDIO_TX_AGG_NUM_MAX
-#define PHL_SDIO_TX_AGG_MAX	CONFIG_SDIO_TX_AGG_NUM_MAX
-#endif /* CONFIG_SDIO_TX_AGG_NUM_MAX */
-#define SDIO_TX_THREAD			/* Use dedicate thread for SDIO TX */
-/* For SDIO TX TP TST - ENDT */
-#endif /* CONFIG_SDIO_HCI */
 
 #ifdef CONFIG_MAC_REG_RW_CHK
 #define DBG_PHL_MAC_REG_RW
@@ -338,10 +325,6 @@
 #define RTW_WKARD_STA_BCN_INTERVAL
 
 #define RTW_WKARD_SER_L1_EXPIRE
-
-#ifdef CONFIG_USB_HCI
-#define RTW_WKARD_SER_USB_POLLING_EVENT
-#endif
 
 /* #define RTW_WKARD_SER_USB_DISABLE_L1_RCVY_FLOW */
 

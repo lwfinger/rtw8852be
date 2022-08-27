@@ -20,10 +20,6 @@
 #define PHL_STA_TID_NUM (16)    /* TODO: */
 
 struct hci_info_t {
-	/* enum rtw_hci_type hci_type; */
-
-#if defined(CONFIG_PCI_HCI)
-
 	u8 total_txch_num;
 	u8 total_rxch_num;
 	u8 *txbd_buf;
@@ -32,32 +28,19 @@ struct hci_info_t {
 	u8 fixed_mitigation; /*no watchdog dynamic setting*/
 #endif
 	void *wd_dma_pool;
-#elif defined(CONFIG_USB_HCI)
-	u16 usb_bulkout_size;
-#elif defined(CONFIG_SDIO_HCI)
-	u32 tx_drop_cnt;	/* bit31 means overflow or not */
-#ifdef SDIO_TX_THREAD
-	_os_sema tx_thrd_sema;
-	_os_thread tx_thrd;
-#endif /* SDIO_TX_THREAD */
-#endif
 
 	u8 *wd_ring;
 	u8 *txbuf_pool;
 	u8 *rxbuf_pool;
 	u8 *wp_tag;
 	u16 wp_seq[PHL_MACID_MAX_NUM]; 	/* maximum macid number */
-
 };
 
-#if defined(CONFIG_PCI_HCI)
 enum rx_channel_type {
 	RX_CH = 0,
 	RP_CH = 1,
 	RX_CH_TYPE_MAX = 0xFF
 };
-#endif
-
 
 #define MAX_PHL_RING_STATUS_NUMBER 64
 #define RX_REORDER_RING_NUMBER PHL_MACID_MAX_NUM
@@ -125,21 +108,9 @@ struct phl_hci_trx_ops {
 						struct rtw_phl_rx_pkt *phl_rx);
 	void (*tx_watchdog)(struct phl_info_t *phl_info);
 
-#ifdef CONFIG_PCI_HCI
 	enum rtw_phl_status (*recycle_busy_wd)(struct phl_info_t *phl);
 	enum rtw_phl_status (*recycle_busy_h2c)(struct phl_info_t *phl);
 	void (*read_hw_rx)(struct phl_info_t *phl, enum rx_channel_type rx_ch);
-#endif
-
-#ifdef CONFIG_USB_HCI
-	enum rtw_phl_status (*pend_rxbuf)(struct phl_info_t *phl, void *rxobj,
-						u32 inbuf_len, u8 status_code);
-	enum rtw_phl_status (*recycle_tx_buf)(void *phl, u8 *tx_buf_ptr);
-#endif
-
-#if defined(CONFIG_SDIO_HCI) && defined(CONFIG_PHL_SDIO_READ_RXFF_IN_INT)
-	enum rtw_phl_status (*recv_rxfifo)(struct phl_info_t *phl);
-#endif
 };
 
 /**
