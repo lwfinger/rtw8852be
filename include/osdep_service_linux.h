@@ -106,16 +106,6 @@
 #include <linux/fs.h>
 #endif
 
-#ifdef CONFIG_USB_HCI
-#include <linux/usb.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 21))
-#include <linux/usb_ch9.h>
-#else
-#include <linux/usb/ch9.h>
-#endif
-#endif
-
-
 #if defined(CONFIG_RTW_GRO) && (!defined(CONFIG_RTW_NAPI))
 
 	#error "Enable NAPI before enable GRO\n"
@@ -226,28 +216,6 @@ static inline void _rtw_mfree(void *pbuf, u32 sz)
 
 }
 
-#ifdef CONFIG_USB_HCI
-typedef struct urb *PURB;
-
-static inline void *_rtw_usb_buffer_alloc(struct usb_device *dev, size_t size, dma_addr_t *dma)
-{
-	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
-	return usb_alloc_coherent(dev, size, (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL), dma);
-	#else
-	return usb_buffer_alloc(dev, size, (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL), dma);
-	#endif
-}
-static inline void _rtw_usb_buffer_free(struct usb_device *dev, size_t size, void *addr, dma_addr_t dma)
-{
-	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
-	usb_free_coherent(dev, size, addr, dma);
-	#else
-	usb_buffer_free(dev, size, addr, dma);
-	#endif
-}
-#endif /* CONFIG_USB_HCI */
-
-
 /*lock - spinlock*/
 typedef	spinlock_t _lock;
 static inline void _rtw_spinlock_init(_lock *plock)
@@ -266,18 +234,6 @@ static inline void _rtw_spinunlock(_lock *plock)
 	spin_unlock(plock);
 }
 
-#if 0
-static inline void _rtw_spinlock_ex(_lock *plock)
-{
-	spin_lock(plock);
-}
-
-static inline void _rtw_spinunlock_ex(_lock *plock)
-{
-
-	spin_unlock(plock);
-}
-#endif
 __inline static void _rtw_spinlock_irq(_lock *plock, unsigned long *flags)
 {
 	spin_lock_irqsave(plock, *flags);
