@@ -511,7 +511,7 @@ static struct dvobj_priv *pci_dvobj_init(struct pci_dev *pdev,
 		pci_data->bdma64 = _TRUE;
 	}
 #else
-	if (!dma_set_dma_mask(pdev, DMA_BIT_MASK(64))) {
+	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
 		RTW_INFO("RTL819xCE: Using 64bit DMA\n");
 		err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64));
 		if (err != 0) {
