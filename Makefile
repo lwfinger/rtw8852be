@@ -22,6 +22,8 @@ endif
 
 EXTRA_CFLAGS += -I$(src)/include
 
+EXTRA_CFLAGS += -DCONFIG_64BIT_DMA
+
 #EXTRA_LDFLAGS += --strip-debug
 
 ifeq ("","$(wildcard MOK.der)")
@@ -611,6 +613,7 @@ strip:
 	$(CROSS_COMPILE)strip $(MODULE_NAME).ko --strip-unneeded
 
 install:
+	@mkdir -p $(MODDESTDIR)realtek/rtw89/
 	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)realtek/rtw89/
 	/sbin/depmod -a ${KVER}
 

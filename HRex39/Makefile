@@ -649,6 +649,7 @@ strip:
 	$(CROSS_COMPILE)strip $(MODULE_NAME).ko --strip-unneeded
 
 install:
+	@mkdir -p $(MODDESTDIR)realtek/rtw89/
 	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)realtek/rtw89/
 	/sbin/depmod -a ${KVER}
 
