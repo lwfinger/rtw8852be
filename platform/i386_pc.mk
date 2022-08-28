@@ -13,9 +13,7 @@ KSRC := /lib/modules/$(KVER)/build
 MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/
 INSTALL_PREFIX :=
 STAGINGMODDIR := /lib/modules/$(KVER)/kernel/drivers/staging
-ifeq ($(CONFIG_PCI_HCI), y)
 EXTRA_CFLAGS += -DCONFIG_PLATFORM_OPS
 _PLATFORM_FILES := platform/platform_linux_pc_pci.o
 OBJS += $(_PLATFORM_FILES)
-endif
 endif
