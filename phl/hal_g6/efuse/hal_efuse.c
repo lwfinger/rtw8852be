@@ -644,7 +644,7 @@ enum rtw_hal_status rtw_efuse_get_avl(void *efuse, u32 *size)
 
 enum rtw_hal_status rtw_efuse_get_offset_mask(void *efuse, u16 offset, u8 *mask)
 {
-	enum rtw_hal_status status = RTW_HAL_STATUS_SUCCESS;
+	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
 	struct efuse_t *efuse_info = efuse;
 
 	if(TEST_STATUS_FLAG(efuse_info->status, EFUSE_STATUS_PROCESS) == false)
@@ -655,23 +655,6 @@ enum rtw_hal_status rtw_efuse_get_offset_mask(void *efuse, u16 offset, u8 *mask)
 
 	*mask = efuse_info->mask[offset];
 	PHL_INFO("%s: offset = %x mask = %x\n", __FUNCTION__, offset, *mask);
-	return status;
-}
-
-enum rtw_hal_status rtw_efuse_get_mask_buf(void *efuse, u8 *destbuf, u32 *buflen)
-{
-	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
-	struct efuse_t *efuse_info = efuse;
-
-	if (efuse_info->mask_size > 0) {
-		_os_mem_cpy(efuse_info->hal_com->drv_priv, (void *)destbuf,
-				(void *)efuse_info->mask , efuse_info->mask_size);
-		*buflen = efuse_info->mask_size;
-
-		PHL_INFO("%s: size = %d\n", __FUNCTION__, efuse_info->mask_size);
-		status = RTW_HAL_STATUS_SUCCESS;
-	}
-
 	return status;
 }
 
@@ -750,14 +733,13 @@ void rtw_efuse_process(void *efuse, char *ic_name)
 	/* Load wifi full map to shadow map */
 	rtw_efuse_shadow_load(efuse_info, false);
 
-	SET_STATUS_FLAG(efuse_info->status, EFUSE_STATUS_PROCESS);
-
 	rtw_efuse_shadow_file_load(efuse_info, ic_name, true);
 
 	debug_dump_data(efuse_info->shadow_map, efuse_info->log_efuse_size,
 					"Logical EFUSE MAP:");
 	efuse_hidden_handle(efuse_info);
 
+	SET_STATUS_FLAG(efuse_info->status, EFUSE_STATUS_PROCESS);
 	/*
 	 * We can set the hw cap after we got the shadow map.
 	 * The efuse get info API will check the efuse is processed or not.
@@ -786,10 +768,7 @@ u32 rtw_efuse_init(struct rtw_phl_com_t *phl_com,
 		hal_status = RTW_HAL_STATUS_RESOURCE;
 		goto error_efuse_init;
 	}
-//	if (!efuse_info->log_efuse_size) {
-//		pr_info("******************** log_efuse_size is zero\n");
-//		goto error_efuse_shadow_init;
-//	}
+
 	/* Allocate shadow map memory */
 	hal_status = rtw_hal_mac_get_log_efuse_size(hal_com,
 						    &(efuse_info->log_efuse_size),
@@ -1341,21 +1320,6 @@ enum rtw_hal_status rtw_efuse_bt_get_offset_mask(void *efuse, u16 offset, u8 *ma
 	return status;
 }
 
-enum rtw_hal_status rtw_efuse_bt_get_mask_buf(void *efuse, u8 *destbuf, u32 *buflen)
-{
-	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
-	struct efuse_t *efuse_info = efuse;
-
-	if (efuse_info->bt_mask_size > 0) {
-		_os_mem_cpy(efuse_info->hal_com->drv_priv, (void *)destbuf,
-				(void *)efuse_info->bt_mask , efuse_info->bt_mask_size);
-		*buflen = efuse_info->bt_mask_size;
-
-		PHL_INFO("%s: size = %d\n", __FUNCTION__, efuse_info->bt_mask_size);
-		status = RTW_HAL_STATUS_SUCCESS;
-	}
-	return status;
-}
 
 enum rtw_hal_status rtw_efuse_bt_read_hidden(void *efuse, u32 addr, u32 size, u8 *val)
 {

@@ -186,41 +186,6 @@ enum TDLS_option {
 
 #endif /* CONFIG_TDLS */
 
-typedef enum {
-	DISCONNECTION_NOT_YET_OCCUR,
-	DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND,
-	DISCONNECTION_BY_SYSTEM_DUE_TO_NET_DEVICE_DOWN,
-	DISCONNECTION_BY_SYSTEM_DUE_TO_SYSTEM_IN_SUSPEND,
-	DISCONNECTION_BY_DRIVER_DUE_TO_CONNECTION_EXIST,
-	DISCONNECTION_BY_DRIVER_DUE_TO_EACH_IFACE_CHBW_NOT_SYNC,
-	DISCONNECTION_BY_DRIVER_DUE_TO_DFS_DETECTION,
-	DISCONNECTION_BY_DRIVER_DUE_TO_IOCTL_DBG_PORT,
-	DISCONNECTION_BY_DRIVER_DUE_TO_AP_BEACON_CHANGED,
-	DISCONNECTION_BY_DRIVER_DUE_TO_KEEPALIVE_TIMEOUT,
-	DISCONNECTION_BY_DRIVER_DUE_TO_LAYER2_ROAMING_TERMINATE,
-	DISCONNECTION_BY_DRIVER_DUE_TO_JOINBSS_TIMEOUT,
-	DISCONNECTION_BY_FW_DUE_TO_FW_DECISION_IN_WOW_RESUME,
-	DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DISASSOC_IN_WOW_RESUME,
-	DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DEAUTH_IN_WOW_RESUME,
-	DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DEAUTH,
-	DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DISASSOC,
-	DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_NON_DFS,
-	DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_DFS,
-	DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_INVALID_CSA,
-	DISCONNECTION_BY_DRIVER_DUE_TO_JOIN_WRONG_CHANNEL,
-	DISCONNECTION_BY_DRIVER_DUE_TO_FT,
-	DISCONNECTION_BY_DRIVER_DUE_TO_ROAMING,
-	DISCONNECTION_BY_DRIVER_DUE_TO_SA_QUERY_TIMEOUT,
-} Disconnect_type;
-
-#define SSID_CHANGED BIT0
-#define SSID_LENGTH_CHANGED BIT1
-#define BEACON_CHANNEL_CHANGED BIT2
-#define ENCRYPT_PROTOCOL_CHANGED BIT3
-#define PAIRWISE_CIPHER_CHANGED BIT4
-#define GROUP_CIPHER_CHANGED BIT5
-#define IS_8021X_CHANGED BIT6
-
 /*
  * Usage:
  * When one iface acted as AP mode and the other iface is STA mode and scanning,
@@ -301,10 +266,6 @@ struct mlme_ext_info {
 	NDIS_802_11_RATES_EX	SupportedRates_infra_ap;
 	u8 ht_vht_received;/*ht_vht_received used to show debug msg BIT(0):HT BIT(1):VHT */
 #endif /* ROKU_PRIVATE */
-	Disconnect_type disconnect_code;
-	u32 illegal_beacon_code;
-	u32 wifi_reason_code;
-	u32 disconnect_occurred_time;
 };
 
 enum {
@@ -672,15 +633,10 @@ bool rtw_validate_value(u16 EID, u8 *p, u16 len);
 bool is_hidden_ssid(char *ssid, int len);
 bool hidden_ssid_ap(WLAN_BSSID_EX *snetwork);
 void rtw_absorb_ssid_ifneed(_adapter *padapter, WLAN_BSSID_EX *bssid, u8 *pframe);
-
-int rtw_get_bcn_keys(_adapter *adapter
-	, u8 *whdr, u32 flen, struct beacon_keys *bcn_keys);
-int rtw_get_bcn_keys_from_bss(WLAN_BSSID_EX *bss, struct beacon_keys *bcn_keys);
-int rtw_update_bcn_keys_of_network(struct wlan_network *network);
-
+int rtw_get_bcn_keys(_adapter *adapter, u8 *pframe, u32 packet_len,
+		struct beacon_keys *recv_beacon);
 int validate_beacon_len(u8 *pframe, uint len);
 void rtw_dump_bcn_keys(void *sel, struct beacon_keys *recv_beacon);
-bool rtw_bcn_key_compare(struct beacon_keys *cur, struct beacon_keys *recv);
 int rtw_check_bcn_info(_adapter *adapter, u8 *pframe, u32 packet_len);
 void update_beacon_info(_adapter *padapter, u8 *pframe, uint len, struct sta_info *psta);
 #if CONFIG_DFS
@@ -805,9 +761,7 @@ void start_clnt_assoc(_adapter *padapter);
 void start_clnt_auth(_adapter *padapter);
 void start_clnt_join(_adapter *padapter);
 void start_create_ibss(_adapter *padapter);
-#if defined(CONFIG_LAYER2_ROAMING) && defined(CONFIG_RTW_80211K)
-void rtw_roam_nb_discover(_adapter *padapter, u8 bfroce);
-#endif
+
 unsigned int OnAssocReq(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnAssocRsp(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int OnProbeReq(_adapter *padapter, union recv_frame *precv_frame);
@@ -1014,11 +968,6 @@ u8 run_in_thread_hdl(_adapter *padapter, u8 *pbuf);
 
 int rtw_sae_preprocess(_adapter *adapter, const u8 *buf, u32 len, u8 tx);
 
-u32 rtw_desc_rate_to_bitrate(u8 bw, u16 rate_idx, u8 sgi);
-u16 rtw_get_current_tx_rate(_adapter *padapter, struct sta_info *psta);
-u8 rtw_get_current_tx_sgi(_adapter *padapter, struct sta_info *psta);
-void rtw_get_current_rx_info(_adapter *adapter, struct sta_info *psta,
-	u16 *rate, u8 *bw, u8 *gi_ltf);
 
 #ifdef CONFIG_RTW_MESH
 extern u8 rtw_mesh_set_plink_state_cmd_hdl(_adapter *adapter, u8 *parmbuf);

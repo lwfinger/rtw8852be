@@ -498,7 +498,7 @@ static void HE_phy_caps_handler(_adapter *padapter, struct rtw_phl_stainfo_t *ph
 		if (GET_HE_PHY_CAP_SUPPORT_CHAN_WIDTH_SET(ele_start) & BIT(3))
 			*supp_mcs_len += 4;
 	}
-	phl_sta->asoc_cap.he_ldpc = (GET_HE_PHY_CAP_LDPC_IN_PAYLOAD(ele_start) & role_cap->he_ldpc);
+	phl_sta->asoc_cap.he_ldpc = GET_HE_PHY_CAP_LDPC_IN_PAYLOAD(ele_start);
 	if (phl_sta->asoc_cap.er_su) {
 		phl_sta->asoc_cap.ltf_gi = (BIT(RTW_GILTF_2XHE16) |
 			BIT(RTW_GILTF_2XHE08) | BIT(RTW_GILTF_1XHE16) |
@@ -1459,127 +1459,6 @@ void rtw_he_init_om_info(_adapter *padapter)
 
 }
 
-void rtw_process_he_triggerframe(_adapter *padapter,
-				union recv_frame *precv_frame)
-{
 
-	void *phl;
-	struct rtw_phl_stainfo_t *phl_sta;
-
-	struct dvobj_priv *d = adapter_to_dvobj(padapter);
-	u8 *trigger_frame = precv_frame->u.hdr.rx_data;
-	u16 trigger_length = precv_frame->u.hdr.len;
-	struct rx_pkt_attrib *pattrib = &precv_frame->u.hdr.attrib;
-	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
-	struct wlan_network *cur_network = &(pmlmepriv->cur_network);
-	u16 aid = 0;
-	u8 *user_info;
-	u16 remain_length = 0;
-	u8 trigger_type = 0;
-	bool ra_is_bc = _FALSE;
-	phl = GET_PHL_INFO(d);
-
-
-	if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _FALSE)
-		return;
-
-	/* check length */
-	if (trigger_length < TRIGGER_FRAME_MIN_LENGTH) {
-		RTW_INFO("%s [T_Frame]TRIGGER_FRAME_MIN_LENGTH(%d) trigger_length=%d\n",
-			 __func__,
-			 TRIGGER_FRAME_MIN_LENGTH,
-			 trigger_length);
-		return;
-	}
-
-	/* Check TA : from connected AP*/
-	if(_rtw_memcmp(get_addr2_ptr(trigger_frame), cur_network->network.MacAddress, ETH_ALEN) == _FALSE) {
-		RTW_INFO("%s [T_Frame] Trigger Frame error, not from connected AP\n", __func__);
-		return;
-	}
-
-	/* parsing trigger frame sub-type*/
-	trigger_type = GET_TRIGGER_FRAME_TYPE(trigger_frame);
-	switch (trigger_type) {
-	case TRIGGER_FRAME_T_BASIC:
-		{
-			#ifdef RTW_WKARD_TRIGGER_FRAME_PARSER
-			user_info = trigger_frame + 24;
-			remain_length = trigger_length - 24;
-			phl_sta = rtw_phl_get_stainfo_by_addr(phl, padapter->phl_role, get_addr2_ptr(trigger_frame));
-
-			if(phl_sta == NULL)
-				break;
-			/* start from User Info */
-			while (remain_length >= TRIGGER_FRAME_BASIC_USER_INFO_SZ) {
-				aid = GET_TRIGGER_FRAME_USER_INFO_AID12(user_info);
-				RTW_DBG("%s [T_Frame] aid=0x%x, UL MCS=0x%x, RU_alloc=0x%x \n",
-					  __func__, aid,
-					  GET_TRIGGER_FRAME_USER_INFO_UL_MCS(user_info),
-					  GET_TRIGGER_FRAME_USER_INFO_RUA(user_info));
-				if ((aid == phl_sta->aid) && (aid != 0)) {
-					phl_sta->stats.rx_tf_cnt++;
-					RTW_DBG("%s [T_Frame]phl_sta->stats.rx_tf_cnt(%d)\n",
-						 __func__,
-						 phl_sta->stats.rx_tf_cnt);
-					break;
-				}
-				if (aid == 0xfff) {
-					/* padding content, break it */
-					break;
-				}
-				/* shift to next user info */
-				user_info += TRIGGER_FRAME_BASIC_USER_INFO_SZ;
-				remain_length -= TRIGGER_FRAME_BASIC_USER_INFO_SZ;
-			}
-			#endif /*RTW_WKARD_TRIGGER_FRAME_PARSER*/
-		}
-		break;
-	case TRIGGER_FRAME_T_BFRP:
-		fallthrough;
-		/* fall through */
-	case TRIGGER_FRAME_T_MUBAR:
-		fallthrough;
-		/* fall through */
-	case TRIGGER_FRAME_T_MURTS:
-		fallthrough;
-		/* fall through */
-	case TRIGGER_FRAME_T_BSRP:
-		fallthrough;
-		/* fall through */
-	case TRIGGER_FRAME_T_GCR_MUBAR:
-		fallthrough;
-		/* fall through */
-	case TRIGGER_FRAME_T_BQRP:
-		fallthrough;
-		/* fall through */
-	case TRIGGER_FRAME_T_NFRP:
-		fallthrough;
-		/* fall through */
-	case TRIGGER_FRAME_T_RSVD:
-		break;
-	}
-}
-
-void rtw_update_he_ies(_adapter *padapter, WLAN_BSSID_EX *pnetwork)
-{
-	u8 he_cap_ie_len;
-	u8 he_cap_ie[255];
-	u8 he_cap_eid_ext = WLAN_EID_EXTENSION_HE_CAPABILITY;
-	u8 he_op_ie_len;
-	u8 he_op_ie[255];
-	u8 he_op_eid_ext = WLAN_EID_EXTENSION_HE_OPERATION;
-
-	RTW_INFO("Don't setting HE capability/operation IE from hostap, builded by driver temporarily\n");
-	rtw_he_use_default_setting(padapter);
-
-	rtw_remove_bcn_ie_ex(padapter, pnetwork, WLAN_EID_EXTENSION, &he_cap_eid_ext, 1);
-	he_cap_ie_len = rtw_build_he_cap_ie(padapter, he_cap_ie);
-	rtw_add_bcn_ie_ex(padapter, pnetwork, he_cap_eid_ext, he_cap_ie + 2, he_cap_ie_len - 2);
-
-	rtw_remove_bcn_ie_ex(padapter, pnetwork, WLAN_EID_EXTENSION, &he_op_eid_ext, 1);
-	he_op_ie_len = rtw_build_he_operation_ie(padapter, he_op_ie);
-	rtw_add_bcn_ie_ex(padapter, pnetwork, he_op_eid_ext, he_op_ie + 2, he_op_ie_len - 2);
-}
 #endif /* CONFIG_80211AX_HE */
 

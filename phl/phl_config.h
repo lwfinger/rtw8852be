@@ -72,13 +72,14 @@
 		#define CONFIG_PHL_CMD_SER
 		#define CONFIG_PHL_CMD_BTC
 	#endif
-	#define PCIE_TRX_MIT_EN
+	#ifdef CONFIG_PCI_HCI
+		#define PCIE_TRX_MIT_EN
+	#endif
 	#define CONFIG_PHL_P2PPS
 	#define CONFIG_6GHZ
 	#define RTW_WKARD_BFEE_SET_AID
 	#define CONFIG_PHL_THERMAL_PROTECT
 	#define CONFIG_PHL_TX_DBG
-	#define CONFIG_PHL_RELEASE_RPT_ENABLE
 #endif /* PHL_FEATURE_NONE */
 
 #ifdef PHL_PLATFORM_WINDOWS
@@ -119,8 +120,6 @@
 #define RTW_WKARD_WOW_L2_PWR
 #define DBG_RST_BDRAM_TIME
 #endif
-
-#define DBG_PHY_ON_TIME
 
 /*CONFIG_IFACE_NUMBER*/
 #ifdef CONFIG_IFACE_NUMBER
@@ -185,10 +184,6 @@
 #endif
 
 #define CONFIG_PHL_CMD_BTC
-
-#ifdef CONFIG_MSG_NUM
-	#define CONFIG_PHL_MSG_NUM CONFIG_MSG_NUM
-#endif
 #endif /**** CONFIG_CMD_DISP ***/
 
 #define CONFIG_GEN_GIT_INFO 1
@@ -208,7 +203,7 @@
 #define CONFIG_PHL_USB_RX_AGGREGATION
 #endif
 
-#ifdef CONFIG_DFS_MASTER
+#if CONFIG_DFS
 #define CONFIG_PHL_DFS
 #endif
 
@@ -254,12 +249,8 @@
 #define CONFIG_PHL_RA_TXSTS_DBG
 #endif
 
-#ifdef CONFIG_RELEASE_RPT
-#define CONFIG_PHL_RELEASE_RPT_ENABLE
-#endif
-
-#ifdef CONFIG_PS_FW_DBG
-#define CONFIG_PHL_PS_FW_DBG
+#ifdef CONFIG_USB_RELEASE_RPT
+#define CONFIG_PHL_USB_RELEASE_RPT_ENABLE
 #endif
 
 #ifdef CONFIG_P2PPS
@@ -269,8 +260,10 @@
 #ifdef CONFIG_TX_DBG
 #define CONFIG_PHL_TX_DBG
 #endif
+#ifdef CONFIG_PCI_HCI
 #ifdef CONFIG_PCIE_TRX_MIT
 #define PCIE_TRX_MIT_EN
+#endif
 #endif
 #ifdef CONFIG_THERMAL_PROTECT
 #define CONFIG_PHL_THERMAL_PROTECT
@@ -283,6 +276,12 @@
 #ifdef CONFIG_TDLS
 #define CONFIG_PHL_TDLS
 #endif
+
+#ifdef CONFIG_SDIO_HCI
+/* For SDIO TX TP TST - START */
+#define SDIO_TX_THREAD			/* Use dedicate thread for SDIO TX */
+/* For SDIO TX TP TST - ENDT */
+#endif /* CONFIG_SDIO_HCI */
 
 #ifdef CONFIG_MAC_REG_RW_CHK
 #define DBG_PHL_MAC_REG_RW
@@ -303,12 +302,9 @@
 #define RTW_WKARD_MP_MODE_CHANGE
 #define RTW_WKARD_WIN_TRX_BALANCE
 #define RTW_WKARD_DYNAMIC_LTR
-#define RTW_WKARD_GET_PROCESSOR_ID
 #endif
 
 #define RTW_WKARD_PHY_CAP
-
-#define RTW_WKARD_BTC_STBC_CAP
 
 #define RTW_WKARD_LAMODE
 
@@ -325,6 +321,10 @@
 #define RTW_WKARD_STA_BCN_INTERVAL
 
 #define RTW_WKARD_SER_L1_EXPIRE
+
+#ifdef CONFIG_USB_HCI
+#define RTW_WKARD_SER_USB_POLLING_EVENT
+#endif
 
 /* #define RTW_WKARD_SER_USB_DISABLE_L1_RCVY_FLOW */
 
@@ -369,6 +369,9 @@
 #ifdef RTW_WKARD_PHY_INFO_NTFY
 #define CONFIG_PHY_INFO_NTFY
 #endif
+
+/* LPS should disable other role */
+#define RTW_WKARD_LPS_ROLE_CONFIG
 
 #ifdef PHL_PLATFORM_WINDOWS
 #define CONFIG_WOW_WITH_SER
@@ -422,7 +425,5 @@
 #ifdef RTW_WKARD_DISABLE_2G40M_ULOFDMA
 #define RTW_WKARD_BB_DISABLE_STA_2G40M_ULOFDMA
 #endif
-
-#define RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
 
 #endif /*_PHL_CONFIG_H_*/

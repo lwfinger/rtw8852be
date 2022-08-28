@@ -26,13 +26,17 @@ u32 mac_reset_mcc_group(struct mac_ax_adapter *adapter, u8 group)
 	u8 *buf;
 	u32 ret = 0;
 
+	if (adapter->sm.mcc_group[group] != MAC_AX_MCC_STATE_ERROR) {
+		PLTFM_MSG_ERR("[ERR]%s: state != error\n", __func__);
+		return MACPROCERR;
+	}
+
 	if (group > MCC_GROUP_ID_MAX) {
 		PLTFM_MSG_ERR("[ERR]%s: invalid group: %d\n", __func__, group);
 		return MACNOITEM;
 	}
 
-	adapter->sm.mcc_group[group] = MAC_AX_MCC_EMPTY;
-	adapter->sm.mcc_request[group] = MAC_AX_MCC_REQ_IDLE;
+	adapter->sm.mcc_group[group] = MAC_AX_MCC_STATE_H2C_SENT;
 
 	h2cb = h2cb_alloc(adapter, H2CB_CLASS_DATA);
 	if (!h2cb) {
@@ -897,8 +901,8 @@ u32 mac_check_del_mcc_group_done(struct mac_ax_adapter *adapter, u8 group)
 
 u32 mac_check_mcc_request_tsf_done(struct mac_ax_adapter *adapter, u8 group)
 {
-	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr req state: %d\n", __func__,
-			group, adapter->sm.mcc_request[group]);
+	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr state: %d\n", __func__,
+			group, adapter->sm.mcc_group[group]);
 
 	if (adapter->sm.mcc_request[group] == MAC_AX_MCC_REQ_DONE)
 		return MACSUCCESS;
@@ -908,8 +912,8 @@ u32 mac_check_mcc_request_tsf_done(struct mac_ax_adapter *adapter, u8 group)
 
 u32 mac_check_mcc_macid_bitmap_done(struct mac_ax_adapter *adapter, u8 group)
 {
-	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr req state: %d\n", __func__,
-			group, adapter->sm.mcc_request[group]);
+	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr state: %d\n", __func__,
+			group, adapter->sm.mcc_group[group]);
 
 	if (adapter->sm.mcc_request[group] == MAC_AX_MCC_REQ_IDLE)
 		return MACSUCCESS;
@@ -919,8 +923,8 @@ u32 mac_check_mcc_macid_bitmap_done(struct mac_ax_adapter *adapter, u8 group)
 
 u32 mac_check_mcc_sync_enable_done(struct mac_ax_adapter *adapter, u8 group)
 {
-	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr req state: %d\n", __func__,
-			group, adapter->sm.mcc_request[group]);
+	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr state: %d\n", __func__,
+			group, adapter->sm.mcc_group[group]);
 
 	if (adapter->sm.mcc_request[group] == MAC_AX_MCC_REQ_IDLE)
 		return MACSUCCESS;
@@ -930,8 +934,8 @@ u32 mac_check_mcc_sync_enable_done(struct mac_ax_adapter *adapter, u8 group)
 
 u32 mac_check_mcc_set_duration_done(struct mac_ax_adapter *adapter, u8 group)
 {
-	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr req state: %d\n", __func__,
-			group, adapter->sm.mcc_request[group]);
+	PLTFM_MSG_TRACE("[TRACE]%s: group %d curr state: %d\n", __func__,
+			group, adapter->sm.mcc_group[group]);
 
 	if (adapter->sm.mcc_request[group] == MAC_AX_MCC_REQ_IDLE)
 		return MACSUCCESS;

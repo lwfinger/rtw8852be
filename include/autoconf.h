@@ -25,6 +25,14 @@
 #define CONFIG_SIGNAL_STAT_PROCESS
 #endif
 
+#ifndef DBG_MEM_ALLOC
+#define DBG_MEM_ALLOC
+
+#define DBG_PHL_MEM_ALLOC
+#define DBG_HAL_MAC_MEM_MOINTOR
+#define DBG_HAL_MEM_MOINTOR
+#endif
+/*#define CONFIG_PHL_USE_KMEM_ALLOC*/
 #define CONFIG_HW_RTS
 
 /*
@@ -43,11 +51,7 @@
 
 #define CONFIG_PCIE_TRX_MIT
 #ifdef CONFIG_PCIE_TRX_MIT
-	#define PCIE_RX_INT_MIT_TIMER 4096
-	/*#define CONFIG_PCIE_TRX_MIT_FIX*/ /*  if defined, the mitigation mode will be set to fixed */
-	#ifndef CONFIG_PCIE_TRX_MIT_FIX
-	#define CONFIG_PCIE_TRX_MIT_DYN
-	#endif
+#define PCIE_RX_INT_MIT_TIMER 4096
 #endif
 
 #define CONFIG_RPQ_AGG_NUM 30
@@ -135,16 +139,8 @@
 		#define LPS_RPWM_WAIT_MS 300
 	#endif
 #endif
-
-#ifdef CONFIG_POWER_SAVE
-	#define CONFIG_RTW_IPS
-	#define CONFIG_RTW_LPS
-
-	#if defined(CONFIG_RTW_IPS) || defined(CONFIG_RTW_LPS)
-		#define CONFIG_PS_FW_DBG
-	#endif
-#endif
-
+/*#define CONFIG_RTW_IPS*/
+/*#define CONFIG_RTW_LPS*/
 	/*#define CONFIG_ANTENNA_DIVERSITY*/
 
 
@@ -274,6 +270,7 @@
 
 /* #define DBG_IO */
 /* #define DBG_DELAY_OS */
+/* #define DBG_MEM_ALLOC */
 /* #define DBG_IOCTL */
 
 /* #define DBG_TX */
@@ -296,20 +293,12 @@
 #define CONFIG_DBG_COUNTER
 #define	DBG_RX_DFRAME_RAW_DATA
 /*#define	DBG_TXBD_DESC_DUMP*/
-#define CONFIG_RTW_EFUSE_DBG_DUMP	1
 
 #define CONFIG_PCI_BCN_POLLING
 //#define RTW_PHL_TEST_FPGA //For 8852A PCIE FPGA TEST
 
-#define CONFIG_DMA_USE_COHERENT_MEM
-
-#ifdef CONFIG_DMA_USE_COHERENT_MEM
-#define CONFIG_DMA_TX_USE_COHERENT_MEM
-#define CONFIG_DMA_RX_USE_COHERENT_MEM
-#else
-#ifndef CONFIG_DIS_DYN_RXBUF
+#ifndef CONFIG_DYNAMIC_RX_BUF
 #define CONFIG_DYNAMIC_RX_BUF
-#endif
 #endif
 
 /*#define CONFIG_RTW_BTM_ROAM*/
@@ -395,4 +384,27 @@
 #ifdef CONFIG_ARCH_CORTINA
 #include "autoconf_arm_9617b.h"
 #endif /* CONFIG_ARCH_CORTINA */
+
+#include "autoconf_8852be_custom.h"
+
+#if 0 /* For Debug Purpose */
+
+/* Core Config */
+#ifndef CONFIG_PHL_USE_KMEM_ALLOC
+#define CONFIG_PHL_USE_KMEM_ALLOC
+#endif
+
+#ifdef CONFIG_DYNAMIC_RX_BUF
+#undef CONFIG_DYNAMIC_RX_BUF
+#endif
+
+#define CONFIG_RXBUF_NUM_1024
+#define CONFIG_TX_SKB_ORPHAN
+#define CONFIG_SWCAP_SYNC_WIN
+
+/* PHL Config */
+#define PHL_RX_BATCH_IND
+#define RTW_WKARD_98D_RXTAG
+
+#endif
 

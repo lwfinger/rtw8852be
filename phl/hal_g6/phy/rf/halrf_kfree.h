@@ -24,9 +24,7 @@ enum BITMASK {
 	HIGH_MASK = 1
 };
 
-struct halrf_kfree_info{
-	u8 efuse_content[80];
-#if 0
+struct halrf_rx_gain_k_info{
 	bool efuse_chenk;
 	bool hide_efuse_chenk;
 	s8 rx_gain_offset[RX_GAIN_K_PATH_MAX][RX_GAIN_K_OFFSET_MAX];
@@ -39,7 +37,6 @@ struct halrf_kfree_info{
 	s8 rx_frontend_loss[RX_GAIN_K_PATH_MAX];
 	s8 rx_rpl_bias_comp[RX_GAIN_K_PATH_MAX];
 	s8 rx_rssi_bias_comp[RX_GAIN_K_PATH_MAX];
-#endif
 };
 
 #endif	/*_HALRF_SET_PWR_TABLE_H_*/

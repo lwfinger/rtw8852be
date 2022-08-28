@@ -15,7 +15,7 @@
 #define _PHL_TRX_MIT_C_
 #include "phl_headers.h"
 
-#if defined(PCIE_TRX_MIT_EN)
+#if defined(CONFIG_PCI_HCI) && defined(PCIE_TRX_MIT_EN)
 enum rtw_phl_status phl_pcie_trx_mit_start(struct phl_info_t *phl_info,
 					   u8 dispr_idx)
 {
@@ -65,7 +65,7 @@ static void _phl_pcie_trx_mit_done(void *drv_priv, u8 *cmd, u32 cmd_len, enum rt
 
 static enum rtw_phl_status
 phl_pcie_trx_mit(struct phl_info_t *phl_info,
-                 u32 tx_timer, u8 tx_counter, u32 rx_timer, u8 rx_counter)
+		u32 tx_timer, u8 tx_counter, u32 rx_timer, u8 rx_counter)
 {
 #ifdef CONFIG_CMD_DISP
 	void *drv_priv = phl_to_drvpriv(phl_info);
@@ -113,9 +113,8 @@ _exit:
 void phl_pcie_trx_mit_watchdog(struct phl_info_t *phl_info)
 {
 	static enum rtw_tfc_lvl rx_traffic_lvl = RTW_TFC_IDLE;
+
 	struct rtw_stats *phl_stats = &phl_info->phl_com->phl_stats;
-	struct bus_sw_cap_t *bus_sw_cap = &phl_info->phl_com->bus_sw_cap;
-	struct rtw_pcie_trx_mit_info_t *mit_ctl = &bus_sw_cap->mit_ctl;
 
 	if (phl_info->hci->fixed_mitigation == 1)
 		return;
@@ -126,10 +125,9 @@ void phl_pcie_trx_mit_watchdog(struct phl_info_t *phl_info)
 	rx_traffic_lvl = phl_stats->rx_traffic.lvl;
 
 	if (rx_traffic_lvl == RTW_TFC_HIGH)
-		phl_pcie_trx_mit(phl_info, 0, 0, mit_ctl->rx_timer,
-		                 mit_ctl->rx_counter);
+		phl_pcie_trx_mit(phl_info, 0, 0, 100000, 200);
 	else
 		phl_pcie_trx_mit(phl_info, 0, 0, 0, 0);
 }
-#endif /* defined(PCIE_TRX_MIT_EN)*/
+#endif /*defined(CONFIG_PCI_HCI) && defined(PCIE_TRX_MIT_EN)*/
 

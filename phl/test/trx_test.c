@@ -357,7 +357,7 @@ void _phl_free_tx_pkt_pool(void *phl)
 		INIT_LIST_HEAD(&tpkt->list);
 		if (NULL != tpkt->pkt.vir_addr) {
 			#ifdef CONFIG_PCI_HCI
-			_os_shmem_free(drv_priv, NULL,
+			_os_shmem_free(drv_priv,
 						tpkt->pkt.vir_addr,
 						(_dma *)&tpkt->pkt.phy_addr_l,
 						(_dma *)&tpkt->pkt.phy_addr_h,
@@ -421,7 +421,7 @@ enum rtw_phl_status _phl_alloc_tx_pkt_pool(void *phl, u32 tx_pkt_num,
 		for (i = 0; i < tx_pkt_num; i++) {
 			INIT_LIST_HEAD(&tpkt[i].list);
 			#ifdef CONFIG_PCI_HCI
-			tpkt[i].pkt.vir_addr = _os_shmem_alloc(drv_priv, NULL,
+			tpkt[i].pkt.vir_addr = _os_shmem_alloc(drv_priv,
 						  (_dma *)&tpkt[i].pkt.phy_addr_l,
 						  (_dma *)&tpkt[i].pkt.phy_addr_h,
 						  tx_pkt_size,

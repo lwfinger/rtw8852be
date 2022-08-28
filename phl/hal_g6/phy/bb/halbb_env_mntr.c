@@ -290,25 +290,9 @@ void halbb_nhm_cal_wgt(struct bb_info *bb)
 			env->nhm_wgt[i] = (u8)((env->nhm_th[i - 1] +
 					  env->nhm_th[i]) >> 1);
 	}
-
-	if ((bb->ic_type == BB_RTL8852A) || (bb->ic_type == BB_RTL8852B) ||
-	    (bb->ic_type == BB_RTL8852C)) {
-		if (env->nhm_th[NHM_TH_NUM - 1] == RSSI_2_NHM_TH(NHM_WA_TH)) {
-			env->nhm_wgt[NHM_RPT_NUM - 1] = (u8)(env->nhm_th[NHM_TH_NUM - 2] + 2);
-			env->nhm_wgt[NHM_RPT_NUM - 2] = env->nhm_wgt[NHM_RPT_NUM - 1];
-		}
-	}
-
-	BB_DBG(bb, DBG_ENV_MNTR,
-	       "Update NHM_wgt(H->L)[%d %d %d %d %d %d %d %d %d %d %d %d]\n",
-	       env->nhm_wgt[11], env->nhm_wgt[10], env->nhm_wgt[9], env->nhm_wgt[8],
-	       env->nhm_wgt[7], env->nhm_wgt[6], env->nhm_wgt[5], env->nhm_wgt[4],
-	       env->nhm_wgt[3], env->nhm_wgt[2], env->nhm_wgt[1],
-	       env->nhm_wgt[0]);
 }
 
-u8 halbb_nhm_cal_wgt_avg(struct bb_info *bb, u8 start_i, u8 end_i, u16 n_sum,
-		       u8 frac_bit_num)
+u8 halbb_nhm_cal_wgt_avg(struct bb_info *bb, u8 start_i, u8 end_i, u16 n_sum)
 {
 	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
 	u8 i = 0;
@@ -331,11 +315,7 @@ u8 halbb_nhm_cal_wgt_avg(struct bb_info *bb, u8 start_i, u8 end_i, u16 n_sum,
 	for (i = start_i; i <= end_i; i++)
 		tmp += env->nhm_sw_result[i] * env->nhm_wgt[i];
 
-	if (frac_bit_num == 1) /*u(8.1)*/
-		wgt_avg = (u8)HALBB_DIV(tmp, n_sum);
-	else /*u(8.0)*/
-		wgt_avg = (u8)(NHM_TH_2_RSSI(HALBB_DIV(tmp, n_sum)));
-
+	wgt_avg = (u8)(NHM_TH_2_RSSI(HALBB_DIV(tmp, n_sum)));
 	nhm_valid = (u8)halbb_ccx_get_ratio(bb, n_sum, 100);
 	BB_DBG(bb, DBG_ENV_MNTR,
 	       "valid: ((%d)) percent, wgt_avg(RSSI)=((%d))\n",
@@ -433,9 +413,7 @@ void halbb_nhm_get_utility(struct bb_info *bb)
 	env->nhm_idle_ratio = (u8)halbb_ccx_get_ratio(bb, env->nhm_idle_cnt,
 						      100);
 	env->nhm_pwr = halbb_nhm_cal_wgt_avg(bb, 0, NHM_RPT_NUM - 1,
-					  env->nhm_result_sum, 0);
-	env->nhm_pwr_0p5 = halbb_nhm_cal_wgt_avg(bb, 0, NHM_RPT_NUM - 1,
-					      env->nhm_result_sum, 1);
+					     env->nhm_result_sum);
 
 	if (bb->ic_type == BB_RTL8852A) {
 		if ((edcca_r->pwdb_fb != (s8)(EDCCA_PWDB_EXCLU_TX)) &&
@@ -445,10 +423,8 @@ void halbb_nhm_get_utility(struct bb_info *bb)
 		BB_DBG(bb, DBG_ENV_MNTR, "edcca_noise_bg, nhm_pwr = {%d, %d}\n",
 		       env->edcca_noise_bg, env->nhm_pwr);
 
-		if (env->nhm_pwr <= NHM_WA_PWR) {
+		if (env->nhm_pwr <= NHM_WA_PWR)
 			env->nhm_pwr = env->edcca_noise_bg;
-			env->nhm_pwr_0p5 = (u8)(env->nhm_pwr << 1);
-		}
 	}
 
 	for (i = 0; i < NHM_RPT_NUM; i++)
@@ -458,9 +434,8 @@ void halbb_nhm_get_utility(struct bb_info *bb)
 	BB_DBG(bb, DBG_ENV_MNTR, "cnt ratio{cca, tx, idle} = {%d, %d, %d}\n",
 	       env->nhm_cca_ratio, env->nhm_tx_ratio, env->nhm_idle_ratio);
 
-	BB_DBG(bb, DBG_ENV_MNTR, "nhm_ratio=%d, nhm_pwr=%d, nhm_pwr_0p5=%d.%d\n",
-	       env->nhm_ratio, env->nhm_pwr, env->nhm_pwr_0p5 >> 1,
-	       5 * (env->nhm_pwr_0p5 & 0x1));
+	BB_DBG(bb, DBG_ENV_MNTR, "nhm_ratio=%d, nhm_pwr(RSSI)=%d\n",
+	       env->nhm_ratio, env->nhm_pwr);
 }
 
 bool halbb_nhm_get_result(struct bb_info *bb)
@@ -805,10 +780,8 @@ void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 			BB_DBG_CNSL(out_len, used, output + used,
 				    out_len - used,
-				    "nhm_ratio=%d, nhm_pwr=%d, nhm_pwr_0p5=%d.%d\n",
-				    env->nhm_ratio, env->nhm_pwr,
-				    env->nhm_pwr_0p5 >> 1,
-				    5 * (env->nhm_pwr_0p5 & 0x1));
+				    "nhm_ratio=%d, nhm_pwr(RSSI)=%d\n",
+				    env->nhm_ratio, env->nhm_pwr);
 		} else {
 			BB_DBG_CNSL(out_len, used, output + used,
 				    out_len - used, "Get NHM result Fail\n");
@@ -819,8 +792,9 @@ void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	} else { /*NMH trigger*/
 		env->ccx_manual_ctrl = true;
 
-		for (i = 1; i < 9; i++)
+		for (i = 1; i < 9; i++) {
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
+		}
 
 		if (var[0] == 1) {
 			para.nhm_app = NHM_DBG_11K;
@@ -986,8 +960,9 @@ void halbb_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u32 out_len = *_out_len;
 	u8 i = 0;
 
-	for (i = 0; i < 5; i++)
+	for (i = 0; i < 5; i++) {
 		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
+	}
 
 	if ((_os_strcmp(input[1], help) == 0)) {
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -1371,8 +1346,9 @@ void halbb_ifs_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u32 out_len = *_out_len;
 	u8 i = 0;
 
-	for (i = 0; i < 5; i++)
+	for (i = 0; i < 5; i++) {
 		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
+	}
 
 	if ((_os_strcmp(input[1], help) == 0)) {
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -1520,25 +1496,9 @@ void halbb_fahm_cal_wgt(struct bb_info *bb)
 			env->fahm_wgt[i] = (u8)((env->fahm_th[i - 1] +
 					   env->fahm_th[i]) >> 1);
 	}
-
-	if ((bb->ic_type == BB_RTL8852A) || (bb->ic_type == BB_RTL8852B) ||
-	    (bb->ic_type == BB_RTL8852C)) {
-		if (env->fahm_th[FAHM_TH_NUM - 1] == RSSI_2_FAHM_TH(FAHM_WA_TH)) {
-			env->fahm_wgt[FAHM_RPT_NUM - 1] = (u8)(env->fahm_th[FAHM_TH_NUM - 2] + 2);
-			env->fahm_wgt[FAHM_RPT_NUM - 2] = env->fahm_wgt[FAHM_RPT_NUM - 1];
-		}
-	}
-
-	BB_DBG(bb, DBG_ENV_MNTR,
-	       "Update FAHM_wgt(H->L)[%d %d %d %d %d %d %d %d %d %d %d %d]\n",
-	       env->fahm_wgt[11], env->fahm_wgt[10], env->fahm_wgt[9], env->fahm_wgt[8],
-	       env->fahm_wgt[7], env->fahm_wgt[6], env->fahm_wgt[5], env->fahm_wgt[4],
-	       env->fahm_wgt[3], env->fahm_wgt[2], env->fahm_wgt[1],
-	       env->fahm_wgt[0]);
 }
 
-u8 halbb_fahm_cal_wgt_avg(struct bb_info *bb, u8 start_i, u8 end_i, u16 n_sum,
-		        u8 frac_bit_num)
+u8 halbb_fahm_cal_wgt_avg(struct bb_info *bb, u8 start_i, u8 end_i, u16 n_sum)
 {
 	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
 	u8 i = 0;
@@ -1561,11 +1521,7 @@ u8 halbb_fahm_cal_wgt_avg(struct bb_info *bb, u8 start_i, u8 end_i, u16 n_sum,
 	for (i = start_i; i <= end_i; i++)
 		tmp += env->fahm_sw_result[i] * env->fahm_wgt[i];
 
-	if (frac_bit_num == 1) /*u(8.1)*/
-		wgt_avg = (u8)HALBB_DIV(tmp, n_sum);
-	else /*u(8.0)*/
-		wgt_avg = (u8)(FAHM_TH_2_RSSI(HALBB_DIV(tmp, n_sum)));
-
+	wgt_avg = (u8)(FAHM_TH_2_RSSI(HALBB_DIV(tmp, n_sum)));
 	fahm_valid = (u8)halbb_ccx_get_ratio(bb, n_sum, 100);
 	BB_DBG(bb, DBG_ENV_MNTR,
 	       "valid: ((%d)) percent, wgt_avg(RSSI)=((%d))\n",
@@ -1609,17 +1565,14 @@ void halbb_fahm_get_utility(struct bb_info *bb)
 	env->fahm_denom_ratio = (u8)halbb_ccx_get_ratio(bb,
 				env->fahm_denom_result, 100);
 	env->fahm_pwr = halbb_fahm_cal_wgt_avg(bb, 0, FAHM_RPT_NUM - 1,
-					    env->fahm_result_sum, 0);
-	env->fahm_pwr_0p5 = halbb_fahm_cal_wgt_avg(bb, 0, FAHM_RPT_NUM - 1,
-					        env->fahm_result_sum, 1);
+					       env->fahm_result_sum);
 
 	for (i = 0; i < FAHM_RPT_NUM; i++)
 		env->fahm_rpt[i] = (u8)halbb_ccx_get_ratio(bb,
 				   env->fahm_sw_result[i], 100);
 
-	BB_DBG(bb, DBG_ENV_MNTR, "fahm_ratio=%d, fahm_pwr=%d, fahm_pwr_0p5=%d.%d\n",
-	       env->fahm_ratio, env->fahm_pwr, env->fahm_pwr_0p5 >> 1,
-	       5 * (env->fahm_pwr_0p5 & 0x1));
+	BB_DBG(bb, DBG_ENV_MNTR, "fahm_ratio=%d, fahm_pwr(RSSI)=%d\n",
+	       env->fahm_ratio, env->fahm_pwr);
 }
 
 bool halbb_fahm_get_result(struct bb_info *bb)
@@ -1967,10 +1920,8 @@ void halbb_fahm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 			BB_DBG_CNSL(out_len, used, output + used,
 				    out_len - used,
-				    "fahm_ratio=%d, fahm_pwr=%d, fahm_pwr_0p5=%d.%d\n",
-				    env->fahm_ratio, env->fahm_pwr,
-				    env->fahm_pwr_0p5 >> 1,
-				    5 * (env->fahm_pwr_0p5 & 0x1));
+				    "fahm_ratio=%d, fahm_pwr(RSSI)=%d\n",
+				    env->fahm_ratio, env->fahm_pwr);
 
 			BB_DBG_CNSL(out_len, used, output + used,
 				    out_len - used,
@@ -1987,8 +1938,9 @@ void halbb_fahm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	} else { /*FAMH trigger*/
 		env->ccx_manual_ctrl = true;
 
-		for (i = 1; i < 9; i++)
+		for (i = 1; i < 9; i++) {
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
+		}
 
 		if (var[0] == 1) {
 			para.fahm_app = FAHM_DBG_11K;
@@ -2142,8 +2094,9 @@ void halbb_edcca_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	struct ccx_para_info para = {0};
 	u8 i = 0;
 
-	for (i = 0; i < 5; i++)
+	for (i = 0; i < 5; i++) {
 		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
+	}
 
 	if ((_os_strcmp(input[1], help) == 0)) {
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -2293,7 +2246,7 @@ void halbb_env_mntr_cmn_log(struct bb_info *bb)
 	if ((bb->ic_type == BB_RTL8852A) || (bb->ic_type == BB_RTL8852B) ||
 	    (bb->ic_type == BB_RTL8852C)) {
 		BB_DBG(bb, DBG_CMN,
-		       "%-18s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       "%-16s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
 		       "  Th", NHM_TH_2_RSSI(env->nhm_th[9]),
 		       NHM_TH_2_RSSI(env->nhm_th[8]), NHM_TH_2_RSSI(env->nhm_th[7]),
 		       NHM_TH_2_RSSI(env->nhm_th[6]), NHM_TH_2_RSSI(env->nhm_th[5]),
@@ -2301,22 +2254,20 @@ void halbb_env_mntr_cmn_log(struct bb_info *bb)
 		       NHM_TH_2_RSSI(env->nhm_th[2]), NHM_TH_2_RSSI(env->nhm_th[1]),
 		       NHM_TH_2_RSSI(env->nhm_th[0]));
 		BB_DBG(bb, DBG_CMN,
-		       "[NHM]  (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->nhm_pwr, 5 * (env->nhm_pwr_0p5 & 0x1), env->nhm_rpt[10],
-		       env->nhm_rpt[9], env->nhm_rpt[8], env->nhm_rpt[7],
-		       env->nhm_rpt[6], env->nhm_rpt[5], env->nhm_rpt[4],
-		       env->nhm_rpt[3], env->nhm_rpt[2], env->nhm_rpt[1],
-		       env->nhm_rpt[0]);
+		       "[NHM]  (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->nhm_pwr, env->nhm_rpt[10],env->nhm_rpt[9],
+		       env->nhm_rpt[8], env->nhm_rpt[7],env->nhm_rpt[6],
+		       env->nhm_rpt[5], env->nhm_rpt[4], env->nhm_rpt[3],
+		       env->nhm_rpt[2], env->nhm_rpt[1], env->nhm_rpt[0]);
 		BB_DBG(bb, DBG_CMN,
-		       "[FAHM] (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->fahm_pwr, 5 * (env->fahm_pwr_0p5 & 0x1),
-		       env->fahm_rpt[10], env->fahm_rpt[9], env->fahm_rpt[8],
-		       env->fahm_rpt[7], env->fahm_rpt[6], env->fahm_rpt[5],
-		       env->fahm_rpt[4], env->fahm_rpt[3], env->fahm_rpt[2],
-		       env->fahm_rpt[1], env->fahm_rpt[0]);
+		       "[FAHM] (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->fahm_pwr, env->fahm_rpt[10], env->fahm_rpt[9],
+		       env->fahm_rpt[8], env->fahm_rpt[7], env->fahm_rpt[6],
+		       env->fahm_rpt[5], env->fahm_rpt[4], env->fahm_rpt[3],
+		       env->fahm_rpt[2], env->fahm_rpt[1], env->fahm_rpt[0]);
 	} else {
 		BB_DBG(bb, DBG_CMN,
-		       "%-18s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       "%-16s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
 		       "  Th", NHM_TH_2_RSSI(env->nhm_th[10]),
 		       NHM_TH_2_RSSI(env->nhm_th[9]), NHM_TH_2_RSSI(env->nhm_th[8]),
 		       NHM_TH_2_RSSI(env->nhm_th[7]), NHM_TH_2_RSSI(env->nhm_th[6]),
@@ -2324,21 +2275,31 @@ void halbb_env_mntr_cmn_log(struct bb_info *bb)
 		       NHM_TH_2_RSSI(env->nhm_th[3]), NHM_TH_2_RSSI(env->nhm_th[2]),
 		       NHM_TH_2_RSSI(env->nhm_th[1]), NHM_TH_2_RSSI(env->nhm_th[0]));
 		BB_DBG(bb, DBG_CMN,
-		       "[NHM]  (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->nhm_pwr, 5 * (env->nhm_pwr_0p5 & 0x1), env->nhm_rpt[11],
-		       env->nhm_rpt[10], env->nhm_rpt[9], env->nhm_rpt[8],
-		       env->nhm_rpt[7], env->nhm_rpt[6], env->nhm_rpt[5],
-		       env->nhm_rpt[4], env->nhm_rpt[3], env->nhm_rpt[2],
-		       env->nhm_rpt[1], env->nhm_rpt[0]);
+		       "[NHM]  (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->nhm_pwr, env->nhm_rpt[11], env->nhm_rpt[10],
+		       env->nhm_rpt[9], env->nhm_rpt[8], env->nhm_rpt[7],
+		       env->nhm_rpt[6], env->nhm_rpt[5], env->nhm_rpt[4],
+		       env->nhm_rpt[3], env->nhm_rpt[2], env->nhm_rpt[1],
+		       env->nhm_rpt[0]);
 		BB_DBG(bb, DBG_CMN,
-		       "[FAHM] (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->fahm_pwr, 5 * (env->fahm_pwr_0p5 & 0x1),
-		       env->fahm_rpt[11], env->fahm_rpt[10], env->fahm_rpt[9],
-		       env->fahm_rpt[8], env->fahm_rpt[7], env->fahm_rpt[6],
-		       env->fahm_rpt[5], env->fahm_rpt[4], env->fahm_rpt[3],
-		       env->fahm_rpt[2], env->fahm_rpt[1], env->fahm_rpt[0]);
+		       "[FAHM] (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->fahm_pwr, env->fahm_rpt[11], env->fahm_rpt[10],
+		       env->fahm_rpt[9], env->fahm_rpt[8], env->fahm_rpt[7],
+		       env->fahm_rpt[6], env->fahm_rpt[5], env->fahm_rpt[4],
+		       env->fahm_rpt[3], env->fahm_rpt[2], env->fahm_rpt[1],
+		       env->fahm_rpt[0]);
 	}
 	BB_DBG(bb, DBG_CMN, "nhm_ratio = %d %%\n", env->nhm_ratio);
+	BB_DBG(bb, DBG_CMN,
+	       "[IFS] Time(us):[his, ifs_avg(us), cca_avg(us)], total cnt=%d\n",
+	       env->ifs_clm_total_ifs);
+	for (i = 0; i < IFS_CLM_NUM; i++)
+		BB_DBG(bb, DBG_CMN,
+		       " *[%d](%04d~%04d):[%03d,     %04d,     %04d]\n",
+		       i + 1, halbb_ccx_idx_cnt_2_us(bb, env->ifs_clm_th_l[i]),
+		       halbb_ccx_idx_cnt_2_us(bb, env->ifs_clm_th_h[i]),
+		       env->ifs_clm_his[i], env->ifs_clm_ifs_avg[i],
+		       env->ifs_clm_cca_avg[i]);
 }
 
 void halbb_env_mntr_log(struct bb_info *bb, u32 dbg_comp)
@@ -2375,7 +2336,7 @@ void halbb_env_mntr_log(struct bb_info *bb, u32 dbg_comp)
 	if ((bb->ic_type == BB_RTL8852A) || (bb->ic_type == BB_RTL8852B) ||
 	    (bb->ic_type == BB_RTL8852C)) {
 		BB_DBG(bb, DBG_ENV_MNTR,
-		       "%-18s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       "%-16s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
 		       "  Th", NHM_TH_2_RSSI(env->nhm_th[9]),
 		       NHM_TH_2_RSSI(env->nhm_th[8]), NHM_TH_2_RSSI(env->nhm_th[7]),
 		       NHM_TH_2_RSSI(env->nhm_th[6]), NHM_TH_2_RSSI(env->nhm_th[5]),
@@ -2383,22 +2344,20 @@ void halbb_env_mntr_log(struct bb_info *bb, u32 dbg_comp)
 		       NHM_TH_2_RSSI(env->nhm_th[2]), NHM_TH_2_RSSI(env->nhm_th[1]),
 		       NHM_TH_2_RSSI(env->nhm_th[0]));
 		BB_DBG(bb, DBG_ENV_MNTR,
-		       "[NHM]  (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->nhm_pwr, 5 * (env->nhm_pwr_0p5 & 0x1), env->nhm_rpt[10],
-		       env->nhm_rpt[9], env->nhm_rpt[8], env->nhm_rpt[7],
-		       env->nhm_rpt[6], env->nhm_rpt[5], env->nhm_rpt[4],
-		       env->nhm_rpt[3], env->nhm_rpt[2], env->nhm_rpt[1],
-		       env->nhm_rpt[0]);
+		       "[NHM]  (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->nhm_pwr, env->nhm_rpt[10],env->nhm_rpt[9],
+		       env->nhm_rpt[8], env->nhm_rpt[7],env->nhm_rpt[6],
+		       env->nhm_rpt[5], env->nhm_rpt[4], env->nhm_rpt[3],
+		       env->nhm_rpt[2], env->nhm_rpt[1], env->nhm_rpt[0]);
 		BB_DBG(bb, DBG_ENV_MNTR,
-		       "[FAHM] (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->fahm_pwr, 5 * (env->fahm_pwr_0p5 & 0x1),
-		       env->fahm_rpt[10], env->fahm_rpt[9], env->fahm_rpt[8],
-		       env->fahm_rpt[7], env->fahm_rpt[6], env->fahm_rpt[5],
-		       env->fahm_rpt[4], env->fahm_rpt[3], env->fahm_rpt[2],
-		       env->fahm_rpt[1], env->fahm_rpt[0]);
+		       "[FAHM] (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->fahm_pwr, env->fahm_rpt[10], env->fahm_rpt[9],
+		       env->fahm_rpt[8], env->fahm_rpt[7], env->fahm_rpt[6],
+		       env->fahm_rpt[5], env->fahm_rpt[4], env->fahm_rpt[3],
+		       env->fahm_rpt[2], env->fahm_rpt[1], env->fahm_rpt[0]);
 	} else {
 		BB_DBG(bb, DBG_ENV_MNTR,
-		       "%-18s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       "%-16s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
 		       "  Th", NHM_TH_2_RSSI(env->nhm_th[10]),
 		       NHM_TH_2_RSSI(env->nhm_th[9]), NHM_TH_2_RSSI(env->nhm_th[8]),
 		       NHM_TH_2_RSSI(env->nhm_th[7]), NHM_TH_2_RSSI(env->nhm_th[6]),
@@ -2406,19 +2365,19 @@ void halbb_env_mntr_log(struct bb_info *bb, u32 dbg_comp)
 		       NHM_TH_2_RSSI(env->nhm_th[3]), NHM_TH_2_RSSI(env->nhm_th[2]),
 		       NHM_TH_2_RSSI(env->nhm_th[1]), NHM_TH_2_RSSI(env->nhm_th[0]));
 		BB_DBG(bb, DBG_ENV_MNTR,
-		       "[NHM]  (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->nhm_pwr, 5 * (env->nhm_pwr_0p5 & 0x1), env->nhm_rpt[11],
-		       env->nhm_rpt[10], env->nhm_rpt[9], env->nhm_rpt[8],
-		       env->nhm_rpt[7], env->nhm_rpt[6], env->nhm_rpt[5],
-		       env->nhm_rpt[4], env->nhm_rpt[3], env->nhm_rpt[2],
-		       env->nhm_rpt[1], env->nhm_rpt[0]);
+		       "[NHM]  (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->nhm_pwr, env->nhm_rpt[11], env->nhm_rpt[10],
+		       env->nhm_rpt[9], env->nhm_rpt[8], env->nhm_rpt[7],
+		       env->nhm_rpt[6], env->nhm_rpt[5], env->nhm_rpt[4],
+		       env->nhm_rpt[3], env->nhm_rpt[2], env->nhm_rpt[1],
+		       env->nhm_rpt[0]);
 		BB_DBG(bb, DBG_ENV_MNTR,
-		       "[FAHM] (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-		       env->fahm_pwr, 5 * (env->fahm_pwr_0p5 & 0x1),
-		       env->fahm_rpt[11], env->fahm_rpt[10], env->fahm_rpt[9],
-		       env->fahm_rpt[8], env->fahm_rpt[7], env->fahm_rpt[6],
-		       env->fahm_rpt[5], env->fahm_rpt[4], env->fahm_rpt[3],
-		       env->fahm_rpt[2], env->fahm_rpt[1], env->fahm_rpt[0]);
+		       "[FAHM] (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       env->fahm_pwr, env->fahm_rpt[11], env->fahm_rpt[10],
+		       env->fahm_rpt[9], env->fahm_rpt[8], env->fahm_rpt[7],
+		       env->fahm_rpt[6], env->fahm_rpt[5], env->fahm_rpt[4],
+		       env->fahm_rpt[3], env->fahm_rpt[2], env->fahm_rpt[1],
+		       env->fahm_rpt[0]);
 	}
 	BB_DBG(bb, DBG_ENV_MNTR, "nhm_ratio = %d %%\n", env->nhm_ratio);
 	BB_DBG(bb, DBG_ENV_MNTR,
@@ -2540,16 +2499,15 @@ u8 halbb_env_mntr_result(struct bb_info *bb, struct env_mntr_rpt *rpt)
 		rpt->nhm_cca_cnt = env->nhm_cca_cnt;
 		rpt->nhm_idle_cnt = env->nhm_idle_cnt;
 		rpt->nhm_pwr = env->nhm_pwr;
-		rpt->nhm_pwr_0p5 = env->nhm_pwr_0p5;
 		rpt->ccx_rpt_result |= NHM_SUCCESS;
-		halbb_mem_cpy(bb, &rpt->nhm_rpt[0], &env->nhm_rpt[0], NHM_RPT_NUM);
+		halbb_mem_cpy(bb, &rpt->nhm_rpt[0], &env->nhm_rpt[0],
+			      NHM_RPT_NUM);
 	} else {
 		rpt->nhm_ratio = ENV_MNTR_FAIL_BYTE;
 		rpt->nhm_tx_ratio = ENV_MNTR_FAIL_BYTE;
 		rpt->nhm_cca_ratio = ENV_MNTR_FAIL_BYTE;
 		rpt->nhm_idle_ratio = ENV_MNTR_FAIL_BYTE;
 		rpt->nhm_pwr = ENV_MNTR_FAIL_BYTE;
-		rpt->nhm_pwr_0p5 = ENV_MNTR_FAIL_BYTE;
 		for (i = 0; i < NHM_RPT_NUM; i++)
 			rpt->nhm_rpt[i] = ENV_MNTR_FAIL_BYTE;
 	}
@@ -2559,14 +2517,13 @@ u8 halbb_env_mntr_result(struct bb_info *bb, struct env_mntr_rpt *rpt)
 		rpt->fahm_ratio = env->fahm_ratio;
 		rpt->fahm_denom_ratio = env->fahm_denom_ratio;
 		rpt->fahm_pwr = env->fahm_pwr;
-		rpt->fahm_pwr_0p5= env->fahm_pwr_0p5;
 		rpt->ccx_rpt_result |= FAHM_SUCCESS;
-		halbb_mem_cpy(bb, &rpt->fahm_rpt[0], &env->fahm_rpt[0], FAHM_RPT_NUM);
+		halbb_mem_cpy(bb, &rpt->fahm_rpt[0], &env->fahm_rpt[0],
+			      FAHM_RPT_NUM);
 	} else {
 		rpt->fahm_ratio = ENV_MNTR_FAIL_BYTE;
 		rpt->fahm_denom_ratio = ENV_MNTR_FAIL_BYTE;
 		rpt->fahm_pwr = ENV_MNTR_FAIL_BYTE;
-		rpt->fahm_pwr_0p5 = ENV_MNTR_FAIL_BYTE;
 		for (i = 0; i < FAHM_RPT_NUM; i++)
 			rpt->fahm_rpt[i] = ENV_MNTR_FAIL_BYTE;
 	}
@@ -2748,6 +2705,110 @@ void halbb_env_mntr_init(struct bb_info *bb)
 	env->idle_pwr_physts= 0;
 }
 
+void halbb_env_mntr_bg_log(struct bb_info *bb, enum phl_phy_idx phy_idx)
+{
+	struct bb_env_mntr_info *env = &bb->bb_env_mntr_i;
+	struct ccx_para_info para = {0};
+	struct env_mntr_rpt rpt = {0};
+	u8 i = 0;
+
+	halbb_env_mntr_get_bg_setting(bb, &para, phy_idx);
+	halbb_env_mntr_get_bg_result(bb, &rpt, phy_idx);
+
+	/*bg_para*/
+	BB_DBG(bb, DBG_ENV_MNTR,
+	       "rac_lv = %d, mntr_time = %d, edcca_opt_sc_idx = %d\n",
+	       para.rac_lv, para.mntr_time,  para.ccx_edcca_opt_sc_idx);
+	BB_DBG(bb, DBG_ENV_MNTR,
+	       "APP:{CLM, NHM, FAHM, IFS_CLM, EDCCA} = {%d, %d, %d, %d, %d}\n",
+	       para.clm_app, para.nhm_app, para.fahm_app, para.ifs_clm_app,
+	       para.edcca_clm_app);
+	BB_DBG(bb, DBG_ENV_MNTR, "clm_input_opt = %d, nhm_inclu_cca = %d\n",
+	       para.clm_input_opt, para.nhm_incld_cca);
+	BB_DBG(bb, DBG_ENV_MNTR, "fahm_numer_opt = %d, fahm_denom_opt = %d\n",
+	       para.fahm_numer_opt, para.fahm_denom_opt);
+
+	/*bg_rpt*/
+	BB_DBG(bb, DBG_ENV_MNTR, "ccx_rpt_stamp = %d\n", rpt.ccx_rpt_stamp);
+	BB_DBG(bb, DBG_ENV_MNTR,
+	       "{Tx, Idle, CCA_p20, CCA_sec, EDCCA_p20} = {%d, %d, %d, %d, %d} %%\n",
+	       rpt.nhm_tx_ratio, rpt.nhm_idle_ratio, rpt.nhm_cca_ratio,
+	       rpt.clm_ratio, rpt.edcca_clm_ratio);
+	BB_DBG(bb, DBG_ENV_MNTR, "{FA, CRC_err} = {%d, %d} %%\n",
+	       rpt.fahm_ratio, rpt.fahm_denom_ratio);
+	BB_DBG(bb, DBG_ENV_MNTR, "FA{CCK, OFDM} = {%d, %d} %%\n",
+	       rpt.ifs_clm_cck_fa_ratio, rpt.ifs_clm_ofdm_fa_ratio);
+	BB_DBG(bb, DBG_ENV_MNTR, "CCA_exclu_FA{CCK, OFDM} = {%d, %d} %%\n",
+	       rpt.ifs_clm_cck_cca_excl_fa_ratio,
+	       rpt.ifs_clm_ofdm_cca_excl_fa_ratio);
+	if ((bb->ic_type == BB_RTL8852A) || (bb->ic_type == BB_RTL8852B) ||
+	    (bb->ic_type == BB_RTL8852C)) {
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "%-16s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       "  Th", NHM_TH_2_RSSI(env->nhm_th[9]),
+		       NHM_TH_2_RSSI(env->nhm_th[8]),
+		       NHM_TH_2_RSSI(env->nhm_th[7]),
+		       NHM_TH_2_RSSI(env->nhm_th[6]),
+		       NHM_TH_2_RSSI(env->nhm_th[5]),
+		       NHM_TH_2_RSSI(env->nhm_th[4]),
+		       NHM_TH_2_RSSI(env->nhm_th[3]),
+		       NHM_TH_2_RSSI(env->nhm_th[2]),
+		       NHM_TH_2_RSSI(env->nhm_th[1]),
+		       NHM_TH_2_RSSI(env->nhm_th[0]));
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "[NHM]  (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       rpt.nhm_pwr, rpt.nhm_rpt[10], rpt.nhm_rpt[9],
+		       rpt.nhm_rpt[8], rpt.nhm_rpt[7], rpt.nhm_rpt[6],
+		       rpt.nhm_rpt[5], rpt.nhm_rpt[4], rpt.nhm_rpt[3],
+		       rpt.nhm_rpt[2], rpt.nhm_rpt[1], rpt.nhm_rpt[0]);
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "[FAHM] (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       rpt.fahm_pwr, rpt.fahm_rpt[10], rpt.fahm_rpt[9],
+		       rpt.fahm_rpt[8], rpt.fahm_rpt[7], rpt.fahm_rpt[6],
+		       rpt.fahm_rpt[5], rpt.fahm_rpt[4], rpt.fahm_rpt[3],
+		       rpt.fahm_rpt[2], rpt.fahm_rpt[1], rpt.fahm_rpt[0]);
+	} else {
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "%-16s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       "  Th", NHM_TH_2_RSSI(env->nhm_th[10]),
+		       NHM_TH_2_RSSI(env->nhm_th[9]),
+		       NHM_TH_2_RSSI(env->nhm_th[8]),
+		       NHM_TH_2_RSSI(env->nhm_th[7]),
+		       NHM_TH_2_RSSI(env->nhm_th[6]),
+		       NHM_TH_2_RSSI(env->nhm_th[5]),
+		       NHM_TH_2_RSSI(env->nhm_th[4]),
+		       NHM_TH_2_RSSI(env->nhm_th[3]),
+		       NHM_TH_2_RSSI(env->nhm_th[2]),
+		       NHM_TH_2_RSSI(env->nhm_th[1]),
+		       NHM_TH_2_RSSI(env->nhm_th[0]));
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "[NHM]  (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       rpt.nhm_pwr, rpt.nhm_rpt[11], rpt.nhm_rpt[10],
+		       rpt.nhm_rpt[9], rpt.nhm_rpt[8], rpt.nhm_rpt[7],
+		       rpt.nhm_rpt[6], rpt.nhm_rpt[5], rpt.nhm_rpt[4],
+		       rpt.nhm_rpt[3], rpt.nhm_rpt[2], rpt.nhm_rpt[1],
+		       rpt.nhm_rpt[0]);
+		BB_DBG(bb, DBG_ENV_MNTR,
+		       "[FAHM] (pwr:%02d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+		       rpt.fahm_pwr, rpt.fahm_rpt[11], rpt.fahm_rpt[10],
+		       rpt.fahm_rpt[9], rpt.fahm_rpt[8], rpt.fahm_rpt[7],
+		       rpt.fahm_rpt[6], rpt.fahm_rpt[5], rpt.fahm_rpt[4],
+		       rpt.fahm_rpt[3], rpt.fahm_rpt[2], rpt.fahm_rpt[1],
+		       rpt.fahm_rpt[0]);
+	}
+	BB_DBG(bb, DBG_ENV_MNTR, "nhm_ratio = %d %%\n", rpt.nhm_ratio);
+	BB_DBG(bb, DBG_ENV_MNTR,
+	       "[IFS] Time(us):[his, ifs_avg(us), cca_avg(us)], total cnt=%d\n",
+	       rpt.ifs_clm_total_ifs);
+	for (i = 0; i < IFS_CLM_NUM; i++)
+		BB_DBG(bb, DBG_ENV_MNTR, 
+		       " *[%d](%04d~%04d):[%03d,     %04d,     %04d]\n", i + 1,
+		       halbb_ccx_idx_cnt_2_us(bb, env->ifs_clm_th_l[i]),
+		       halbb_ccx_idx_cnt_2_us(bb, env->ifs_clm_th_h[i]),
+		       rpt.ifs_clm_his[i], rpt.ifs_clm_ifs_avg[i],
+		       rpt.ifs_clm_cca_avg[i]);
+}
+
 void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			char *output, u32 *_out_len)
 {
@@ -2762,10 +2823,10 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	enum phl_phy_idx phy_idx = HW_PHY_0;
 	u8 set_result = CCX_FAIL;
 	u8 i = 0;
-	bool is_show_rpt = false;
 
-	for (i = 0; i < 2; i++)
+	for (i = 0; i < 2; i++) {
 		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
+	}
 
 	if ((_os_strcmp(input[1], help) == 0)) {
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -2786,7 +2847,115 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			    set_result, rpt.ccx_rpt_stamp);
 
 		if (set_result) {
-			is_show_rpt = true;
+			BB_DBG_CNSL(out_len, used, output + used,
+				    out_len - used,
+				    "{tx, idle, cca_p20, cca_sec, EDCCA_p20} = {%d, %d, %d, %d, %d} %%\n",
+				    rpt.nhm_tx_ratio, rpt.nhm_idle_ratio,
+				    rpt.nhm_cca_ratio, rpt.clm_ratio,
+				    rpt.edcca_clm_ratio);
+			BB_DBG_CNSL(out_len, used, output + used,
+				    out_len - used,
+				    "{FA, CRC32 error} = {%d, %d} %%\n",
+				    rpt.fahm_ratio, rpt.fahm_denom_ratio);
+			BB_DBG_CNSL(out_len, used, output + used,
+				    out_len - used,
+				    "FA{CCK, OFDM} = {%d, %d} %%\n",
+				    rpt.ifs_clm_cck_fa_ratio,
+				    rpt.ifs_clm_ofdm_fa_ratio);
+			BB_DBG_CNSL(out_len, used, output + used,
+				    out_len - used,
+				    "CCA_exclu_FA{CCK, OFDM} = {%d, %d} %%\n",
+				    rpt.ifs_clm_cck_cca_excl_fa_ratio,
+				    rpt.ifs_clm_ofdm_cca_excl_fa_ratio);
+			if ((bb->ic_type == BB_RTL8852A) || (bb->ic_type == BB_RTL8852B) ||
+			    (bb->ic_type == BB_RTL8852C)) {
+				BB_DBG_CNSL(out_len, used, output + used,
+					    out_len - used,
+					    "NHM/FAHM_th(RSSI)[H->L] = [%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+					    NHM_TH_2_RSSI(env->nhm_th[9]),
+					    NHM_TH_2_RSSI(env->nhm_th[8]),
+					    NHM_TH_2_RSSI(env->nhm_th[7]),
+					    NHM_TH_2_RSSI(env->nhm_th[6]),
+					    NHM_TH_2_RSSI(env->nhm_th[5]),
+					    NHM_TH_2_RSSI(env->nhm_th[4]),
+					    NHM_TH_2_RSSI(env->nhm_th[3]),
+					    NHM_TH_2_RSSI(env->nhm_th[2]),
+					    NHM_TH_2_RSSI(env->nhm_th[1]),
+					    NHM_TH_2_RSSI(env->nhm_th[0]));
+				BB_DBG_CNSL(out_len, used, output + used,
+					    out_len - used,
+					    "NHM  rpt(percent)[H->L]=[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+					    rpt.nhm_rpt[10], rpt.nhm_rpt[9],
+					    rpt.nhm_rpt[8], rpt.nhm_rpt[7],
+					    rpt.nhm_rpt[6], rpt.nhm_rpt[5],
+					    rpt.nhm_rpt[4], rpt.nhm_rpt[3],
+					    rpt.nhm_rpt[2], rpt.nhm_rpt[1],
+					    rpt.nhm_rpt[0]);
+				BB_DBG_CNSL(out_len, used, output + used,
+					    out_len - used,
+					    "FAHM rpt(percent)[H->L]=[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+					    rpt.fahm_rpt[10], rpt.fahm_rpt[9],
+					    rpt.fahm_rpt[8], rpt.fahm_rpt[7],
+					    rpt.fahm_rpt[6], rpt.fahm_rpt[5],
+					    rpt.fahm_rpt[4], rpt.fahm_rpt[3],
+					    rpt.fahm_rpt[2], rpt.fahm_rpt[1],
+					    rpt.fahm_rpt[0]);
+			} else {
+				BB_DBG_CNSL(out_len, used, output + used,
+					    out_len - used,
+					    "NHM/FAHM_th(RSSI)[H->L] = [%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+					    NHM_TH_2_RSSI(env->nhm_th[10]),
+					    NHM_TH_2_RSSI(env->nhm_th[9]),
+					    NHM_TH_2_RSSI(env->nhm_th[8]),
+					    NHM_TH_2_RSSI(env->nhm_th[7]),
+					    NHM_TH_2_RSSI(env->nhm_th[6]),
+					    NHM_TH_2_RSSI(env->nhm_th[5]),
+					    NHM_TH_2_RSSI(env->nhm_th[4]),
+					    NHM_TH_2_RSSI(env->nhm_th[3]),
+					    NHM_TH_2_RSSI(env->nhm_th[2]),
+					    NHM_TH_2_RSSI(env->nhm_th[1]),
+					    NHM_TH_2_RSSI(env->nhm_th[0]));
+				BB_DBG_CNSL(out_len, used, output + used,
+					    out_len - used,
+					    "NHM  rpt(percent)[H->L]=[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+					    rpt.nhm_rpt[11], rpt.nhm_rpt[10],
+					    rpt.nhm_rpt[9], rpt.nhm_rpt[8],
+					    rpt.nhm_rpt[7], rpt.nhm_rpt[6],
+					    rpt.nhm_rpt[5], rpt.nhm_rpt[4],
+					    rpt.nhm_rpt[3], rpt.nhm_rpt[2],
+					    rpt.nhm_rpt[1], rpt.nhm_rpt[0]);
+				BB_DBG_CNSL(out_len, used, output + used,
+					    out_len - used,
+					    "FAHM rpt(percent)[H->L]=[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
+					    rpt.fahm_rpt[11], rpt.fahm_rpt[10],
+					    rpt.fahm_rpt[9], rpt.fahm_rpt[8],
+					    rpt.fahm_rpt[7], rpt.fahm_rpt[6],
+					    rpt.fahm_rpt[5], rpt.fahm_rpt[4],
+					    rpt.fahm_rpt[3], rpt.fahm_rpt[2],
+					    rpt.fahm_rpt[1], rpt.fahm_rpt[0]);
+			}
+			BB_DBG_CNSL(out_len, used, output + used,
+				    out_len - used,
+				    "nhm_ratio = %d %%, nhm_pwr(RSSI) = %d, fahm_pwr(RSSI)=%d\n",
+				    rpt.nhm_ratio, rpt.nhm_pwr, rpt.fahm_pwr);
+
+			BB_DBG_CNSL(out_len, used, output + used,
+				    out_len - used, "IFS_total cnt = %d\n",
+				    rpt.ifs_clm_total_ifs);
+
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+				    "Time(us):[his, ifs_avg(us), cca_avg(us)]\n");
+			for (i = 0; i < IFS_CLM_NUM; i++)
+				BB_DBG_CNSL(out_len, used, output + used,
+					    out_len - used,
+					    "T%d(%d ~ %d):[%d, %d, %d]\n",
+					    i + 1, halbb_ccx_idx_cnt_2_us(bb,
+					    env->ifs_clm_th_l[i]),
+					    halbb_ccx_idx_cnt_2_us(bb,
+					    env->ifs_clm_th_h[i]),
+					    rpt.ifs_clm_his[i],
+					    rpt.ifs_clm_ifs_avg[i],
+					    rpt.ifs_clm_cca_avg[i]);
 		} else {
 			BB_DBG_CNSL(out_len, used, output + used,
 				    out_len - used, "Get CCX_rpt all Fail\n");
@@ -2794,26 +2963,7 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		env->ccx_manual_ctrl = false;
 	} else if (var[0] == 101) { /* Get bg results */
 		phy_idx = (enum phl_phy_idx)var[1];
-		halbb_env_mntr_get_bg_setting(bb, &para, phy_idx);
-		halbb_env_mntr_get_bg_result(bb, &rpt, phy_idx);
-
-		/*bg_para*/
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "rac_lv = %d, mntr_time = %d, edcca_opt_sc_idx = %d\n",
-			   para.rac_lv, para.mntr_time,  para.ccx_edcca_opt_sc_idx);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "APP:{CLM, NHM, FAHM, IFS_CLM, EDCCA} = {%d, %d, %d, %d, %d}\n",
-			   para.clm_app, para.nhm_app, para.fahm_app,
-			   para.ifs_clm_app, para.edcca_clm_app);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "clm_input_opt = %d, nhm_inclu_cca = %d\n",
-			   para.clm_input_opt, para.nhm_incld_cca);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "fahm_numer_opt = %d, fahm_denom_opt = %d\n",
-			   para.fahm_numer_opt, para.fahm_denom_opt);
-
-		/*bg_rpt*/
-		is_show_rpt = true;
+		halbb_env_mntr_bg_log(bb, phy_idx);
 	} else if (_os_strcmp(input[1], "noise") == 0) { 
 		/*This command is used for customers, do not modify it arbitrarily*/
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -2853,101 +3003,6 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "Set Result=0x%x, ccx_rpt_stamp=%d\n",
 			    set_result, trig_rpt.ccx_rpt_stamp);
-	}
-
-	if (is_show_rpt) {
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "ccx_rpt_stamp = %d\n", rpt.ccx_rpt_stamp);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "{Tx, Idle, CCA_p20, CCA_sec, EDCCA_p20} = {%d, %d, %d, %d, %d} %%\n",
-			   rpt.nhm_tx_ratio, rpt.nhm_idle_ratio, rpt.nhm_cca_ratio,
-			   rpt.clm_ratio, rpt.edcca_clm_ratio);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "{FA, CRC_err} = {%d, %d} %%\n",
-			   rpt.fahm_ratio, rpt.fahm_denom_ratio);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "FA{CCK, OFDM} = {%d, %d} %%\n",
-		 	   rpt.ifs_clm_cck_fa_ratio, rpt.ifs_clm_ofdm_fa_ratio);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			   "CCA_exclu_FA{CCK, OFDM} = {%d, %d} %%\n",
-			   rpt.ifs_clm_cck_cca_excl_fa_ratio,
-			   rpt.ifs_clm_ofdm_cca_excl_fa_ratio);
-		if ((bb->ic_type == BB_RTL8852A) || (bb->ic_type == BB_RTL8852B) ||
-		    (bb->ic_type == BB_RTL8852C)) {
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "%-18s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-				   "  Th", NHM_TH_2_RSSI(env->nhm_th[9]),
-				   NHM_TH_2_RSSI(env->nhm_th[8]),
-				   NHM_TH_2_RSSI(env->nhm_th[7]),
-				   NHM_TH_2_RSSI(env->nhm_th[6]),
-				   NHM_TH_2_RSSI(env->nhm_th[5]),
-				   NHM_TH_2_RSSI(env->nhm_th[4]),
-				   NHM_TH_2_RSSI(env->nhm_th[3]),
-				   NHM_TH_2_RSSI(env->nhm_th[2]),
-				   NHM_TH_2_RSSI(env->nhm_th[1]),
-				   NHM_TH_2_RSSI(env->nhm_th[0]));
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "[NHM]  (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-				   rpt.nhm_pwr, 5 * (env->nhm_pwr_0p5 & 0x1),
-				   rpt.nhm_rpt[10], rpt.nhm_rpt[9], rpt.nhm_rpt[8],
-				   rpt.nhm_rpt[7], rpt.nhm_rpt[6], rpt.nhm_rpt[5],
-				   rpt.nhm_rpt[4], rpt.nhm_rpt[3], rpt.nhm_rpt[2],
-				   rpt.nhm_rpt[1], rpt.nhm_rpt[0]);
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "[FAHM] (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-				   rpt.fahm_pwr, 5 * (env->fahm_pwr_0p5 & 0x1),
-				   rpt.fahm_rpt[10], rpt.fahm_rpt[9],
-				   rpt.fahm_rpt[8], rpt.fahm_rpt[7], rpt.fahm_rpt[6],
-				   rpt.fahm_rpt[5], rpt.fahm_rpt[4], rpt.fahm_rpt[3],
-				   rpt.fahm_rpt[2], rpt.fahm_rpt[1],
-				   rpt.fahm_rpt[0]);
-		} else {
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "%-18s[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-				   "  Th", NHM_TH_2_RSSI(env->nhm_th[10]),
-				   NHM_TH_2_RSSI(env->nhm_th[9]),
-				   NHM_TH_2_RSSI(env->nhm_th[8]),
-				   NHM_TH_2_RSSI(env->nhm_th[7]),
-				   NHM_TH_2_RSSI(env->nhm_th[6]),
-				   NHM_TH_2_RSSI(env->nhm_th[5]),
-				   NHM_TH_2_RSSI(env->nhm_th[4]),
-				   NHM_TH_2_RSSI(env->nhm_th[3]),
-				   NHM_TH_2_RSSI(env->nhm_th[2]),
-				   NHM_TH_2_RSSI(env->nhm_th[1]),
-				   NHM_TH_2_RSSI(env->nhm_th[0]));
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "[NHM]  (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-				   rpt.nhm_pwr, 5 * (env->nhm_pwr_0p5 & 0x1),
-				   rpt.nhm_rpt[11], rpt.nhm_rpt[10], rpt.nhm_rpt[9],
-				   rpt.nhm_rpt[8], rpt.nhm_rpt[7], rpt.nhm_rpt[6],
-				   rpt.nhm_rpt[5], rpt.nhm_rpt[4], rpt.nhm_rpt[3],
-				   rpt.nhm_rpt[2], rpt.nhm_rpt[1], rpt.nhm_rpt[0]);
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "[FAHM] (pwr:%02d.%d)[%.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d  %.2d]\n",
-				   rpt.fahm_pwr, 5 * (env->fahm_pwr_0p5 & 0x1),
-				   rpt.fahm_rpt[11], rpt.fahm_rpt[10],
-				   rpt.fahm_rpt[9], rpt.fahm_rpt[8], rpt.fahm_rpt[7],
-				   rpt.fahm_rpt[6], rpt.fahm_rpt[5], rpt.fahm_rpt[4],
-				   rpt.fahm_rpt[3], rpt.fahm_rpt[2], rpt.fahm_rpt[1],
-				   rpt.fahm_rpt[0]);
-			}
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "nhm_ratio = %d %%\n", rpt.nhm_ratio);
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-				   "[IFS] Time(us):[his, ifs_avg(us), cca_avg(us)], total cnt=%d\n",
-				   rpt.ifs_clm_total_ifs);
-			for (i = 0; i < IFS_CLM_NUM; i++)
-				BB_DBG_CNSL(out_len, used, output + used,
-					   out_len - used,
-					   " *[%d](%04d~%04d):[%03d,     %04d,     %04d]\n",
-					   i + 1,
-					   halbb_ccx_idx_cnt_2_us(bb,
-					   env->ifs_clm_th_l[i]),
-					   halbb_ccx_idx_cnt_2_us(bb,
-					   env->ifs_clm_th_h[i]),
-					   rpt.ifs_clm_his[i],
-					   rpt.ifs_clm_ifs_avg[i],
-					   rpt.ifs_clm_cca_avg[i]);
 	}
 
 	*_used = used;

@@ -184,7 +184,6 @@ static int cmd_idle_st_hdl(void *obj, u16 event, void *param)
 		/* We need to request power */
 		cmd_add_wdog_event(pcmd);
 
-		fallthrough;
 		/* fall through */
 
 	case CMD_EV_REQ_PWR:
@@ -247,7 +246,6 @@ static int cmd_req_pwr_st_hdl(void *obj, u16 event, void *param)
 		}
 
 		/* RTW_PHL_STATUS_SUCCESS */
-		fallthrough;
 		/* fall through */
 
 	case CMD_EV_PWR_ON_OK:
@@ -330,7 +328,6 @@ static int cmd_service_st_hdl(void *obj, u16 event, void *param)
 			break;
 
 		/* no more commands */
-		fallthrough;
 		/* fall through */
 
 	case FSM_EV_CANCEL:

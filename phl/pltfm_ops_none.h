@@ -173,23 +173,14 @@ static inline void _os_cache_wback(void *d, _dma *bus_addr_l,
 {
 }
 
-static inline void *_os_dma_pool_create(void *d, char *name, u32 wd_page_sz)
-{
-	return NULL;
-}
-
-static inline void _os_dma_pool_destory(void *d, void *pool)
-{
-}
-
 /* txbd, rxbd, wd */
-static inline void *_os_shmem_alloc(void *d, void *pool, _dma *bus_addr_l,
+static inline void *_os_shmem_alloc(void *d, _dma *bus_addr_l,
 				    _dma *bus_addr_h, u32 buf_sz,
 				    u8 cache, u8 direction, void **os_rsvd)
 {
 	return NULL;
 }
-static inline void _os_shmem_free(void *d, void *pool, u8 *vir_addr, _dma *bus_addr_l,
+static inline void _os_shmem_free(void *d, u8 *vir_addr, _dma *bus_addr_l,
 				  _dma *bus_addr_h, u32 buf_sz,
 				  u8 cache, u8 direction, void *os_rsvd)
 {
@@ -208,12 +199,12 @@ static inline void *_os_pkt_buf_map_rx(void *d, _dma *bus_addr_l, _dma *bus_addr
 }
 
 static inline void *_os_pkt_buf_alloc_rx(void *d, _dma *bus_addr_l,
-			_dma *bus_addr_h, u32 buf_sz, u8 cache, void **os_priv)
+			_dma *bus_addr_h, u32 buf_sz, void **os_priv)
 {
 	return NULL;
 }
 static inline u8 *_os_pkt_buf_free_rx(void *d, u8 *vir_addr, _dma bus_addr_l,
-			_dma bus_addr_h, u32 buf_sz, u8 cache, void *os_priv)
+			_dma bus_addr_h, u32 buf_sz, void *os_priv)
 {
 	return NULL;
 }
@@ -508,6 +499,7 @@ static inline u32 _os_read_file(const char *path, u8 *buf, u32 sz)
 	return 0;
 }
 
+#ifdef CONFIG_PCI_HCI
 static __inline u8 _os_read8_pcie(void *h, u32 addr)
 {
 	return 0;
@@ -534,6 +526,134 @@ static __inline u32 _os_write32_pcie(void *h, u32 addr, u32 val)
 {
 	return 0;
 }
+#endif/*#ifdef CONFIG_PCI_HCI*/
+
+#ifdef CONFIG_USB_HCI
+static __inline u32 _os_usbctrl_vendorreq(void *h, u8 request, u16 value,
+			u16 index, void *pdata, u16 len, u8 requesttype)
+{
+	return 0;
+}
+
+static inline int os_usb_tx(void *h, u8 *tx_buf_ptr,
+			u8 bulk_id, u32 len, u8 *pkt_data_buf)
+{
+	return 1;
+}
+
+static __inline void os_enable_usb_out_pipes(void *drv_priv)
+{
+}
+
+static __inline void os_disable_usb_out_pipes(void *drv_priv)
+{
+	/* Free bulkout urb */
+}
+
+static __inline u8 os_out_token_alloc(void *drv_priv)
+{
+	return 0; // RTW_PHL_STATUS_SUCCESS
+}
+
+static __inline void os_out_token_free(void *drv_priv)
+{
+}
+
+
+static __inline u8 os_in_token_alloc(void *drv_priv)
+{
+	// Allocate in token (pUrb) list
+	return 0;
+}
+
+static __inline void os_in_token_free(void *drv_priv)
+{
+	// Free in token (pUrb) list
+}
+
+
+static __inline u8 os_send_usb_in_token(void *drv_priv, void *rxobj, u8 *inbuf, u32 inbuf_len, u8 pipe_idx, u8 minLen)
+{
+	// send rtw_rx_buf to os
+	return 0;
+}
+
+static __inline void os_enable_usb_in_pipes(void *drv_priv)
+{
+}
+
+static __inline void os_disable_usb_in_pipes(void *drv_priv)
+{
+}
+
+#endif /*CONFIG_USB_HCI*/
+
+#ifdef CONFIG_SDIO_HCI
+static inline u8 _os_sdio_cmd52_r8(void *d, u32 offset)
+{
+	return 0;
+}
+
+static inline u8 _os_sdio_cmd53_r8(void *d, u32 offset)
+{
+	return 0;
+}
+
+static inline u16 _os_sdio_cmd53_r16(void *d, u32 offset)
+{
+	return 0;
+}
+
+static inline u32 _os_sdio_cmd53_r32(void *d, u32 offset)
+{
+	return 0;
+}
+
+static inline u8 _os_sdio_cmd53_rn(void *d, u32 offset, u32 size, u8 *data)
+{
+	return 0;
+}
+
+static inline u8 _os_sdio_cmd53_r(void *d, u32 offset, u32 size, u8 *data)
+{
+	return 0;
+}
+
+static inline void _os_sdio_cmd52_w8(void *d, u32 offset, u8 val)
+{
+}
+
+static inline void _os_sdio_cmd53_w8(void *d, u32 offset, u8 val)
+{
+}
+
+static inline void _os_sdio_cmd53_w16(void *d, u32 offset, u16 val)
+{
+}
+
+static inline void _os_sdio_cmd53_w32(void *d, u32 offset, u32 val)
+{
+}
+
+static inline void _os_sdio_cmd53_wn(void *d, u32 offset, u32 size, u8 *data)
+{
+}
+
+static inline void _os_sdio_cmd53_w(void *d, u32 offset, u32 size, u8 *data)
+{
+}
+
+static inline u8 _os_sdio_f0_read(void *d, u32 addr, void *buf, size_t len)
+{
+	return 0;
+}
+
+static inline u8 _os_sdio_read_cia_r8(void *d, u32 addr)
+{
+	return 0;
+}
+#endif /*CONFIG_SDIO_HCI*/
+
 
 /*
 * Continuous bits starting from least significant bit

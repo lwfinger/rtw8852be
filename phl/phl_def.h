@@ -43,7 +43,7 @@ enum phl_hw_port {
 	HW_PORT_MAX,
 };
 
-#define RTW_MAX_TID_NUM 16
+#define RTW_MAX_TID_NUM 8
 #define RTW_MAX_AC_QUEUE_NUM 4
 enum phl_ac_queue {
 	PHL_BE_QUEUE_SEL		= 0,
@@ -51,11 +51,6 @@ enum phl_ac_queue {
 	PHL_VI_QUEUE_SEL		= 2,
 	PHL_VO_QUEUE_SEL		= 3,
 	PHL_AC_QUEUE_TOTAL
-};
-
-enum phl_stat_info_query {
-	STAT_INFO_FA_ALL,
-	STAT_INFO_CCA_ALL,
 };
 
 /**
@@ -101,20 +96,68 @@ struct rtw_chan_ctx {
 };
 
 
+#ifdef CONFIG_PCI_HCI
 struct rtw_pci_info {
 	u8 dummy;
 };
+#endif
 
-enum rtw_rx_status {
-	RTW_STATUS_RX_OK,
-	RTW_STATUS_RXDMA_HANG,
-	RTW_STATUS_RXFIFO_HANG
+
+#ifdef CONFIG_USB_HCI
+struct rtw_usb_info {
+	enum rtw_usb_speed usb_speed; /* USB 1.1, 2.0 or 3.0 */
+	u16 usb_bulkout_size;
+	u8 outep_num;
+	u8 inep_num;
 };
+
+enum phl_usb_rx_agg_mode {
+	PHL_RX_AGG_DISABLE,
+	PHL_RX_AGG_DEFAULT,
+	PHL_RX_AGG_SMALL_PKT,
+	PHL_RX_AGG_USER_DEFINE,
+};
+/*
+ * refers to _usb.h
+ * #define SWITCHMODE           0x2
+ * #define FORCEUSB3MODE        0x1
+ * #define FORCEUSB2MODE        0x0
+*/
+enum rtw_usb_sw_ability {
+	RTW_USB2_ONLY = 0,
+	RTW_USB3_ONLY,
+	RTW_USB_SUPPORT_SWITCH,
+	RTW_USB_SUPPORT_MAX
+};
+#endif
+
+#ifdef CONFIG_SDIO_HCI
+struct rtw_sdio_info {
+	unsigned int clock;
+	unsigned int timing;
+	u8 sd3_bus_mode;
+	u16 block_sz;
+	u16 io_align_sz;
+	u16 tx_align_sz;
+	bool tx_512_by_byte_mode;	/* Send 512 bytes by cmd53 byte or */
+					/* block mode. */
+};
+#endif
 
 struct rtw_ic_info {
 	enum rtl_ic_id ic_id;
 	enum rtw_hci_type hci_type;
+	#ifdef CONFIG_SDIO_HCI
+	struct rtw_sdio_info sdio_info;
+	#endif
+
+	#ifdef CONFIG_USB_HCI
+	struct rtw_usb_info usb_info;
+	#endif
+
+	#ifdef CONFIG_PCI_HCI
 	struct rtw_pci_info pci_info;
+	#endif
 };
 
 enum rtw_proc_cmd_type {
@@ -152,19 +195,14 @@ struct rtw_proc_cmd {
 enum rtw_para_src {
 	RTW_PARA_SRC_INTNAL, /* 0 */
 	RTW_PARA_SRC_EXTNAL, /* 1 */
-	RTW_PARA_SRC_EXTNAL_BUF, /* 2 */
-	RTW_PARA_SRC_CUSTOM, /* 3 */
+	RTW_PARA_SRC_CUSTOM, /* 2 */
 	RTW_PARA_SRC_MAX
 };
 
 struct rtw_para_info_t {
 	enum rtw_para_src para_src;
 	char para_path[256];
-	char *hal_phy_folder;
-	char postfix[33];
 
-	u8 *ext_para_file_buf;
-	u32 ext_para_file_buf_len;
 	u32 para_data_len;
 	u32 *para_data;
 };
@@ -174,11 +212,7 @@ struct rtw_para_info_t {
 struct rtw_para_pwrlmt_info_t {
 	enum rtw_para_src para_src;
 	char para_path[256];
-	char *hal_phy_folder;
-	char postfix[33];
 
-	u8 *ext_para_file_buf;
-	u32 ext_para_file_buf_len;
 	u32 para_data_len;
 	u32 *para_data;
 
@@ -227,11 +261,7 @@ struct rtw_phl_handler {
 	char type;
 	void *drv_priv;
 	struct _os_handler os_handler;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
-	void (*callback)(unsigned long context);
-#else
 	void (*callback)(void *context);
-#endif
 	void *context;
 };
 
@@ -312,7 +342,6 @@ enum wr_chg_id {
 	WR_CHG_RTS_TH,
 	WR_CHG_DFS_HE_TB_CFG,
 	WR_CHG_TRX_PATH,
-	WR_CHG_STBC_CFG,
 	WR_CHG_MAX,
 };
 
@@ -522,7 +551,7 @@ enum phl_msg_evt_id {
 	MSG_EVT_LISTEN_STATE_EXPIRE = 55,
 	/* beamform */
 	MSG_EVT_SET_VHT_GID = 56,
-	MSG_EVT_HW_WATCHDOG = 57,
+	MSG_EVT_WATCHDOG = 57,
 	MSG_EVT_DEV_CANNOT_IO = 58,
 	MSG_EVT_DEV_RESUME_IO = 59,
 	MSG_EVT_FORCE_USB_SW = 60,
@@ -585,12 +614,6 @@ enum phl_msg_evt_id {
 	MSG_EVT_CHG_OP_CH_DEF_START = 111,
 	MSG_EVT_CHG_OP_CH_DEF_END = 112,
 	MSG_EVT_MDL_CHECK_STOP = 113,
-	MSG_EVT_HW_RF_CHG = 114,
-
-	MSG_EVT_TX_PKT_NTFY = 115,
-	MSG_EVT_SW_WATCHDOG = 116,
-	/* ltr */
-	MSG_EVT_LTR_TX_DLY = 199,
 	/* dbg */
 	MSG_EVT_DBG_SIP_REG_DUMP = 200,
 	MSG_EVT_DBG_FULL_REG_DUMP = 201,
@@ -1044,10 +1067,8 @@ struct protocol_cap_t {
 	u8 nss_rx:3;
 
 	u8 num_ampdu_bk;
-	u8 cap_option;
 };
 
-#define EXT_CAP_LIMIT_2G_RX_STBC	BIT0
 
 
 #define LOAD_MAC_REG_FILE				BIT0
@@ -1072,16 +1093,8 @@ enum rtw_pcie_ltr_state {
 	RTW_PCIE_LTR_SW_IDLE = 2
 };
 
-struct rtw_pcie_trx_mit_info_t {
-	u32 tx_timer;
-	u8 tx_counter;
-	u32 rx_timer;
-	u8 rx_counter;
-	u8 fixed_mitigation; /*no watchdog dynamic setting*/
-	void *priv;
-};
-
 struct bus_sw_cap_t {
+#ifdef CONFIG_PCI_HCI
 	enum rtw_pcie_bus_func_cap_t l0s_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1ss_ctrl;
@@ -1092,8 +1105,6 @@ struct bus_sw_cap_t {
 	u32 rpbd_num;
 	u32 rxbuf_num;
 	u32 rpbuf_num;
-	u32 read_txbd_lvl; /* 0: always read, 1: < 1/2 tx res, 2: < 1/4 tx res */
-	struct rtw_pcie_trx_mit_info_t mit_ctl;
 	u8 clkdly_ctrl;
 	u8 l0sdly_ctrl;
 	u8 l1dly_ctrl;
@@ -1107,12 +1118,28 @@ struct bus_sw_cap_t {
 	u32 ltr_sw_act_tri_cnt;
 	u32 ltr_sw_idle_tri_cnt;
 	u8 ltr_cur_state;
-	#ifdef RTW_WKARD_GET_PROCESSOR_ID
-	u64 proc_id; /* processor id */
-	#endif
+#elif defined (CONFIG_USB_HCI)
+	u32 tx_buf_size;
+	u32 tx_buf_num;
+	u32 tx_mgnt_buf_size;
+	u32 tx_mgnt_buf_num;
+	u32 tx_h2c_buf_num;
+	u32 rx_buf_size;
+	u32 rx_buf_num;
+	u32 in_token_num;
+#elif defined(CONFIG_SDIO_HCI)
+	u32 tx_buf_size;
+	u32 tx_buf_num;
+	u32 tx_mgnt_buf_size;
+	u32 tx_mgnt_buf_num;
+	u32 rx_buf_size;
+	u32 rx_buf_num;
+#else
+	u8 temp_for_struct_empty; /* for undefined interface */
+#endif
 };
-
 struct bus_cap_t {
+#ifdef CONFIG_PCI_HCI
 	enum rtw_pcie_bus_func_cap_t l0s_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1_ctrl;
 	enum rtw_pcie_bus_func_cap_t l1ss_ctrl;
@@ -1123,7 +1150,6 @@ struct bus_cap_t {
 	u32 rpbd_num;
 	u32 rxbuf_num;
 	u32 rpbuf_num;
-	u32 read_txbd_th;
 	u8 clkdly_ctrl;
 	u8 l0sdly_ctrl;
 	u8 l1dly_ctrl;
@@ -1132,9 +1158,25 @@ struct bus_cap_t {
 	u8 ltr_init_state;
 	u8 ltr_sw_ctrl;
 	u8 ltr_hw_ctrl;
-	#ifdef RTW_WKARD_GET_PROCESSOR_ID
-	u64 proc_id; /* processor id */
-	#endif
+#elif defined (CONFIG_USB_HCI)
+	u32 tx_buf_size;
+	u32 tx_buf_num;
+	u32 tx_mgnt_buf_size;
+	u32 tx_mgnt_buf_num;
+	u32 tx_h2c_buf_num;
+	u32 rx_buf_size;
+	u32 rx_buf_num;
+	u32 in_token_num;
+#elif defined(CONFIG_SDIO_HCI)
+	u32 tx_buf_size;
+	u32 tx_buf_num;
+	u32 tx_mgnt_buf_size;
+	u32 tx_mgnt_buf_num;
+	u32 rx_buf_size;
+	u32 rx_buf_num;
+#else
+	u8 temp_for_struct_empty; /* for undefined interface */
+#endif
 };
 
 #ifdef CONFIG_PHL_TWT
@@ -1322,7 +1364,6 @@ struct  rtw_wow_cap_t {
 	u8 arp_ofld_sup;
 	u8 ns_oflod_sup;
 	u8 gtk_ofld_sup;
-	u8 nlo_sup;
 };
 
 /**
@@ -1497,7 +1538,6 @@ struct dev_cap_t {
 	u8 hw_stype_cap;
 	u8 wl_func_cap;
 	u8 rpq_agg_num; /* 0: no adjust, use mac default size: 121 */
-	bool quota_turbo;
 };
 
 #ifdef RTW_PHL_BCN //phl def
@@ -1725,7 +1765,6 @@ struct rtw_stats {
 	struct rtw_traffic_t tx_traffic;
 	struct rtw_traffic_t rx_traffic;
 	u32 rx_tf_cnt; /* rx trigger frame number (accumulated, only reset in disconnect) */
-	u32 pre_rx_tf_cnt; /* last record rx trigger frame number from BB */
 };
 enum sta_chg_id {
 	STA_CHG_BW,
@@ -1763,9 +1802,6 @@ struct rtw_hal_stainfo_t;
 struct rtw_phl_stainfo_t {
 	_os_list list;
 	struct rtw_wifi_role_t *wrole;
-#ifdef RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
-	bool allocated;
-#endif
 	bool active;
 	u16 aid;
 	u16 macid;
@@ -1785,7 +1821,7 @@ struct rtw_phl_stainfo_t {
 	u8 addr_msk;
 
 	/* rx agg */
-	struct phl_tid_ampdu_rx *tid_rx[RTW_MAX_TID_NUM]; /* TID_MAX_NUM */
+	struct phl_tid_ampdu_rx *tid_rx[8]; /* TID_MAX_NUM */
 	_os_lock tid_rx_lock;               /* guarding @tid_rx */
 	_os_event comp_sync;     /* reorder timer completion event */
 	_os_timer reorder_timer; /* reorder timer for all @tid_rx of the
@@ -1885,6 +1921,9 @@ struct hal_spec_t {
 	u8 rf_reg_path_num;
 	u8 max_tx_cnt;
 
+	u8 tx_nss_num:4;
+	u8 rx_nss_num:4;
+
 	u8 band_cap;	/* value of BAND_CAP_XXX */
 	u8 bw_cap;	/* value of BW_CAP_XXX */
 	u8 port_num;
@@ -1899,10 +1938,16 @@ struct hal_spec_t {
 	u8 rx_bd_info_sz;
 
 	u16 rx_tag[2];
+	#ifdef CONFIG_USB_HCI
+	u8 max_bulkin_num;
+	u8 max_bulkout_num;
+	#endif
+	#ifdef CONFIG_PCI_HCI
 	u16 txbd_multi_tag;
 	u8 txbd_upd_lmt;
 	#ifdef RTW_WKARD_BUSCAP_IN_HALSPEC
 	u8 phyaddr_num;
+	#endif
 	#endif
 	u8 cts2_thres_en;
 	u16 cts2_thres;
@@ -1974,14 +2019,6 @@ struct rtw_fw_info_t {
 	u32 sym_buf_size;
 };
 
-enum rtw_fw_status {
-	RTW_FW_STATUS_OK,
-	RTW_FW_STATUS_NOFW,
-	RTW_FW_STATUS_ASSERT,
-	RTW_FW_STATUS_EXCEP,
-	RTW_FW_STATUS_RXI300,
-	RTW_FW_STATUS_HANG
-};
 
 #ifdef CONFIG_PHL_DFS
 enum dfs_regd_t {
@@ -2586,6 +2623,8 @@ struct rtw_phl_com_t {
 	bool append_fcs;
 	bool accept_icv_err;
 
+	u8 tx_nss; /*tx Spatial Streams - GET_HAL_TX_NSS, get_min from registery and hal_spec*/
+	u8 rx_nss; /*rx Spatial Streams - GET_HAL_RX_NSS, get_min from registery and hal_spec*/
 	u8 rf_type; /*enum rf_type , is RF_PATH - GET_HAL_RFPATH*/
 	u8 rf_path_num; /*GET_HAL_RFPATH_NUM*/
 	u8 regulation;  /*regulation*/
@@ -2733,58 +2772,7 @@ enum pkt_ofld_type {
 	PKT_TYPE_REALWOW_KAPKT = 9, /* RealWoW Keep Alive Packet */
 	PKT_TYPE_REALWOW_ACK = 10, /* RealWoW Ack Patten */
 	PKT_TYPE_REALWOW_WP = 11, /* RealWoW Wakeup Patten */
-	PKT_TYPE_PROBE_REQ = 12,
 	PKT_OFLD_TYPE_MAX,
-};
-
-struct scan_ofld_ch_info {
-	u8 center_chan;
-	u8 chan; /* primary channel */
-	u8 bw;
-	u8 period;
-	bool tx_pkt; /* 1:probe request will be sent */
-	bool tx_data_pause; /* 1:no data will be sent during fw scanning */
-};
-
-enum SCAN_OFLD_OP {
-	SCAN_OFLD_OP_STOP,
-	SCAN_OFLD_OP_START,
-	SCAN_OFLD_OP_SET
-};
-
-enum SCAN_OFLD_MD {
-	/* scan once */
-	SCAN_OFLD_MD_ONCE,
-	/**
-	 * normal period repeatd
-	 * e.g., period = 2s
-	 * scan - 2s - scan - 2s -....
-	 */
-
-	SCAN_OFLD_MD_PD,
-	/**
-	 * slow period repeat
-	 * e.g., period = 2s, cycle = 2, slow period = 3s
-	 * scan - 2s - scan - 2s - scan - 3s - scan - 3s
-	 */
-	SCAN_OFLD_MD_PD_SLOW,
-	/**
-	 * seamless
-	 * scan - scan - scan - scan - scan  -....
-	 */
-	SCAN_OFLD_MD_SEEMLESS,
-};
-
-struct scan_ofld_info {
-	enum SCAN_OFLD_OP operation;
-	enum SCAN_OFLD_MD mode;
-	/* destinated tsf to start scanning, set 0 for both to scan immediately*/
-	u32 tsf_low;
-	u32 tsf_high;
-	u32 probe_req_pkt_id;
-	u32 period; /* SCAN_OFLD_MD_PD & SCAN_OFLD_MD_PD_SLOW */
-	u8 cycle; /* SCAN_OFLD_MD_PD & SCAN_OFLD_MD_PD_SLOW*/
-	u32 slow_period; /* SCAN_OFLD_MD_PD_SLOW */
 };
 
 struct mp_plcp_param_t {
@@ -3167,11 +3155,19 @@ struct rtw_phl_rainfo {
 	enum rtw_gi_ltf gi_ltf;
 };
 
+struct rtw_pcie_trx_mit_info_t {
+	u32 tx_timer;
+	u8 tx_counter;
+	u32 rx_timer;
+	u8 rx_counter;
+	u8 fixed_mitigation; /*no watchdog dynamic setting*/
+	void *priv;
+};
+
 struct rtw_env_report {
 	bool rpt_status; /*1 means CCX_SUCCESS,0 means fail*/
 	u8 clm_ratio;
 	u8 nhm_ratio;
-	u8 nhm_tx_ratio;
 	u8 nhm_pwr;
 	u8 nhm_cca_ratio;
 };

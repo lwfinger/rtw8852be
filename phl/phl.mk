@@ -82,7 +82,15 @@ _PHL_FILES += $(phl_path)phl_cmd_dispatch_engine.o\
 						$(phl_path)phl_sound_cmd.o \
 						$(phl_path)phl_watchdog.o
 
+ifeq ($(CONFIG_PCI_HCI), y)
 _PHL_FILES += $(phl_path)hci/phl_trx_pcie.o
+endif
+ifeq ($(CONFIG_USB_HCI), y)
+_PHL_FILES += $(phl_path)hci/phl_trx_usb.o
+endif
+ifeq ($(CONFIG_SDIO_HCI), y)
+_PHL_FILES += $(phl_path)hci/phl_trx_sdio.o
+endif
 
 ifeq ($(CONFIG_PHL_CUSTOM_FEATURE), y)
 _PHL_FILES += $(phl_path)custom/phl_custom.o

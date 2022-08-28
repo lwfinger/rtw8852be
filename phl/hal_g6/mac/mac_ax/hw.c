@@ -185,11 +185,6 @@ u32 set_enable_bb_rf(struct mac_ax_adapter *adapter, u8 enable)
 			value8 = PHYREG_SET_ALL_CYCLE;
 			MAC_REG_W8(R_AX_PHYREG_SET, value8);
 		} else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-			/* 0x200[18:17] = 2'b01 */
-			value32 = MAC_REG_R32(R_AX_SPS_DIG_ON_CTRL0);
-			value32 = SET_CLR_WORD(value32, 0x1, B_AX_REG_ZCDC_H);
-			MAC_REG_W32(R_AX_SPS_DIG_ON_CTRL0, value32);
-
 			/* RDC KS/BB suggest : write 1 then write 0 then write 1 */
 			value32 = MAC_REG_R32(R_AX_WLRF_CTRL);
 			value32 = (value32 | B_AX_AFC_AFEDIG);
@@ -367,12 +362,12 @@ u32 set_cctl_rty_limit(struct mac_ax_adapter *adapter,
 {
 #define DFLT_DATA_RTY_LIMIT 32
 #define DFLT_RTS_RTY_LIMIT 15
-	struct rtw_hal_mac_ax_cctl_info info;
-	struct rtw_hal_mac_ax_cctl_info mask;
+	struct mac_ax_cctl_info info;
+	struct mac_ax_cctl_info mask;
 	u32 data_rty, rts_rty;
 
-	PLTFM_MEMSET(&mask, 0, sizeof(struct rtw_hal_mac_ax_cctl_info));
-	PLTFM_MEMSET(&info, 0, sizeof(struct rtw_hal_mac_ax_cctl_info));
+	PLTFM_MEMSET(&mask, 0, sizeof(struct mac_ax_cctl_info));
+	PLTFM_MEMSET(&info, 0, sizeof(struct mac_ax_cctl_info));
 
 	data_rty = cfg->data_lmt_val == 0 ?
 		DFLT_DATA_RTY_LIMIT : cfg->data_lmt_val;
@@ -1644,14 +1639,12 @@ u32 cfg_mac_bw(struct mac_ax_adapter *adapter, struct mac_ax_cfg_bw *cfg)
 		txsc80 = rtw_hal_bb_get_txsc(hal_com, cfg->pri_ch,
 					     cfg->central_ch, cfg->cbw,
 					     CHANNEL_WIDTH_80);
-		fallthrough;
-		/* fall through */
+		fallthrough;	/* fall through */
 	case CHANNEL_WIDTH_80:
 		txsc40 = rtw_hal_bb_get_txsc(hal_com, cfg->pri_ch,
 					     cfg->central_ch, cfg->cbw,
 					     CHANNEL_WIDTH_40);
-		fallthrough;
-		/* fall through */
+		fallthrough;	/* fall through */
 	case CHANNEL_WIDTH_40:
 		txsc20 = rtw_hal_bb_get_txsc(hal_com, cfg->pri_ch,
 					     cfg->central_ch, cfg->cbw,
@@ -2769,18 +2762,6 @@ u32 mac_io_chk_access(struct mac_ax_adapter *adapter, u32 offset)
 	if (adapter->sm.fw_rst == MAC_AX_FW_RESET_IDLE &&
 	    adapter->mac_pwr_info.pwr_in_lps && ADDR_NOT_ALLOW_LPS(offset))
 		return MACIOERRLPS;
-
-	return MACSUCCESS;
-}
-
-u32 mac_watchdog(struct mac_ax_adapter *adapter)
-{
-	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	u32 ret = MACSUCCESS;
-
-	ret = ops->pcie_autok_counter_avg(adapter);
-	if (ret != MACSUCCESS)
-		return ret;
 
 	return MACSUCCESS;
 }

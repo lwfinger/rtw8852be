@@ -124,14 +124,14 @@ static u32 txdes_proc_data(struct mac_ax_adapter *adapter,
 	struct wd_info_t *wdi;
 	u8 wd_info_tmpl[WD_INFO_PKT_MAX][24] = {{0}};
 	u32 ret;
-	u8 qsel, dbcc_wmm;
+	u8 ch, qsel;
 
 	if (len != mac_txdesc_len(adapter, info)) {
 		PLTFM_MSG_ERR("[ERR] illegal len %d\n", len);
 		return MACBUFSZ;
 	}
 
-	if (info->dma_ch > MAC_AX_DATA_CH11) {
+	if (info->dma_ch > MAC_AX_DATA_HIQ) {
 		PLTFM_MSG_ERR("[ERR] txd ch %d illegal\n", info->dma_ch);
 		return MACTXCHDMA;
 	}
@@ -164,6 +164,14 @@ static u32 txdes_proc_data(struct mac_ax_adapter *adapter,
 		return MACINTF;
 	}
 
+	if (info->dma_ch == MAC_AX_DATA_HIQ &&
+	    adapter->hw_info->intf == MAC_AX_INTF_USB)
+		ch = info->band ? MAC_AX_DMA_B1MG : MAC_AX_DMA_B0MG;
+	else if (info->dma_ch == MAC_AX_DATA_HIQ)
+		ch = info->band ? MAC_AX_DMA_B1HI : MAC_AX_DMA_B0HI;
+	else
+		ch = info->dma_ch;
+
 	wdb->dword0 |=
 		cpu_to_le32(SET_WORD(info->hw_seq_mode,
 				     AX_TXD_EN_HWSEQ_MODE) |
@@ -171,7 +179,7 @@ static u32 txdes_proc_data(struct mac_ax_adapter *adapter,
 				     AX_TXD_HW_SSN_SEL) |
 			    SET_WORD(info->hdr_len,
 				     AX_TXD_HDR_LLC_LEN) |
-			    SET_WORD(info->dma_ch, AX_TXD_CH_DMA) |
+			    SET_WORD(ch, AX_TXD_CH_DMA) |
 			    (info->hw_amsdu ? AX_TXD_HWAMSDU : 0) |
 			    (info->smh_en ? AX_TXD_SMH_EN : 0) |
 			    (info->hw_sec_iv ? AX_TXD_HW_AES_IV : 0) |
@@ -181,15 +189,8 @@ static u32 txdes_proc_data(struct mac_ax_adapter *adapter,
 	wdb->dword1 =
 		cpu_to_le32(SET_WORD(info->shcut_camid, AX_TXD_SHCUT_CAMID));
 	/* Get bb and qsel from qsel by according MAC ID */
-	if (info->macid < DBCC_WMM_LIST_SIZE)
-		dbcc_wmm = *(adapter->dbcc_info->dbcc_wmm_list + info->macid);
-	else
-		dbcc_wmm = MAC_AX_DBCC_WMM_INVALID;
-
-	if (info->dma_ch == MAC_AX_DATA_CH9 || info->dma_ch == MAC_AX_DATA_CH11)
+	if (info->dma_ch == MAC_AX_DATA_HIQ)
 		qsel = info->band ? MAC_AX_HI1_SEL : MAC_AX_HI0_SEL;
-	else if (dbcc_wmm != MAC_AX_DBCC_WMM_INVALID)
-		qsel = (dbcc_wmm << 2) | qsel_l[info->tid];
 	else
 		qsel = (info->band << 3) | (info->wmm << 2) | qsel_l[info->tid];
 	wdb->dword2 =

@@ -194,7 +194,6 @@ static int snd_fsm_func_ready_st_hdl(void *obj, u16 event, void *param)
 			snd_set_timer(snd, 10, SND_EV_TERMINATE);
 			break;
 		}
-		fallthrough;
 		/* fall through */
 	/*go through*/
 	case SND_FUNC_EV_START_SND_PROC:
@@ -279,7 +278,6 @@ static int snd_fsm_proc_idle_st_hdl(void *obj, u16 event, void *param)
 				phl_snd_proc_chk_prev_grp(snd->phl_info, grp);
 			}
 		}
-		fallthrough;
 		/* fall through */
 	/* go through */
 	case SND_PROC_EV_IDLE_GET_SND_GRP :
@@ -354,7 +352,6 @@ static int snd_fsm_proc_busy_st_hdl(void *obj, u16 event, void *param)
 		PHL_TRACE(COMP_PHL_SOUND, _PHL_INFO_,
 			  "SND_PROC_BUSY : grp sta-3 macid = 0x%x \n",
 			  grp->sta[3].macid);
-		fallthrough;
 		/* fall through */
 	case SND_PROC_EV_BUSY_GET_BF_RES:
 		pstatus = phl_snd_proc_get_res(snd->phl_info, grp, &sta_num);
@@ -364,12 +361,10 @@ static int snd_fsm_proc_busy_st_hdl(void *obj, u16 event, void *param)
 			snd_set_timer(snd, 0, SND_PROC_EV_BUSY_SND_DOWN);
 			break;
 		}
-		fallthrough;
 		/* fall through */
 	/* go through */
 	case SND_PROC_EV_BUSY_PRE_CFG:
 		pstatus = phl_snd_proc_precfg(snd->phl_info, grp);
-		fallthrough;
 		/* fall through */
 	/* go through */
 	case SND_PROC_EV_BUSY_TRIG_SND:
@@ -452,7 +447,6 @@ static int snd_fsm_proc_down_st_hdl(void *obj, u16 event, void *param)
 			snd_set_timer(snd, snd_param->snd_proc_period,
 				      SND_PROC_EV_DOWN_SND_END);
 		}
-		fallthrough;
 		/* fall through */
 	/* go through */
 	case SND_PROC_EV_DOWN_POST_CFG:
@@ -461,7 +455,6 @@ static int snd_fsm_proc_down_st_hdl(void *obj, u16 event, void *param)
 			PHL_TRACE(COMP_PHL_SOUND, _PHL_INFO_,
 				  "POST CONFIG SUCCESS!!!!\n");
 		}
-		fallthrough;
 		/* fall through */
 	/* go through */
 	case SND_PROC_EV_DOWN_SND_END:

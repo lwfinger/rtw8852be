@@ -3051,8 +3051,48 @@ void _rtw_mcache_free(rtw_mcache *cachep, void *objp)
 #endif
 }
 
+#ifdef DBG_MEM_ALLOC
+inline void *dbg_rtw_mcache_alloc(rtw_mcache *cachep, const enum mstat_f flags, const char *func, const int line)
+{
+	void *p;
+	u32 sz = cachep->size;
+
+	if (match_mstat_sniff_rules(flags, sz))
+		RTW_INFO("DBG_MEM_ALLOC %s:%d %s(%u)\n", func, line, __func__, sz);
+
+	p = _rtw_mcache_alloc(cachep);
+
+	rtw_mstat_update(
+		flags
+		, p ? MSTAT_ALLOC_SUCCESS : MSTAT_ALLOC_FAIL
+		, sz
+	);
+
+	return p;
+}
+
+inline void dbg_rtw_mcache_free(rtw_mcache *cachep, void *pbuf, const enum mstat_f flags, const char *func, const int line)
+{
+	u32 sz = cachep->size;
+
+	if (match_mstat_sniff_rules(flags, sz))
+		RTW_INFO("DBG_MEM_ALLOC %s:%d %s(%u)\n", func, line, __func__, sz);
+
+	_rtw_mcache_free(cachep, pbuf);
+
+	rtw_mstat_update(
+		flags
+		, MSTAT_FREE
+		, sz
+	);
+}
+
+#define rtw_mcache_alloc(cachep) dbg_rtw_mcache_alloc(cachep, MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
+#define rtw_mcache_free(cachep, objp) dbg_rtw_mcache_free(cachep, objp, MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
+#else
 #define rtw_mcache_alloc(cachep) _rtw_mcache_alloc(cachep)
 #define rtw_mcache_free(cachep, objp) _rtw_mcache_free(cachep, objp)
+#endif /* DBG_MEM_ALLOC */
 
 /* Mesh Received Cache */
 #define RTW_MRC_BUCKETS			256 /* must be a power of 2 */

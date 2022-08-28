@@ -16,23 +16,15 @@
 #include "phl_headers.h"
 
 #ifdef CONFIG_RTW_DEBUG
-enum _phl_dbg_comp_mode {
-	PHL_SET_COMP_BIT = 0x01,
-	PHL_CLEAR_COMP_BIT = 0x2,
-	PHL_SHOW_COMP = 0x3,
-	PHL_SET_COMP_VALUE = 0x4,
-};
 
-u32 phl_log_components = COMP_PHL_XMIT |
+u32 phl_log_components = COMP_PHL_DBG |
+			 COMP_PHL_XMIT |
 			 COMP_PHL_WOW |
 			/* COMP_PHL_CMDDISP |*/
 			 COMP_PHL_RECV |
 			 COMP_PHL_MAC |
-			#ifdef CONFIG_POWER_SAVE
-			 COMP_PHL_PS |
-			#endif
-			 COMP_PHL_DBG | 0;
-u8 phl_log_level = _PHL_NONE;
+			 COMP_PHL_PS | 0;
+u8 phl_log_level = _PHL_ERR_;
 struct dbg_mem_ctx debug_memory_ctx;
 
 void debug_dump_mac_address(u8 *mac_addr)
@@ -194,49 +186,29 @@ void rt_mem_dbg_deinit(void *phl)
 }
 
 
-void phl_dbg_show_log_comp(u32 para_dbg)
+void phl_dbg_show_log_comp(u8 comp_bit)
 {
 	PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "[DBG] phl_log_components = 0x%x \n", phl_log_components);
 }
 
-void phl_dbg_set_log_comp(u32 para_dbg)
+void phl_dbg_set_log_comp(u8 comp_bit)
 {
-	phl_log_components |= BIT(para_dbg);
+	phl_log_components |= BIT(comp_bit);
 }
 
-void phl_dbg_clear_log_comp(u32 para_dbg)
+void phl_dbg_clear_log_comp(u8 comp_bit)
 {
-	phl_log_components &= (~BIT(para_dbg));
+	phl_log_components &= (~BIT(comp_bit));
 }
 
-void phl_dbg_set_log_comp_value(u32 para_dbg)
+u32 rtw_phl_dbg_ctrl_comp(u8 ctrl, u8 comp_bit)
 {
-	phl_log_components = para_dbg;
-}
-
-u32 rtw_phl_dbg_ctrl_comp(u8 ctrl, u32 para_dbg)
-{
-	switch(ctrl){
-	case PHL_SET_COMP_BIT:
-		if (para_dbg > 31)
-			PHL_PRINT( "[DBG] bit num is illegal\n");
-		else
-			phl_dbg_set_log_comp(para_dbg);
-		break;
-	case PHL_CLEAR_COMP_BIT:
-		if (para_dbg > 31)
-			PHL_PRINT("[DBG] bit num is illegal\n");
-		else
-			phl_dbg_clear_log_comp(para_dbg);
-		break;
-	case PHL_SET_COMP_VALUE:
-		phl_dbg_set_log_comp_value(para_dbg);
-		break;
-	default:
-		break;
+	if (1 == ctrl) {
+		phl_dbg_set_log_comp(comp_bit);
+	} else if (2 == ctrl) {
+		phl_dbg_clear_log_comp(comp_bit);
 	}
-
-	phl_dbg_show_log_comp(para_dbg);
+	phl_dbg_show_log_comp(comp_bit);
 
 	return phl_log_components;
 }

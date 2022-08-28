@@ -287,13 +287,13 @@ void halbb_set_pwr_ctrl(struct bb_info *bb, u16 macid, u8 pwr_lv)
 
 	if (pwr_lv == TX_HP_LV_3) {
 		pwr_ctrl_en = true;
-		pwr = pwr_ctrl_i->pwr_lv_dbm[2];
+		pwr = pwr_ctrl_i->pwr_lv_dbm[3];
 	} else if (pwr_lv == TX_HP_LV_2) {
 		pwr_ctrl_en = true;
-		pwr = pwr_ctrl_i->pwr_lv_dbm[1];
+		pwr = pwr_ctrl_i->pwr_lv_dbm[2];
 	} else if (pwr_lv == TX_HP_LV_1) {
 		pwr_ctrl_en = true;
-		pwr = pwr_ctrl_i->pwr_lv_dbm[0];
+		pwr = pwr_ctrl_i->pwr_lv_dbm[1];
 	} else {
 		pwr_ctrl_en = false;
 		pwr = 0;
@@ -430,8 +430,9 @@ void halbb_pwr_ctrl_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			 "{Modify LV1(H)~LV3(L) TH} [pwr_ctrl] [2] [LV1] [LV2] [LV3]\n");
 		return;
 	}
-	for (i = 0; i < 8; i++)
+	for (i = 0; i < 8; i++) {
 		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
+	}
 	switch (val[0]) {
 	case 0:
 		halbb_pwr_ctrl_para_init(bb);

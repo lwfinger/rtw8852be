@@ -493,37 +493,4 @@ enum rtw_hal_status rtw_hal_mp_efuse_renew(
 	return hal_status;
 }
 
-enum rtw_hal_status rtw_hal_mp_efuse_wifi_get_mask_buf(
-	struct mp_context *mp, struct mp_efuse_arg *arg)
-{
-	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
-	u32 masklen = 0;
-
-	PHL_INFO("%s\n", __FUNCTION__);
-
-	hal_status = rtw_hal_efuse_get_mask_buf(mp->hal,
-					arg->poutbuf, &masklen);
-
-	arg->buf_len = (u16)masklen;
-	PHL_INFO("%s: status = %d\n", __FUNCTION__, hal_status);
-
-	return hal_status;
-}
-
-enum rtw_hal_status rtw_hal_mp_efuse_bt_get_mask_buf(
-	struct mp_context *mp, struct mp_efuse_arg *arg)
-{
-	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
-	u32 masklen = 0;
-
-	PHL_INFO("%s\n", __FUNCTION__);
-
-	hal_status = rtw_hal_efuse_bt_get_mask_buf(mp->hal,
-					arg->poutbuf, &masklen);
-	arg->buf_len = (u16)masklen;
-	PHL_INFO("%s: status = %d\n", __FUNCTION__, hal_status);
-
-	return hal_status;
-}
-
 #endif /* CONFIG_HAL_TEST_MP */

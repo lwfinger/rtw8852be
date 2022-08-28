@@ -221,42 +221,41 @@ int os_pci_write32(struct dvobj_priv *dvobj, u32 addr, u32 val)
 #elif defined (RTK_1319_PLATFORM)
 #include <soc/realtek/rtk_pcie.h>
 
-#ifndef RTK_1319_PCIE_PORT
-	#define RTK_1319_PCIE_PORT 2
-#endif
+/* #define RTK_1319_PCIE_PORT1 */
+#define RTK_1319_PCIE_PORT2
 
 u8 os_pci_read8(struct dvobj_priv *dvobj, u32 addr)
 {
-#if (1 == RTK_1319_PCIE_PORT)
+#ifdef RTK_1319_PCIE_PORT1
 	return (u8)rtk_pcie2_13xx_read(addr, 1);
-#elif (2 == RTK_1319_PCIE_PORT)
+#elif defined (RTK_1319_PCIE_PORT2)
 	return (u8)rtk_pcie3_13xx_read(addr, 1);
 #endif
 }
 
 u16 os_pci_read16(struct dvobj_priv *dvobj, u32 addr)
 {
-#if (1 == RTK_1319_PCIE_PORT)
+#ifdef RTK_1319_PCIE_PORT1
 	return (u16)rtk_pcie2_13xx_read(addr, 2);
-#elif (2 == RTK_1319_PCIE_PORT)
+#elif defined (RTK_1319_PCIE_PORT2)
 	return (u16)rtk_pcie3_13xx_read(addr, 2);
 #endif
 }
 
 u32 os_pci_read32(struct dvobj_priv *dvobj, u32 addr)
 {
-#if (1 == RTK_1319_PCIE_PORT)
+#ifdef RTK_1319_PCIE_PORT1
 	return (u32)rtk_pcie2_13xx_read(addr, 4);
-#elif (2 == RTK_1319_PCIE_PORT)
+#elif defined (RTK_1319_PCIE_PORT2)
 	return (u32)rtk_pcie3_13xx_read(addr, 4);
 #endif
 }
 
 int os_pci_write8(struct dvobj_priv *dvobj, u32 addr, u8 val)
 {
-#if (1 == RTK_1319_PCIE_PORT)
+#ifdef RTK_1319_PCIE_PORT1
 	rtk_pcie2_13xx_write(addr, 1, val);
-#elif (2 == RTK_1319_PCIE_PORT)
+#elif defined (RTK_1319_PCIE_PORT2)
 	rtk_pcie3_13xx_write(addr, 1, val);
 #endif
 	return 1;
@@ -264,9 +263,9 @@ int os_pci_write8(struct dvobj_priv *dvobj, u32 addr, u8 val)
 
 int os_pci_write16(struct dvobj_priv *dvobj, u32 addr, u16 val)
 {
-#if (1 == RTK_1319_PCIE_PORT)
+#ifdef RTK_1319_PCIE_PORT1
 	rtk_pcie2_13xx_write(addr, 2, val);
-#elif (2 == RTK_1319_PCIE_PORT)
+#elif defined (RTK_1319_PCIE_PORT2)
 	rtk_pcie3_13xx_write(addr, 2, val);
 #endif
 	return 2;
@@ -274,9 +273,9 @@ int os_pci_write16(struct dvobj_priv *dvobj, u32 addr, u16 val)
 
 int os_pci_write32(struct dvobj_priv *dvobj, u32 addr, u32 val)
 {
-#if (1 == RTK_1319_PCIE_PORT)
+#ifdef RTK_1319_PCIE_PORT1
 	rtk_pcie2_13xx_write(addr, 4, val);
-#elif (2 == RTK_1319_PCIE_PORT)
+#elif defined (RTK_1319_PCIE_PORT2)
 	rtk_pcie3_13xx_write(addr, 4, val);
 #endif
 	return 4;

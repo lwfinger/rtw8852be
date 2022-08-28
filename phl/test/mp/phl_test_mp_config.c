@@ -393,24 +393,6 @@ static enum rtw_phl_status phl_mp_config_trigger_fw_conflict(
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
-static enum rtw_phl_status phl_mp_config_get_uuid(
-	struct mp_context *mp, struct mp_config_arg *arg)
-{
-	arg->uuid = rtw_hal_get_uuid(mp);
-
-	/* Record the result */
-	arg->cmd_ok = true;
-	arg->status = RTW_HAL_STATUS_SUCCESS;
-
-	/* Transfer to report */
-	mp->rpt = arg;
-	mp->rpt_len = sizeof(struct mp_config_arg);
-	mp->buf = NULL;
-	mp->buf_len = 0;
-
-	return RTW_PHL_STATUS_SUCCESS;
-}
-
 enum rtw_phl_status mp_config(struct mp_context *mp,struct mp_config_arg *arg)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
@@ -502,10 +484,6 @@ enum rtw_phl_status mp_config(struct mp_context *mp,struct mp_config_arg *arg)
 	case MP_CONFIG_CMD_TRIGGER_FW_CONFLICT:
 		PHL_INFO("%s: CMD = MP_CONFIG_CMD_GET_FW_RPT\n", __FUNCTION__);
 		phl_status = phl_mp_config_trigger_fw_conflict(mp, arg);
-		break;
-	case MP_CONFIG_CMD_GET_UUID:
-		PHL_INFO("%s: CMD = MP_CONFIG_CMD_GET_UUID\n", __FUNCTION__);
-		phl_status = phl_mp_config_get_uuid(mp, arg);
 		break;
 	default:
 		PHL_WARN("%s: CMD NOT RECOGNIZED\n", __FUNCTION__);

@@ -2256,7 +2256,7 @@ u8 _ssmps_chk_by_tp(_adapter *adapter, u8 from_timer)
 	u32 tx_tp_mbits, rx_tp_mbits;
 
 	if (!MLME_IS_STA(adapter) ||
-		!rtw_hw_is_mimo_support(adapter) ||
+		!rtw_hw_is_mimo_support(adapter_to_dvobj(adapter)) ||
 		!pmlmeext->ssmps_en ||
 		(pmlmeext->chandef.chan > 14)
 	)
@@ -2460,7 +2460,7 @@ void rtw_ctrl_tx_ss_by_tp(_adapter *adapter, u8 from_timer)
 	u32 tx_tp_mbits;
 
 	if (!MLME_IS_STA(adapter) ||
-		!rtw_hw_is_mimo_support(adapter) ||
+		!rtw_hw_is_mimo_support(adapter_to_dvobj(adapter)) ||
 		!pmlmeext->txss_ctrl_en
 	)
 		return;
@@ -2506,7 +2506,7 @@ void dbg_ctrl_txss(_adapter *adapter, bool tx_1ss)
 	struct sta_info *psta;
 
 	if (!MLME_IS_STA(adapter) ||
-		!rtw_hw_is_mimo_support(adapter)
+		!rtw_hw_is_mimo_support(adapter_to_dvobj(adapter))
 	)
 		return;
 
@@ -3061,6 +3061,8 @@ void rtw_iface_dynamic_chk_wk_hdl(_adapter *padapter)
 	#endif /* CONFIG_ACTIVE_KEEP_ALIVE_CHECK */
 	dynamic_update_bcn_check(padapter);
 
+	linked_status_chk(padapter, 0);
+	traffic_status_watchdog(padapter, 0);
 	rtw_turbo_edca(padapter);
 
 	/* for debug purpose */
@@ -3135,10 +3137,6 @@ void rtw_dynamic_chk_wk_hw_hdl(_adapter *padapter)
 #ifdef CONFIG_IPS_CHECK_IN_WD
 	/* always call rtw_ps_processor() at last one. */
 	rtw_ps_processor(padapter);
-#endif
-
-#ifdef RTW_DETECT_HANG
-	rtw_is_hang_check(padapter);
 #endif
 }
 
@@ -3777,8 +3775,6 @@ void rtw_dfs_ch_switch_hdl(_adapter *adapter)
 	/* make asoc STA ifaces disconnect */
 	if (ifbmp_s && need_discon) {
 		_adapter *iface;
-		struct mlme_ext_priv *pmlmeext;
-		struct mlme_ext_info *pmlmeinfo;
 		int i;
 
 		for (i = 0; i < dvobj->iface_nums; i++) {
@@ -3791,20 +3787,6 @@ void rtw_dfs_ch_switch_hdl(_adapter *adapter)
 			rtw_free_assoc_resources(iface, _TRUE);
 			#endif
 			rtw_free_network_queue(iface, _TRUE);
-
-			pmlmeext = &iface->mlmeextpriv;
-			pmlmeinfo = &pmlmeext->mlmext_info;
-			pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
-
-			if (rtw_chset_is_dfs_chbw(rfctl->channel_set, req_ch, req_bw, req_offset)) {
-				RTW_INFO("Switched to DFS band (ch %d, bw %d, offset %d) again!!\n",
-					 req_ch, req_bw, req_offset);
-				pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_DFS;
-			} else {
-				pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_NON_DFS;
-			}
-
-			pmlmeinfo->wifi_reason_code = WLAN_REASON_DEAUTH_LEAVING;
 		}
 	}
 

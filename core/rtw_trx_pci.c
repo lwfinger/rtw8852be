@@ -55,22 +55,12 @@ static s32 xmitframe_amsdu_direct(_adapter *padapter,
 #endif
 
 /********************************xmit section*****************************/
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
-static void pci_xmit_tasklet(unsigned long priv)
-{
-	_adapter *padapter = (_adapter *) priv;
-#ifdef CONFIG_TX_AMSDU_SW_MODE
-	core_tx_amsdu_tasklet(padapter);
-#endif
-}
-#else
 static void pci_xmit_tasklet(_adapter *padapter)
 {
 #ifdef CONFIG_TX_AMSDU_SW_MODE
 	core_tx_amsdu_tasklet(padapter);
 #endif
 }
-#endif
 
 s32 pci_init_xmit_priv(_adapter *adapter)
 {
@@ -81,7 +71,7 @@ s32 pci_init_xmit_priv(_adapter *adapter)
 	_rtw_spinlock_init(&dvobj_to_pci(dvobj)->irq_th_lock);
 
 	rtw_tasklet_init(&pxmitpriv->xmit_tasklet,
-		     (void(*)(unsigned long))pci_xmit_tasklet,
+		     (void(*))pci_xmit_tasklet,
 		     (unsigned long)adapter);
 
 	return ret;

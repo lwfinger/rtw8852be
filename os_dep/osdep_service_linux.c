@@ -14,8 +14,6 @@
  *****************************************************************************/
 #define _OSDEP_SERVICE_LINUX_C_
 #include <drv_types.h>
-#include <linux/minmax.h>
-#include <linux/compiler_types.h>
 
 #ifdef DBG_MEMORY_LEAK
 ATOMIC_T _malloc_cnt = ATOMIC_INIT(0);
@@ -49,12 +47,7 @@ void _rtw_skb_queue_purge(struct sk_buff_head *list)
 
 void _rtw_memcpy(void *dst, const void *src, u32 sz)
 {
-	size_t size;
-
-	size  = min_t(size_t, sz, sizeof(dst));
-
-	size = min_t(size_t, size, sizeof(src));
-	memcpy(dst, src, size);
+	memcpy(dst, src, sz);
 }
 
 inline void _rtw_memmove(void *dst, const void *src, u32 sz)
@@ -814,12 +807,11 @@ int rtw_change_ifname(_adapter *padapter, const char *ifname)
 
 	rtw_init_netdev_name(pnetdev, ifname);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-	dev_addr_mod(pnetdev, 0, adapter_mac_addr(padapter), ETH_ALEN);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+	_rtw_memcpy((void *)pnetdev->dev_addr, adapter_mac_addr(padapter), ETH_ALEN);
 #else
-	_rtw_memcpy(pnetdev->dev_addr, adapter_mac_addr(padapter), ETH_ALEN);
+	dev_addr_mod(pnetdev, 0, adapter_mac_addr(padapter), ETH_ALEN);
 #endif
-
 	if (rtnl_lock_needed)
 		ret = register_netdev(pnetdev);
 	else

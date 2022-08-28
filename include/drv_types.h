@@ -32,6 +32,9 @@
 	#include <net/arp.h>
 #endif
 
+#if !defined(fallthrough)
+#define fallthrough do {} while(0)
+#endif
 typedef struct _ADAPTER _adapter;
 /* connection interface of drv and hal */
 #include "../phl/rtw_general_def.h"
@@ -284,11 +287,7 @@ struct registry_priv {
 	/* BIT2 - 80MHz, 1: support, 0: non-support */
 	/* BIT3 - 160MHz, 1: support, 0: non-support */
 	u8	short_gi;
-	/*
-	  * BIT0: Enable VHT LDPC Rx, BIT1: Enable VHT LDPC Tx
-	  * BIT2: Enable HE LDPC Rx, BIT3: Enable HE LDPC Tx
-	  * BIT4: Enable HT LDPC Rx, BIT5: Enable HT LDPC Tx
-	  */
+	/* BIT0: Enable VHT LDPC Rx, BIT1: Enable VHT LDPC Tx, BIT4: Enable HT LDPC Rx, BIT5: Enable HT LDPC Tx */
 	u8	ldpc_cap;
 	/*
 	 * BIT0: Enable VHT STBC Rx, BIT1: Enable VHT STBC Tx
@@ -507,7 +506,6 @@ struct registry_priv {
 	 */
 	u32 scan_interval_thr;
 #endif
-	u16 scan_pch_ex_time;
 	u8 deny_legacy;
 #ifdef CONFIG_RTW_MULTI_AP
 	u8 unassoc_sta_mode_of_stype[UNASOC_STA_SRC_NUM];
@@ -764,24 +762,6 @@ struct int_logs {
 
 #endif /* CONFIG_DBG_COUNTER */
 
-#ifdef RTW_DETECT_HANG
-struct fw_hang_info {
-	u8 dbg_is_fw_hang;
-	u8 dbg_is_fw_gone;
-};
-
-struct rxff_hang_info {
-	u8 dbg_is_rxff_hang;
-	u8 rx_ff_hang_cnt;
-};
-
-struct hang_info {
-	u32 enter_cnt;
-	struct rxff_hang_info dbg_rxff_hang_info;
-	struct fw_hang_info dbg_fw_hang_info;
-};
-#endif /* RTW_DETECT_HANG */
-
 struct debug_priv {
 	u32 dbg_sdio_free_irq_error_cnt;
 	u32 dbg_sdio_alloc_irq_error_cnt;
@@ -816,9 +796,6 @@ struct debug_priv {
 	u64 dbg_rx_fifo_last_overflow;
 	u64 dbg_rx_fifo_curr_overflow;
 	u64 dbg_rx_fifo_diff_overflow;
-#ifdef RTW_DETECT_HANG
-	struct hang_info dbg_hang_info;
-#endif
 };
 
 struct rtw_traffic_statistics {
@@ -1145,6 +1122,9 @@ struct dvobj_priv {
 	/*CONFIG_PHL_ARCH*/
 	void *phl;
 	struct rtw_phl_com_t *phl_com;
+	#ifdef DBG_PHL_MEM_ALLOC
+	ATOMIC_T phl_mem;
+	#endif
 
 	struct rf_ctl_t rf_ctl;
 	/* move to phl */
@@ -1157,8 +1137,6 @@ struct dvobj_priv {
 	/****** Band info may be x 2*********/
 	/* saved channel info when call set_channel_bw */
 	systime on_oper_ch_time;
-
-	u32 fa_cnt_acc[HW_BAND_MAX];
 
 	/****** hal dep info*********/
 
@@ -1355,7 +1333,6 @@ _adapter *dvobj_get_unregisterd_adapter(struct dvobj_priv *dvobj);
 _adapter *dvobj_get_adapter_by_addr(struct dvobj_priv *dvobj, u8 *addr);
 #define dvobj_get_primary_adapter(dvobj)	((dvobj)->padapters[IFACE_ID0])
 
-void rtw_efuse_dbg_raw_dump(struct dvobj_priv *pdvobj);
 
 enum _ADAPTER_TYPE {
 	PRIMARY_ADAPTER,

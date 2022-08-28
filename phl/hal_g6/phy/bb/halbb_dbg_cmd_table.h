@@ -52,7 +52,6 @@ enum HALBB_CMD_ID {
 	HALBB_PSD,
 	HALBB_DBG_PORT,
 	HALBB_CFO_TRK,
-	HALBB_UL_TB,
 	HALBB_ADAPTIVITY_DBG,
 	HALBB_STA_INFO,
 	HALBB_PAUSE_FUNC,
@@ -70,8 +69,7 @@ enum HALBB_CMD_ID {
 	HALBB_ANT_DIV,
 	HALBB_DCR_DBG,
 	HALBB_RX_GAIN_TABLE,
-	HALBB_HW_SETTING,
-	HALBB_MAC_PHY_INTF
+	HALBB_HW_SETTING
 };
 
 /*@--------------------------[Structure]-------------------------------------*/
@@ -99,7 +97,6 @@ static const struct halbb_cmd_info halbb_cmd_i[] = {
 	//{"auto_dbg", HALBB_AUTO_DBG},
 	{"dd_dbg", HALBB_DD_DBG},
 	{"cfo_trk", HALBB_CFO_TRK},
-	{"ul_tb", HALBB_UL_TB},
 	{"rxrate", HALBB_SHOW_RXRATE},
 	//{"nbi", HALBB_NBI_EN},
 	//{"csi_mask", HALBB_CSI_MASK_EN},
@@ -129,8 +126,7 @@ static const struct halbb_cmd_info halbb_cmd_i[] = {
 	{"ant_div", HALBB_ANT_DIV},
 	{"dcr", HALBB_DCR_DBG},
 	{"gain_table", HALBB_RX_GAIN_TABLE},
-	{"hw_set", HALBB_HW_SETTING},
-	{"txinfo", HALBB_MAC_PHY_INTF}
+	{"hw_set", HALBB_HW_SETTING}
 	};
 
 /*@--------------------------[Prptotype]-------------------------------------*/

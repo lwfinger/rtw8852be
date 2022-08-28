@@ -18,6 +18,39 @@
 
 #include <drv_types.h>
 
+
+#ifdef RTK_DMP_PLATFORM
+void Linkup_workitem_callback(struct work_struct *work)
+{
+	struct mlme_priv *pmlmepriv = container_of(work, struct mlme_priv, Linkup_workitem);
+	_adapter *padapter = container_of(pmlmepriv, _adapter, mlmepriv);
+
+
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
+	kobject_uevent(&padapter->pnetdev->dev.kobj, KOBJ_LINKUP);
+#else
+	kobject_hotplug(&padapter->pnetdev->class_dev.kobj, KOBJ_LINKUP);
+#endif
+
+}
+
+void Linkdown_workitem_callback(struct work_struct *work)
+{
+	struct mlme_priv *pmlmepriv = container_of(work, struct mlme_priv, Linkdown_workitem);
+	_adapter *padapter = container_of(pmlmepriv, _adapter, mlmepriv);
+
+
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
+	kobject_uevent(&padapter->pnetdev->dev.kobj, KOBJ_LINKDOWN);
+#else
+	kobject_hotplug(&padapter->pnetdev->class_dev.kobj, KOBJ_LINKDOWN);
+#endif
+
+}
+#endif
+
 extern void rtw_indicate_wx_assoc_event(_adapter *padapter);
 extern void rtw_indicate_wx_disassoc_event(_adapter *padapter);
 
@@ -44,6 +77,12 @@ void rtw_os_indicate_connect(_adapter *adapter)
 
 	if (adapter->pid[2] != 0)
 		rtw_signal_process(adapter->pid[2], SIGALRM);
+
+#ifdef RTK_DMP_PLATFORM
+	_set_workitem(&adapter->mlmepriv.Linkup_workitem);
+#endif
+
+
 }
 
 extern void indicate_wx_scan_complete_event(_adapter *padapter);
@@ -137,7 +176,13 @@ void rtw_os_indicate_disconnect(_adapter *adapter,  u16 reason, u8 locally_gener
 
 	rtw_indicate_wx_disassoc_event(adapter);
 
-	rtw_reset_securitypriv(adapter);
+#ifdef RTK_DMP_PLATFORM
+	_set_workitem(&adapter->mlmepriv.Linkdown_workitem);
+#endif
+	/* modify for CONFIG_IEEE80211W, none 11w also can use the same command */
+	rtw_reset_securitypriv_cmd(adapter);
+
+
 }
 
 void rtw_report_sec_ie(_adapter *adapter, u8 authmode, u8 *sec_ie)
@@ -362,13 +407,11 @@ int hostapd_mode_init(_adapter *padapter)
 	mac[4] = 0x11;
 	mac[5] = 0x12;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-        deev_addr_set(pnetdev, 0, mac, ETH_ALEN);
-#else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	_rtw_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
+#else
+	dev_addr_mod(pnetdevi, 0, mac, ETH_ALEN);
 #endif
-
-
 	rtw_netif_carrier_off(pnetdev);
 
 

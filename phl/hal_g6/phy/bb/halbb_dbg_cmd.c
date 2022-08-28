@@ -310,7 +310,7 @@ void halbb_trace_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			 "12. (( %s ))TBD\n",
 			 ((comp & BIT(12)) ? ("V") : (".")));
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "13. (( %s ))UL_TB_CTRL\n",
+			 "13. (( %s ))TBD\n",
 			 ((comp & BIT(13)) ? ("V") : (".")));
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "14. (( %s ))TBD\n",
@@ -599,12 +599,6 @@ void halbb_cmd_parser(struct bb_info *bb, char input[][MAX_ARGV],
 		#endif
 		break;
 
-	case HALBB_UL_TB:
-		#ifdef HALBB_UL_TB_CTRL_SUPPORT
-		halbb_ul_tb_dbg(bb, input, &used, output, &out_len);
-		#endif
-		break;
-
 #if 0
 	case HALBB_AUTO_DBG:
 		#ifdef HALBB_AUTO_DEGBUG
@@ -762,9 +756,6 @@ void halbb_cmd_parser(struct bb_info *bb, char input[][MAX_ARGV],
 		break;
 	case HALBB_HW_SETTING:
 		halbb_ic_hw_setting_dbg(bb, input, &used, output, &out_len);
-		break;
-	case HALBB_MAC_PHY_INTF:
-		halbb_mac_phy_intf_dbg(bb, input, &used, output, &out_len);
 		break;
 	default:
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,

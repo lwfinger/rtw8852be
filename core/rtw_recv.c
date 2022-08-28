@@ -1172,7 +1172,7 @@ void count_rx_stats(_adapter *padapter, union recv_frame *prframe, struct sta_in
 		}
 
 		if (!is_ra_bmc) {
-			/*pstats->rxratecnt[pattrib->data_rate]++;*/ /* FIXME overflow */
+			pstats->rxratecnt[pattrib->data_rate]++;
 			/*record rx packets for every tid*/
 			pstats->rx_data_qos_pkts[pattrib->priority]++;
 		}
@@ -1644,10 +1644,6 @@ sint validate_recv_ctrl_frame(_adapter *padapter, union recv_frame *precv_frame)
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	u8 *pframe = precv_frame->u.hdr.rx_data;
 	struct sta_info *psta = NULL;
-	u8 subtype = 0;
-	bool ra_is_self = _FALSE;
-	bool ra_is_bc = _FALSE;
-
 	/* uint len = precv_frame->u.hdr.len; */
 
 	/* RTW_INFO("+validate_recv_ctrl_frame\n"); */
@@ -1655,19 +1651,9 @@ sint validate_recv_ctrl_frame(_adapter *padapter, union recv_frame *precv_frame)
 	if (GetFrameType(pframe) != WIFI_CTRL_TYPE)
 		return _FAIL;
 
-	subtype = get_frame_sub_type(pframe);
-	ra_is_self = _rtw_memcmp(GetAddr1Ptr(pframe), adapter_mac_addr(padapter), ETH_ALEN);
-	ra_is_bc = is_broadcast_mac_addr(GetAddr1Ptr(pframe));
-
-	/*only keep to self or BC(trigger frame)*/
-	if(ra_is_self == _FALSE) {
-		if(ra_is_bc == _TRUE) {
-			if(subtype != WIFI_TRIGGER)
-				return _FAIL;
-		} else {
-			return _FAIL;
-		}
-	}
+	/* receive the frames that ra(a1) is my address */
+	if (!_rtw_memcmp(GetAddr1Ptr(pframe), adapter_mac_addr(padapter), ETH_ALEN))
+		return _FAIL;
 
 	psta = rtw_get_stainfo(pstapriv, get_addr2_ptr(pframe));
 	if (psta == NULL)
@@ -1677,26 +1663,19 @@ sint validate_recv_ctrl_frame(_adapter *padapter, union recv_frame *precv_frame)
 	psta->sta_stats.last_rx_time = rtw_get_current_time();
 	psta->sta_stats.rx_ctrl_pkts++;
 
-	switch (subtype) {
+	switch (get_frame_sub_type(pframe)) {
 	#ifdef CONFIG_AP_MODE
 	case WIFI_PSPOLL :
 		{
 			sint rst;
 
-			/*only ra(a1) is my address*/
 			rst = rtw_proccess_pspoll(padapter, precv_frame, psta);
 			/*RTW_INFO(FUNC_ADPT_FMT" pspoll handle %d\n", FUNC_ADPT_ARG(padapter), rst);*/
 		}
 		break;
 	#endif
 	case WIFI_BAR :
-		/*only ra(a1) is my address*/
 		rtw_process_bar_frame(padapter, precv_frame);
-		break;
-	case WIFI_TRIGGER :
-		#ifdef CONFIG_80211AX_HE
-		rtw_process_he_triggerframe(padapter, precv_frame);
-		#endif
 		break;
 	default :
 		break;
@@ -2313,6 +2292,20 @@ sint validate_recv_frame(_adapter *adapter, union recv_frame *precv_frame)
 		ptdlsinfo->collect_pkt_num[ptdlsinfo->cur_channel - 1]++;
 #endif /* CONFIG_TDLS */
 
+#ifdef RTK_DMP_PLATFORM
+	if (0) {
+		RTW_INFO("++\n");
+		{
+			int i;
+			for (i = 0; i < 64; i = i + 8)
+				RTW_INFO("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:", *(ptr + i),
+					*(ptr + i + 1), *(ptr + i + 2) , *(ptr + i + 3) , *(ptr + i + 4), *(ptr + i + 5), *(ptr + i + 6), *(ptr + i + 7));
+
+		}
+		RTW_INFO("--\n");
+	}
+#endif /* RTK_DMP_PLATFORM */
+
 	/* add version chk */
 	if (ver != 0) {
 		retval = _FAIL;
@@ -2712,21 +2705,14 @@ union recv_frame *recvframe_defrag(_adapter *adapter, _queue *defrag_q)
 			return NULL;
 		}
 
+		curfragnum++;
+
 		/* copy the 2nd~n fragment frame's payload to the first fragment */
 		/* get the 2nd~last fragment frame's payload */
 
 		wlanhdr_offset = pnfhdr->attrib.hdrlen + pnfhdr->attrib.iv_len;
 
 		recvframe_pull(pnextrframe, wlanhdr_offset);
-
-		if ((pfhdr->rx_end - pfhdr->rx_tail) < pnfhdr->len) {
-			RTW_INFO("Not enough buffer space, drop fragmented frame!\n");
-			rtw_free_recvframe(prframe);
-			rtw_free_recvframe_queue(defrag_q);
-			return NULL;
-		}
-
-		curfragnum++;
 
 		/* append  to first fragment frame's tail (if privacy frame, pull the ICV) */
 		recvframe_pull_tail(prframe, pfhdr->attrib.icv_len);
@@ -4911,8 +4897,6 @@ void core_update_recvframe_mdata(union recv_frame *prframe, struct rtw_recv_pkt 
 	prxattrib->pkt_len = mdata->pktlen;
 	prxattrib->icv_err = mdata->icverr;
 	prxattrib->crc_err = mdata->crc32;
-	prxattrib->data_rate = mdata->rx_rate; /* enum rtw_data_rate */
-	prxattrib->gi_ltf = mdata->rx_gi_ltf;
 #ifdef CONFIG_TCP_CSUM_OFFLOAD_RX
 	prxattrib->csum_valid = mdata->chksum_ofld_en;
 	prxattrib->csum_err = mdata->chksum_status;
@@ -5028,16 +5012,11 @@ void rx_process_phy_info(union recv_frame *precvframe)
 	is_packet_beacon = is_packet_match_bssid
 			 && (get_frame_sub_type(wlanhdr) == WIFI_BEACON);
 
-
 	if (psta && IsFrameTypeData(wlanhdr)) {
-
-
 		if (is_ra_bmc)
 			psta->curr_rx_rate_bmc = pattrib->data_rate;
-		else {
+		else
 			psta->curr_rx_rate = pattrib->data_rate;
-			psta->curr_rx_gi_ltf = pattrib->gi_ltf;
-		}
 	}
 
 	#if 0
@@ -5478,10 +5457,8 @@ enum rtw_phl_status rtw_core_rx_process(void *drv_priv)
 		if (pre_process_ret != CORE_RX_CONTINUE)
 			goto rx_next;
 
-		if(rtw_core_rx_data_post_process(adapter, prframe) == CORE_RX_DONE) {
-			adapter->recvinfo.rx_pkts++;
+		if(rtw_core_rx_data_post_process(adapter, prframe) == CORE_RX_DONE)
 			continue;
-		}
 
 rx_next:
 		rtw_free_recvframe(prframe);

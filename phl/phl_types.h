@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2019 - 2021 Realtek Corporation.
+ * Copyright(c) 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -20,12 +20,6 @@
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #endif
-
-enum dma_type {
-	DMA_ADDR,
-	VIRTUAL_ADDR,
-	POOL_ADDR
-};
 
 enum lock_type {
 	_ps,
@@ -70,35 +64,6 @@ enum lock_type {
 #endif /*#ifndef PHL_PLATFORM_LINUX*/
 
 
-#ifdef PHL_PLATFORM_WINDOWS
-
-	#define MAC_ALEN 6
-	#define _dma unsigned int
-	#define _os_timer RT_TIMER
-	#define _os_lock RT_SPIN_LOCK
-	#define _os_mutex PlatformMutex
-	#define _os_sema PlatformSemaphore
-	#define _os_event PlatformEvent
-	#define _os_list struct list_head
-
-	#define _os_atomic volatile long
-	#define _os_dbgdump DbgPrint
-	#define _os_dbgdump_c DbgPrint
-	#define _os_assert ASSERT
-	#define _os_warn_on
-
-	/*#define _os_completion unsigned long*/
-	#define _os_tasklet RT_THREAD
-	#define _os_thread RT_THREAD
-	#define _os_spinlockfg unsigned int
-	#define _os_workitem RT_WORK_ITEM
-
-	#define _os_path_sep "\\"
-	#define HAL_FILE_CONFIG_PATH ""
-	#define FW_FILE_CONFIG_PATH ""
-	#define PLATFOM_IS_LITTLE_ENDIAN 1
-
-#elif defined(PHL_PLATFORM_LINUX)
 	typedef struct rtw_timer_list _os_timer;
 	#define _os_lock _lock
 	#define _os_mutex _mutex
@@ -108,13 +73,8 @@ enum lock_type {
 	#define _os_atomic ATOMIC_T
 	#define MAC_ALEN ETH_ALEN
 	#define _os_dbgdump _dbgdump
-	#ifdef _dbgdump_c
-		#define _os_dbgdump_c _dbgdump_c
-	#else
-		#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
-			#define KERN_CONT
-		#endif
-		#define _os_dbgdump_c(fmt, arg...)	_dbgdump(KERN_CONT fmt, ##arg)
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
+	#define KERN_CONT
 	#endif
 	#define _os_assert(_expr) 0/*rtw_bug_on(_expr)*/
 	#define _os_warn_on(_cond) rtw_warn_on(_cond)
@@ -145,64 +105,6 @@ enum lock_type {
 	#else
 	#define PLATFOM_IS_LITTLE_ENDIAN 0
 	#endif
-
-#else
-
-	#ifdef _WIN64
-	typedef unsigned long long size_t;
-	#else
-	typedef unsigned long size_t;
-	#endif
-	#define u8 unsigned char
-	#define s8 char
-	#define u16 unsigned short
-	#define s16 short
-	#define u32 unsigned int
-	#define s32 int
-	#define u64 unsigned long long
-	#define s64 long long
-	#define MAC_ALEN 6
-
-	#ifndef fallthrough
-	#if __GNUC__ >= 5 || defined(__clang__)
-	#ifndef __has_attribute
-	#define __has_attribute(x) 0
-	#endif
-	#if __has_attribute(__fallthrough__)
-	#define fallthrough __attribute__((__fallthrough__))
-	#endif
-	#endif
-	#ifndef fallthrough
-	#define fallthrough do {} while (0) /* fallthrough */
-	#endif
-	#endif
-
-	/* keep define name then delete if osdep ready */
-	#define _dma unsigned long
-
-	#define _os_timer unsigned long
-	#define _os_lock unsigned long
-	#define _os_mutex unsigned long
-	#define _os_sema unsigned long
-	#define _os_event unsigned long
-	#define _os_list struct list_head
-	#define _os_atomic int
-	#define _os_dbgdump(_fmt, ...)
-	#define _os_dbgdump_c(_fmt, ...)
-	#define _os_assert(_expr)
-	#define _os_warn_on(_cond)
-	#define _os_spinlockfg unsigned int
-
-	#define _os_tasklet unsigned long
-	#define _os_thread unsigned long
-	#define _os_workitem unsigned long
-
-	#define	_os_path_sep "/"
-	#define HAL_FILE_CONFIG_PATH	""
-	#define FW_FILE_CONFIG_PATH	""
-
-	#define PLATFOM_IS_LITTLE_ENDIAN 1
-#endif
 
 struct _os_handler {
 	union {

@@ -17,7 +17,6 @@
 #include <drv_types.h>
 
 #include <linux/pci_regs.h>
-#include <linux/version.h>
 #include <rtw_trx_pci.h>
 #ifndef CONFIG_PCI_HCI
 
@@ -436,7 +435,7 @@ static irqreturn_t rtw_pci_interrupt(int irq, void *priv, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-#if defined(CONFIG_PLATFORM_RTL8197D)
+#if defined(RTK_DMP_PLATFORM) || defined(CONFIG_PLATFORM_RTL8197D)
 	#define pci_iounmap(x, y) iounmap(y)
 #endif
 
@@ -504,41 +503,30 @@ static struct dvobj_priv *pci_dvobj_init(struct pci_dev *pdev,
 	if (!pci_set_dma_mask(pdev, DMA_BIT_MASK(64))) {
 		RTW_INFO("RTL819xCE: Using 64bit DMA\n");
 		err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
-		if (err != 0) {
-			RTW_ERR("Unable to obtain 64bit DMA for consistent allocations\n");
-			goto disable_picdev;
-		}
-		pci_data->bdma64 = _TRUE;
-	}
 #else
 	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
 		RTW_INFO("RTL819xCE: Using 64bit DMA\n");
 		err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64));
+#endif
 		if (err != 0) {
 			RTW_ERR("Unable to obtain 64bit DMA for consistent allocations\n");
 			goto disable_picdev;
 		}
 		pci_data->bdma64 = _TRUE;
 	}
-#endif
 #else
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 	if (!pci_set_dma_mask(pdev, DMA_BIT_MASK(32))) {
 		err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
-		if (err != 0) {
-			RTW_ERR("Unable to obtain 32bit DMA for consistent allocations\n");
-			goto disable_picdev;
-		}
-	}
 #else
 	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(32))) {
 		err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+#endif
 		if (err != 0) {
 			RTW_ERR("Unable to obtain 32bit DMA for consistent allocations\n");
 			goto disable_picdev;
 		}
 	}
-#endif
 #endif
 
 	pci_set_master(pdev);
@@ -579,9 +567,11 @@ static struct dvobj_priv *pci_dvobj_init(struct pci_dev *pdev,
 		RTW_ERR("%s: No MMIO resource found, abort!\n", __func__);
 		goto release_regions;
 	}
-#endif /* RTK_129X_PLATFORM */
+#endif /* RTK_DMP_PLATFORM */
 
-#if defined(RTK_129X_PLATFORM)
+#ifdef RTK_DMP_PLATFORM
+	pci_data->pci_mem_start = (unsigned long)ioremap_nocache(pmem_start, pmem_len);
+#elif defined(RTK_129X_PLATFORM)
 	if (pdev->bus->number == 0x00)
 		pci_data->ctrl_start =
 			(unsigned long)ioremap(PCIE_SLOT1_CTRL_START, 0x200);
@@ -641,7 +631,9 @@ static struct dvobj_priv *pci_dvobj_init(struct pci_dev *pdev,
 
 iounmap:
 	if (status != _SUCCESS && pci_data->pci_mem_start != 0) {
+#if 1/* def RTK_DMP_PLATFORM */
 		pci_iounmap(pdev, (void *)pci_data->pci_mem_start);
+#endif
 		pci_data->pci_mem_start = 0;
 	}
 
@@ -685,7 +677,9 @@ static void pci_dvobj_deinit(struct pci_dev *pdev)
 		}
 
 		if (pci_data->pci_mem_start != 0) {
+#if 1/* def RTK_DMP_PLATFORM */
 			pci_iounmap(pdev, (void *)pci_data->pci_mem_start);
+#endif
 			pci_data->pci_mem_start = 0;
 		}
 
@@ -1059,25 +1053,11 @@ static void rtw_dev_shutdown(struct pci_dev *pdev)
 	rtw_dev_remove(pdev);
 }
 
-#ifdef CONFIG_PLATFORM_AML_S905
-extern struct device *get_pcie_reserved_mem_dev(void);
-struct device * g_pcie_reserved_mem_dev;
-#endif
-
 static int __init rtw_drv_entry(void)
 {
 	int ret = 0;
 
 	RTW_PRINT("module init start\n");
-
-#ifdef CONFIG_PLATFORM_AML_S905
-#ifdef USE_AML_PCIE_TEE_MEM
-	g_pcie_reserved_mem_dev = get_pcie_reserved_mem_dev();
-	if (g_pcie_reserved_mem_dev)
-		RTW_PRINT("#######use amlogic pcie TEE protect mem#######\n");
-#endif
-#endif
-
 	dump_drv_version(RTW_DBGDUMP);
 #ifdef BTCOEXVERSION
 	RTW_PRINT(DRV_NAME" BT-Coex version = %s\n", BTCOEXVERSION);

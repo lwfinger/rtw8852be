@@ -41,7 +41,6 @@ int rtw_mp_write_reg(struct net_device *dev,
 	_adapter *padapter = rtw_netdev_priv(dev);
 	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
 	char input[RTW_IWD_MAX_LEN];
-	struct rtw_mp_reg_arg	reg_arg;
 
 	_rtw_memset(input, 0, sizeof(input));
 
@@ -84,14 +83,7 @@ int rtw_mp_write_reg(struct net_device *dev,
 			ret = -EINVAL;
 			break;
 		}
-		reg_arg.io_offset = addr;
-		reg_arg.io_type = 1;
-		reg_arg.io_value = (u8)data;
-
-		if (rtw_mp_phl_reg(padapter, &reg_arg, RTW_MP_REG_CMD_WRITE_BB))
-			RTW_INFO("write data=%x,addr=%x OK\n", (u8)data, addr);
-		else
-			RTW_INFO("write data=%x,addr=%x fail\n", (u8)data, addr);
+		rtw_phl_write8(dvobj->phl, addr, (u8)data);
 		break;
 	case 'w':
 		/* 2 bytes*/
@@ -99,25 +91,11 @@ int rtw_mp_write_reg(struct net_device *dev,
 			ret = -EINVAL;
 			break;
 		}
-		reg_arg.io_offset = addr;
-		reg_arg.io_type = 2;
-		reg_arg.io_value = (u16)data;
-
-		if (rtw_mp_phl_reg(padapter, &reg_arg, RTW_MP_REG_CMD_WRITE_BB))
-			RTW_INFO("write data=%x,addr=%x OK\n", (u16)data, addr);
-		else
-			RTW_INFO("write data=%x,addr=%x fail\n", (u16)data, addr);
+		rtw_phl_write16(dvobj->phl, addr, (u16)data);
 		break;
 	case 'd':
 		/* 4 bytes*/
-		reg_arg.io_offset = addr;
-		reg_arg.io_type = 4;
-		reg_arg.io_value = data;
-
-		if (rtw_mp_phl_reg(padapter, &reg_arg, RTW_MP_REG_CMD_WRITE_BB))
-			RTW_INFO("write data=%x,addr=%x OK\n", data, addr);
-		else
-			RTW_INFO("write data=%x,addr=%x fail\n", data, addr);
+		rtw_phl_write32(dvobj->phl, addr, (u32)data);
 		break;
 	default:
 		ret = -EINVAL;
@@ -152,7 +130,6 @@ int rtw_mp_read_reg(struct net_device *dev,
 	u32 i = 0, j = 0, ret = 0, data32 = 0;
 	_adapter *padapter = rtw_netdev_priv(dev);
 	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
-	struct rtw_mp_reg_arg	reg_arg;
 
 	char *pextra = extra;
 
@@ -183,28 +160,14 @@ int rtw_mp_read_reg(struct net_device *dev,
 
 	switch (width) {
 	case 'b':
-		reg_arg.io_offset = addr;
-		reg_arg.io_type = 1;
-
-		if (rtw_mp_phl_reg(padapter, &reg_arg, RTW_MP_REG_CMD_READ_BB)) {
-			data32 = reg_arg.io_value; //rtw_phl_read8(dvobj->phl, addr);
-			RTW_INFO("reg=%x\n", data32);
-			sprintf(extra, "%d", data32);
-		} else
-			sprintf(extra, "reg io fail\n");
-
+		data32 = rtw_phl_read8(dvobj->phl, addr);
+		RTW_INFO("%x\n", data32);
+		sprintf(extra, "%d", data32);
 		wrqu->length = strlen(extra);
 		break;
 	case 'w':
 		/* 2 bytes*/
-		reg_arg.io_offset = addr;
-		reg_arg.io_type = 2;
-
-		if (rtw_mp_phl_reg(padapter, &reg_arg, RTW_MP_REG_CMD_READ_BB)) {
-			sprintf(data, "%04x", reg_arg.io_value);
-			RTW_INFO("reg=%s\n", data);
-		} else
-			sprintf(extra, "reg io fail\n");
+		sprintf(data, "%04x\n", rtw_phl_read16(dvobj->phl, addr));
 
 		for (i = 0 ; i <= strlen(data) ; i++) {
 			if (i % 2 == 0) {
@@ -216,8 +179,6 @@ int rtw_mp_read_reg(struct net_device *dev,
 
 			j++;
 		}
-		tmp[j]='\0';
-
 		pch = tmp;
 		RTW_INFO("pch=%s", pch);
 
@@ -239,15 +200,7 @@ int rtw_mp_read_reg(struct net_device *dev,
 		break;
 	case 'd':
 		/* 4 bytes */
-		reg_arg.io_offset = addr;
-		reg_arg.io_type = 4;
-
-		if (rtw_mp_phl_reg(padapter, &reg_arg, RTW_MP_REG_CMD_READ_BB)) {
-			sprintf(data, "%08x", reg_arg.io_value);
-			RTW_INFO("reg=%s\n", data);
-		} else
-			sprintf(extra, "reg io fail\n");
-
+		sprintf(data, "%08x", rtw_phl_read32(dvobj->phl, addr));
 		/*add read data format blank*/
 		for (i = 0 ; i <= strlen(data) ; i++) {
 			if (i % 2 == 0) {
@@ -259,7 +212,6 @@ int rtw_mp_read_reg(struct net_device *dev,
 
 			j++;
 		}
-
 		pch = tmp;
 		RTW_INFO("pch=%s", pch);
 
@@ -470,7 +422,7 @@ int rtw_mp_rate(struct net_device *dev,
 	_adapter *padapter = rtw_netdev_priv(dev);
 	struct mp_priv *pmp_priv = (struct mp_priv *)&padapter->mppriv;
 	PMPT_CONTEXT		pMptCtx = &(padapter->mppriv.mpt_ctx);
-	u8 tx_nss = get_phy_tx_nss(padapter);
+	u8 tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
 	char *pextra = extra;
 	u8 path_i = 0, i = 0;
 	u16 pwr_dbm = 0;
@@ -730,7 +682,7 @@ int rtw_mp_txpower(struct net_device *dev,
 	u16 agc_cw_val = 0;
 	_adapter *padapter = rtw_netdev_priv(dev);
 	struct mp_priv *pmppriv = &padapter ->mppriv;
-	u8 tx_nss = get_phy_tx_nss(padapter);
+	u8 tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
 	char *pextra = extra;
 
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
@@ -1446,25 +1398,6 @@ int rtw_mp_psd(struct net_device *dev,
 	return 0;
 }
 
-int rtw_mp_uuid(struct net_device *dev,
-		struct iw_request_info *info,
-		struct iw_point *wrqu, char *extra)
-{
-	_adapter *padapter = rtw_netdev_priv(dev);
-	u32 uuid;
-
-	if (copy_from_user(extra, wrqu->pointer, wrqu->length))
-		return -EFAULT;
-
-	GetUuid(padapter, &uuid);
-
-	_rtw_memset(extra, 0, wrqu->length);
-	sprintf(extra, "%d", uuid);
-
-	wrqu->length = strlen(extra);
-
-	return 0;
-}
 
 int rtw_mp_thermal(struct net_device *dev,
 		   struct iw_request_info *info,
@@ -3881,10 +3814,6 @@ int rtw_priv_mp_get(struct net_device *dev,
 	case MP_GET_HE:
 		RTW_INFO("mp_get MP_GET_HE\n");
 		status = rtw_mp_get_he(dev, info, wdata, extra);
-		break;
-	case MP_UUID:
-		RTW_INFO("set case MP_UUID\n");
-		status = rtw_mp_uuid(dev, info, wrqu, extra);
 		break;
 	default:
 		status = -EIO;

@@ -155,12 +155,22 @@ static void request_wps_pbc_event(_adapter *padapter)
 #ifdef CONFIG_SUPPORT_HW_WPS_PBC
 void rtw_request_wps_pbc_event(_adapter *padapter)
 {
+#ifdef RTK_DMP_PLATFORM
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
+	kobject_uevent(&padapter->pnetdev->dev.kobj, KOBJ_NET_PBC);
+#else
+	kobject_hotplug(&padapter->pnetdev->class_dev.kobj, KOBJ_NET_PBC);
+#endif
+#else
+
 	if (padapter->pid[0] == 0) {
 		/*	0 is the default value and it means the application monitors the HW PBC doesn't privde its pid to driver. */
 		return;
 	}
 
 	rtw_signal_process(padapter->pid[0], SIGUSR1);
+
+#endif
 
 	rtw_led_control(padapter, LED_CTL_START_WPS_BOTTON);
 }
@@ -2844,10 +2854,10 @@ static int rtw_wx_set_auth(struct net_device *dev,
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct iw_param *param = (struct iw_param *)&(wrqu->param);
-	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 #ifdef CONFIG_WAPI_SUPPORT
 #ifndef CONFIG_IOCTL_CFG80211
+	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	u32 value = param->value;
 #endif
@@ -2951,9 +2961,6 @@ static int rtw_wx_set_auth(struct net_device *dev,
 			RTW_INFO("%s...call rtw_indicate_disconnect\n ", __FUNCTION__);
 			rtw_indicate_disconnect(padapter, 0, _FALSE);
 
-			pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
-			pmlmeinfo->disconnect_code = DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND;
-			pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 		}
 #endif
 
@@ -3944,9 +3951,6 @@ static int rtw_dbg_port(struct net_device *dev,
 	case 0x7a:
 		receive_disconnect(padapter, pmlmeinfo->network.MacAddress
 				   , WLAN_REASON_EXPIRATION_CHK, _FALSE);
-		pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
-		pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_IOCTL_DBG_PORT;
-		pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 		break;
 	case 0x7F:
 		switch (minor_cmd) {
@@ -5806,7 +5810,6 @@ static int rtw_wowlan_ctrl(struct net_device *dev,
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct pwrctrl_priv *pwrctrlpriv = adapter_to_pwrctl(padapter);
-	struct wow_priv *wowpriv = adapter_to_wowlan(padapter);
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	int ret = 0;
 	systime start_time = rtw_get_current_time();
@@ -5817,15 +5820,11 @@ static int rtw_wowlan_ctrl(struct net_device *dev,
 		MLME_IS_STA(padapter) &&
 		!WOWLAN_IS_STA_MIX_MODE(padapter)) {
 #ifdef CONFIG_PNO_SUPPORT
-		if (wowpriv->wow_nlo.nlo_en) {
-			pwrctrlpriv->wowlan_pno_enable = _TRUE;
-		} else
-#endif
-		{
-			RTW_INFO("[%s] WARNING: Please Connect With AP First!!\n",
-				 __func__);
-			goto _rtw_wowlan_ctrl_exit_free;
-		}
+		pwrctrlpriv->wowlan_pno_enable = _TRUE;
+#else
+		RTW_INFO("[%s] WARNING: Please Connect With AP First!!\n", __func__);
+		goto _rtw_wowlan_ctrl_exit_free;
+#endif /* CONFIG_PNO_SUPPORT */
 	}
 
 	if (check_fwstate(pmlmepriv, WIFI_UNDER_SURVEY))
@@ -8215,6 +8214,7 @@ static const struct iw_priv_args rtw_private_args[] = {
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wps_assoc_req_ie"
 	},
 
+	/* for RTK_DMP_PLATFORM	 */
 	{
 		SIOCIWFIRSTPRIV + 0xA,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "channel_plan"
@@ -8438,8 +8438,7 @@ static const struct iw_priv_args rtw_mp_private_args[] = {
 	{ MP_CUSTOMER_STR, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK,
 				IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "customer_str" },
 #endif
-	{ MP_UUID , IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK,
-				IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "mp_uuid"},
+
 #endif /* CONFIG_MP_INCLUDED */
 };
 
@@ -8463,7 +8462,8 @@ static iw_handler rtw_private_handler[] = {
 	rtw_wx_set_mtk_wps_probe_ie,	/* 0x08 */
 	rtw_wx_set_mtk_wps_ie,			/* 0x09 */
 
-	/* Set Channel depend on the country code */
+	/* for RTK_DMP_PLATFORM
+	 * Set Channel depend on the country code */
 	rtw_wx_set_channel_plan,		/* 0x0A */
 
 	rtw_dbg_port,					/* 0x0B */
@@ -8531,7 +8531,13 @@ static struct iw_statistics *rtw_get_wireless_stats(struct net_device *dev)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 14))
 	piwstats->qual.updated = IW_QUAL_ALL_UPDATED ;/* |IW_QUAL_DBM; */
 #else
+#ifdef RTK_DMP_PLATFORM
+	/* IW_QUAL_DBM= 0x8, if driver use this flag, wireless extension will show value of dbm. */
+	/* remove this flag for show percentage 0~100 */
+	piwstats->qual.updated = 0x07;
+#else
 	piwstats->qual.updated = 0x0f;
+#endif
 #endif
 
 #ifdef CONFIG_SIGNAL_DISPLAY_DBM

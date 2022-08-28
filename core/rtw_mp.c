@@ -835,7 +835,7 @@ int rtw_mp_txpoweridx(_adapter *adapter)
 {
 	struct rtw_mp_txpwr_arg	ptxpwr_arg;
 	struct mp_priv *pmppriv = &adapter->mppriv;
-	u8 tx_nss = get_phy_tx_nss(adapter);
+	u8 tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(adapter));
 	u8 i = 0;
 
 	_rtw_memset((void *)&ptxpwr_arg, 0, sizeof(struct rtw_mp_txpwr_arg));
@@ -1012,38 +1012,6 @@ static u8 ReadRFThermalMeter(_adapter *adapter)
 	return hal_mpt_ReadRFThermalMeter(adapter);
 }
 #endif
-
-void GetUuid(_adapter *adapter, u32 *uuid)
-{
-	struct rtw_mp_config_arg pmp_arg;
-	u16 i = 0;
-
-	_rtw_memset((void *)&pmp_arg, 0, sizeof(struct rtw_mp_config_arg));
-
-	pmp_arg.mp_class = RTW_MP_CLASS_CONFIG;
-	pmp_arg.cmd = RTW_MP_CONFIG_CMD_GET_UUID;
-	RTW_INFO("%s, id: %d !!!\n", __func__, pmp_arg.cmd);
-
-	rtw_mp_set_phl_cmd(adapter, (void*)&pmp_arg, sizeof(struct rtw_mp_config_arg));
-
-	while (i != 100) {
-		rtw_msleep_os(10);
-		rtw_mp_get_phl_cmd(adapter, (void*)&pmp_arg, sizeof(struct rtw_mp_config_arg));
-
-		if (pmp_arg.cmd_ok && pmp_arg.status == RTW_PHL_STATUS_SUCCESS) {
-			*uuid = pmp_arg.uuid;
-			RTW_INFO("%s, SET CMD OK, uuid = %d\n", __func__, pmp_arg.uuid);
-			break;
-		} else {
-			if (i > 100) {
-				RTW_INFO("%s,GET CMD FAIL !!! status %d\n", __func__, pmp_arg.status);
-				break;
-			}
-			i++;
-			rtw_msleep_os(10);
-		}
-	}
-}
 
 void GetThermalMeter(_adapter *adapter, u8 rfpath ,u8 *value)
 {
@@ -1451,7 +1419,7 @@ void rtw_set_phl_packet_tx(_adapter *padapter, u8 bStart)
 {
 	struct mp_priv *pmp_priv;
 	u8 rfpath_i = 0;
-	u8 tx_nss = get_phy_tx_nss(padapter);
+	u8 tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
 	pmp_priv = &padapter->mppriv;
 
 
@@ -3216,35 +3184,6 @@ u8 rtw_mp_phl_calibration(_adapter *padapter, struct rtw_mp_cal_arg	*pcal_arg, u
 	return pcal_arg->cmd_ok;
 }
 
-u8 rtw_mp_phl_reg(_adapter *padapter, struct rtw_mp_reg_arg	*reg_arg, u8 cmdid)
-{
-	struct mp_priv	*pmppriv = &padapter->mppriv;
-	u16 i = 0;
-	u32 cmd_size = sizeof(struct rtw_mp_reg_arg);
-
-	reg_arg->mp_class = RTW_MP_CLASS_REG;
-	reg_arg->cmd = cmdid;
-
-	rtw_mp_set_phl_cmd(padapter, (void*)reg_arg, cmd_size);
-
-	while (i <= 10) {
-		rtw_msleep_os(10);
-		rtw_mp_get_phl_cmd(padapter, (void*)reg_arg, cmd_size);
-		if (reg_arg->cmd_ok && reg_arg->status == RTW_PHL_STATUS_SUCCESS) {
-			RTW_INFO("%s,SET CMD OK\n", __func__);
-			break;
-		} else {
-			if (i > 10) {
-				RTW_DBG("%s,GET CMD FAIL !!! status %d\n", __func__, reg_arg->status);
-				break;
-			}
-			i++;
-		}
-	}
-
-	return reg_arg->cmd_ok;
-}
-
 
 u8 rtw_update_giltf(_adapter *padapter)
 {
@@ -3481,7 +3420,7 @@ u8 rtw_mp_set_tsside2verify(_adapter *padapter, u32 tssi_de, u8 rf_path)
 {
 	struct rtw_mp_txpwr_arg	ptxpwr_arg;
 	struct mp_priv *pmppriv = &padapter->mppriv;
-	u8 tx_nss = get_phy_tx_nss(padapter);
+	u8 tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
 	u8 i = 0;
 
 	_rtw_memset((void *)&ptxpwr_arg, 0, sizeof(struct rtw_mp_txpwr_arg));
@@ -3499,7 +3438,7 @@ u8 rtw_mp_set_tssi_offset(_adapter *padapter, u32 tssi_offset, u8 rf_path)
 {
 	struct rtw_mp_txpwr_arg	ptxpwr_arg;
 	struct mp_priv *pmppriv = &padapter->mppriv;
-	u8 tx_nss = get_phy_tx_nss(padapter);
+	u8 tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
 	u8 i = 0;
 
 	_rtw_memset((void *)&ptxpwr_arg, 0, sizeof(struct rtw_mp_txpwr_arg));

@@ -22,8 +22,6 @@ endif
 
 EXTRA_CFLAGS += -I$(src)/include
 
-EXTRA_CFLAGS += -DCONFIG_64BIT_DMA
-
 #EXTRA_LDFLAGS += --strip-debug
 
 ifeq ("","$(wildcard MOK.der)")
@@ -60,7 +58,7 @@ CONFIG_FILE_FWIMG = n
 CONFIG_TXPWR_BY_RATE = y
 CONFIG_TXPWR_BY_RATE_EN = y
 CONFIG_TXPWR_LIMIT = y
-CONFIG_TXPWR_LIMIT_EN = auto
+CONFIG_TXPWR_LIMIT_EN = n
 CONFIG_RTW_CHPLAN = 0xFFFF
 CONFIG_RTW_ADAPTIVITY_EN = disable
 CONFIG_RTW_ADAPTIVITY_MODE = normal
@@ -104,7 +102,7 @@ USE_TRUE_PHY = y
 CONFIG_I386_BUILD_VERIFY = n
 CONFIG_RTW_MBO = n
 ########################## Android ###########################
-# CONFIG_RTW_ANDROID - 0: no Android, 4/5/6/7/8/9/10 : Android version
+# CONFIG_RTW_ANDROID - 0: no Android, 4/5/6/7/8/9/10/11 : Android version
 CONFIG_RTW_ANDROID = 0
 
 ifeq ($(shell test $(CONFIG_RTW_ANDROID) -gt 0; echo $$?), 0)
@@ -112,8 +110,8 @@ EXTRA_CFLAGS += -DCONFIG_RTW_ANDROID=$(CONFIG_RTW_ANDROID)
 endif
 
 ########################## Debug ###########################
-CONFIG_RTW_DEBUG = n
-# default log level is _DRV_ERR = 2,
+CONFIG_RTW_DEBUG = y
+# default log level is _DRV_INFO_ = 4,
 # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
 CONFIG_RTW_LOG_LEVEL = 2
 
@@ -142,6 +140,7 @@ CONFIG_HIGH_ACTIVE_DEV2HST = n
 CONFIG_ONE_PIN_GPIO = n
 CONFIG_HIGH_ACTIVE_HST2DEV = n
 CONFIG_PNO_SUPPORT = n
+CONFIG_PNO_SET_DEBUG = n
 CONFIG_AP_WOWLAN = n
 ######### Notify SDIO Host Keep Power During Syspend ##########
 CONFIG_RTW_SDIO_PM_KEEP_POWER = y
@@ -165,7 +164,7 @@ CONFIG_PLATFORM_RTK1319 = n
 CONFIG_PLATFORM_RTK16XXB = n
 CONFIG_PLATFORM_AML_S905 = n
 CONFIG_PLATFORM_HUANGLONG = n
-CONFIG_PLATFORM_ARM_RK3188 = n
+CONFIG_PLATFORM_ARM_RK3399 = n
 
 ########### CUSTOMER ################################
 
@@ -198,8 +197,25 @@ endif
 
 ifeq ($(CONFIG_PLATFORM_RTL8198D), y)
 DRV_PATH = $(src)
+else ifeq ($(CONFIG_PLATFORM_ARM_RK3399), y)
+DRV_PATH = $(src)
 else
 DRV_PATH = $(TopDIR)
+endif
+
+########### HAL_RTL8852A #################################
+ifeq ($(CONFIG_RTL8852A), y)
+IC_NAME := rtl8852a
+ifeq ($(CONFIG_USB_HCI), y)
+MODULE_NAME = 8852au
+endif
+ifeq ($(CONFIG_PCI_HCI), y)
+MODULE_NAME = 8852ae
+endif
+ifeq ($(CONFIG_SDIO_HCI), y)
+MODULE_NAME = 8852as
+endif
+
 endif
 
 ########### HAL_RTL8852B #################################
@@ -213,6 +229,21 @@ MODULE_NAME = 8852be
 endif
 ifeq ($(CONFIG_SDIO_HCI), y)
 MODULE_NAME = 8852bs
+endif
+
+endif
+
+########### HAL_RTL8852C #################################
+ifeq ($(CONFIG_RTL8852C), y)
+IC_NAME := rtl8852c
+ifeq ($(CONFIG_USB_HCI), y)
+MODULE_NAME = 8852cu
+endif
+ifeq ($(CONFIG_PCI_HCI), y)
+MODULE_NAME = 8852ce
+endif
+ifeq ($(CONFIG_SDIO_HCI), y)
+MODULE_NAME = 8852cs
 endif
 
 endif
@@ -407,6 +438,9 @@ endif
 
 ifeq ($(CONFIG_PNO_SUPPORT), y)
 EXTRA_CFLAGS += -DCONFIG_PNO_SUPPORT
+ifeq ($(CONFIG_PNO_SET_DEBUG), y)
+EXTRA_CFLAGS += -DCONFIG_PNO_SET_DEBUG
+endif
 endif
 
 ifeq ($(CONFIG_GPIO_WAKEUP), y)
@@ -474,6 +508,8 @@ ifeq ($(CONFIG_WIFI_MONITOR), n)
 EXTRA_CFLAGS += -DCONFIG_WIFI_MONITOR
 endif
 endif
+
+#EXTRA_CFLAGS += -DCONFIG_64BIT_DMA
 
 ifeq ($(CONFIG_RTW_NETIF_SG), y)
 EXTRA_CFLAGS += -DCONFIG_RTW_NETIF_SG
@@ -620,11 +656,6 @@ install:
 uninstall:
 	rm -f $(MODDESTDIR)realtek/rtw89/$(MODULE_NAME).ko
 	/sbin/depmod -a ${KVER}
-
-config_r:
-	@echo "make config"
-	/bin/bash script/Configure script/config.in
-
 
 .PHONY: modules clean
 

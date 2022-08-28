@@ -50,6 +50,85 @@
 
 #endif
 
+#ifdef CONFIG_RTW_ANDROID
+
+	#include <linux/version.h>
+	
+	#ifndef CONFIG_IOCTL_CFG80211
+	#define CONFIG_IOCTL_CFG80211
+	#endif
+	
+	#ifndef RTW_USE_CFG80211_STA_EVENT
+	#define RTW_USE_CFG80211_STA_EVENT
+	#endif
+
+	#if (CONFIG_RTW_ANDROID > 4)
+	#ifndef CONFIG_RADIO_WORK
+	#define CONFIG_RADIO_WORK
+	#endif
+	#endif
+
+	#if (CONFIG_RTW_ANDROID >= 8)
+		#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
+		#ifndef CONFIG_RTW_WIFI_HAL
+		#define CONFIG_RTW_WIFI_HAL
+		#endif
+		#else
+ 		#error "Linux kernel version is too old\n"
+		#endif
+	#endif
+
+	#ifdef CONFIG_RTW_WIFI_HAL
+	#ifndef CONFIG_RTW_WIFI_HAL_DEBUG
+	//#define CONFIG_RTW_WIFI_HAL_DEBUG
+	#endif
+	#if (CONFIG_RTW_ANDROID < 11)
+	#ifndef CONFIG_RTW_CFGVENDOR_LLSTATS
+	#define CONFIG_RTW_CFGVENDOR_LLSTATS
+	#endif
+	#endif
+	#ifndef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+	#define CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+	#endif
+	#ifndef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
+	#define CONFIG_RTW_CFGVENDOR_RSSIMONITOR
+	#endif
+	#ifndef CONFIG_RTW_CFGVENDOR_WIFI_LOGGER
+	#define CONFIG_RTW_CFGVENDOR_WIFI_LOGGER
+	#endif
+	#if (CONFIG_RTW_ANDROID >= 10)
+	#ifndef CONFIG_RTW_CFGVENDOR_WIFI_OFFLOAD
+	//#define CONFIG_RTW_CFGVENDOR_WIFI_OFFLOAD
+	#endif
+	//#ifndef CONFIG_KERNEL_PATCH_EXTERNAL_AUTH
+	//#define CONFIG_KERNEL_PATCH_EXTERNAL_AUTH
+	//#endif
+	#endif
+	#endif // CONFIG_RTW_WIFI_HAL
+
+
+	/* Some Android build will restart the UI while non-printable ascii is passed
+	* between java and c/c++ layer (JNI). We force CONFIG_VALIDATE_SSID
+	* for Android here. If you are sure there is no risk on your system about this,
+	* mask this macro define to support non-printable ascii ssid.
+	* #define CONFIG_VALIDATE_SSID */
+
+	/* Android expect dbm as the rx signal strength unit */
+	#define CONFIG_SIGNAL_DISPLAY_DBM
+#endif // CONFIG_RTW_ANDROID
+
+/*
+#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CONFIG_RESUME_IN_WORKQUEUE)
+	#warning "You have CONFIG_HAS_EARLYSUSPEND enabled in your system, we disable CONFIG_RESUME_IN_WORKQUEUE automatically"
+	#undef CONFIG_RESUME_IN_WORKQUEUE
+#endif
+
+#if defined(CONFIG_ANDROID_POWER) && defined(CONFIG_RESUME_IN_WORKQUEUE)
+	#warning "You have CONFIG_ANDROID_POWER enabled in your system, we disable CONFIG_RESUME_IN_WORKQUEUE automatically"
+	#undef CONFIG_RESUME_IN_WORKQUEUE
+#endif
+*/
+
 #ifdef CONFIG_RESUME_IN_WORKQUEUE /* this can be removed, because there is no case for this... */
 	#if !defined(CONFIG_WAKELOCK) && !defined(CONFIG_ANDROID_POWER)
 		#error "enable CONFIG_RESUME_IN_WORKQUEUE without CONFIG_WAKELOCK or CONFIG_ANDROID_POWER will suffer from the danger of wifi's unfunctionality..."
@@ -236,7 +315,7 @@
 	#define CONFIG_DFS_SLAVE_WITH_RADAR_DETECT 0
 	#endif
 	#if !defined(CONFIG_DFS_MASTER) || CONFIG_DFS_SLAVE_WITH_RADAR_DETECT
-	/*#define CONFIG_DFS_MASTER*/
+	#define CONFIG_DFS_MASTER
 	#endif
 	#if defined(CONFIG_DFS_MASTER) && !defined(CONFIG_RTW_DFS_REGION_DOMAIN)
 	#define CONFIG_RTW_DFS_REGION_DOMAIN 0
@@ -563,11 +642,6 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
 /* for phl illegal mac io access check*/
 #define CONFIG_MAC_REG_RW_CHK
 
-/* To enable the CONFIG_PHL_P2PPS definition in phl_config.h */
-#ifdef CONFIG_P2P_PS
-#define CONFIG_P2PPS
-#endif
-
 #ifdef CONFIG_CMD_DISP
 	/*#define DBG_CONFIG_CMD_DISP*/
 
@@ -590,12 +664,8 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
 #endif
 
 #ifdef ROKU_PRIVATE
-	#define CONFIG_RELEASE_RPT
+	#define CONFIG_USB_RELEASE_RPT
 	#define CONFIG_RA_TXSTS_DBG
-#endif
-
-#ifdef CONFIG_80211AX_HE
-	#define CONFIG_STA_MULTIPLE_BSSID
 #endif
 
 /*
@@ -607,8 +677,4 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
  */
 #define RTW_WKARD_UPDATE_PHL_ROLE_CAP
 
-/*
-*RTW_WKARD_TRIGGER_FRAME_PARSER-OFDMA UL TB control
-*/
-#define RTW_WKARD_TRIGGER_FRAME_PARSER
 #endif /* __DRV_CONF_H__ */

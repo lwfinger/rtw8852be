@@ -717,7 +717,6 @@ static int scan_req_pwr_st_hdl(void *obj, u16 event, void *param)
 			phl_fsm_state_goto(pscan->fsm_obj, SCAN_ST_IDLE);
 			break;
 		}
-		fallthrough;
 		/* fall through */
 
 	case SCAN_EV_REQ_PWR_OK:
@@ -735,7 +734,6 @@ static int scan_req_pwr_st_hdl(void *obj, u16 event, void *param)
 
 		FSM_ERR(pscan->fsm, "%s power on fail\n",
 			phl_fsm_obj_name(pscan->fsm_obj));
-		fallthrough;
 		/* fall through */
 
 	case FSM_EV_CANCEL:
@@ -798,7 +796,6 @@ static int scan_off_ch_st_hdl(void *obj, u16 event, void *param)
 			break;
 		}
 
-		fallthrough;
 	/* fall through */
 	case SCAN_EV_PS_ANN_DONE:
 		scan_flush_tx_queue(pscan);
@@ -825,7 +822,6 @@ static int scan_off_ch_st_hdl(void *obj, u16 event, void *param)
 					ALM_NEXT_CH);
 		}
 
-		fallthrough;
 	/* fall through */
 	case SCAN_EV_NEXT_CH:
 
@@ -860,7 +856,6 @@ static int scan_off_ch_st_hdl(void *obj, u16 event, void *param)
 				SCAN_EV_NEXT_CH, ALM_NEXT_CH, NULL);
 		}
 
-		fallthrough;
 	/* fall through */
 	case SCAN_EV_NEXT_PROBE_REQ:
 

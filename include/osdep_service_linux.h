@@ -72,6 +72,13 @@
 #include <linux/limits.h>
 #endif
 
+#ifdef RTK_DMP_PLATFORM
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
+#include <linux/pageremap.h>
+#endif
+#include <asm/io.h>
+#endif
+
 #ifdef CONFIG_NET_RADIO
 #define CONFIG_WIRELESS_EXT
 #endif
@@ -106,6 +113,16 @@
 #include <linux/fs.h>
 #endif
 
+#ifdef CONFIG_USB_HCI
+#include <linux/usb.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 21))
+#include <linux/usb_ch9.h>
+#else
+#include <linux/usb/ch9.h>
+#endif
+#endif
+
+
 #if defined(CONFIG_RTW_GRO) && (!defined(CONFIG_RTW_NAPI))
 
 	#error "Enable NAPI before enable GRO\n"
@@ -138,8 +155,6 @@ static inline void *_rtw_vmalloc(u32 sz)
 {
 	void *pbuf;
 
-	if (!sz)
-		return NULL;
 	pbuf = vmalloc(sz);
 
 #ifdef DBG_MEMORY_LEAK
@@ -177,7 +192,12 @@ static inline void *_rtw_malloc(u32 sz)
 {
 	void *pbuf = NULL;
 
-	pbuf = kmalloc(sz, in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+	#ifdef RTK_DMP_PLATFORM
+	if (sz > 0x4000)
+		pbuf = dvr_malloc(sz);
+	else
+	#endif
+		pbuf = kmalloc(sz, in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 
 #ifdef DBG_MEMORY_LEAK
 	if (pbuf != NULL) {
@@ -207,7 +227,12 @@ static inline void *_rtw_zmalloc(u32 sz)
 
 static inline void _rtw_mfree(void *pbuf, u32 sz)
 {
-	kfree(pbuf);
+	#ifdef RTK_DMP_PLATFORM
+	if (sz > 0x4000)
+		dvr_free(pbuf);
+	else
+	#endif
+		kfree(pbuf);
 
 #ifdef DBG_MEMORY_LEAK
 	atomic_dec(&_malloc_cnt);
@@ -215,6 +240,28 @@ static inline void _rtw_mfree(void *pbuf, u32 sz)
 #endif /* DBG_MEMORY_LEAK */
 
 }
+
+#ifdef CONFIG_USB_HCI
+typedef struct urb *PURB;
+
+static inline void *_rtw_usb_buffer_alloc(struct usb_device *dev, size_t size, dma_addr_t *dma)
+{
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
+	return usb_alloc_coherent(dev, size, (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL), dma);
+	#else
+	return usb_buffer_alloc(dev, size, (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL), dma);
+	#endif
+}
+static inline void _rtw_usb_buffer_free(struct usb_device *dev, size_t size, void *addr, dma_addr_t dma)
+{
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
+	usb_free_coherent(dev, size, addr, dma);
+	#else
+	usb_buffer_free(dev, size, addr, dma);
+	#endif
+}
+#endif /* CONFIG_USB_HCI */
+
 
 /*lock - spinlock*/
 typedef	spinlock_t _lock;
@@ -234,6 +281,18 @@ static inline void _rtw_spinunlock(_lock *plock)
 	spin_unlock(plock);
 }
 
+#if 0
+static inline void _rtw_spinlock_ex(_lock *plock)
+{
+	spin_lock(plock);
+}
+
+static inline void _rtw_spinunlock_ex(_lock *plock)
+{
+
+	spin_unlock(plock);
+}
+#endif
 __inline static void _rtw_spinlock_irq(_lock *plock, unsigned long *flags)
 {
 	spin_lock_irqsave(plock, *flags);
@@ -429,10 +488,10 @@ static inline void rtw_thread_enter(char *name)
 
 static inline void rtw_thread_exit(_completion *comp)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-	kthread_complete_and_exit(comp, 0);
-#else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	complete_and_exit(comp, 0);
+#else
+	kthread_complete_and_exit(comp, 0);
 #endif
 }
 
@@ -978,18 +1037,5 @@ static inline void rtw_dump_stack(void)
 
 #define STRUCT_PACKED __attribute__ ((packed))
 
-#ifndef fallthrough
-#if __GNUC__ >= 5 || defined(__clang__)
-#ifndef __has_attribute
-#define __has_attribute(x) 0
-#endif
-#if __has_attribute(__fallthrough__)
-#define fallthrough __attribute__((__fallthrough__))
-#endif
-#endif
-#ifndef fallthrough
-#define fallthrough do {} while (0) /* fallthrough */
-#endif
-#endif
 
 #endif /* __OSDEP_LINUX_SERVICE_H_ */

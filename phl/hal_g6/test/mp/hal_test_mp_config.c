@@ -406,13 +406,4 @@ enum rtw_hal_status rtw_hal_mp_ic_hw_setting_init(struct mp_context *mp)
 	return hal_status;
 }
 
-
-u32 rtw_hal_get_uuid(struct mp_context *mp)
-{
-	struct hal_info_t *hal_info = (struct hal_info_t *)mp->hal;
-	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
-
-	return hal_com->uuid;
-}
-
 #endif /* CONFIG_HAL_TEST_MP */

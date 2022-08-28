@@ -29,6 +29,11 @@ void rtw_init_mlme_timer(_adapter *padapter)
 #ifdef CONFIG_SET_SCAN_DENY_TIMER
 	rtw_init_timer(&(pmlmepriv->set_scan_deny_timer), rtw_set_scan_deny_timer_hdl, padapter);
 #endif
+
+#ifdef RTK_DMP_PLATFORM
+	_init_workitem(&(pmlmepriv->Linkup_workitem), Linkup_workitem_callback, padapter);
+	_init_workitem(&(pmlmepriv->Linkdown_workitem), Linkdown_workitem_callback, padapter);
+#endif
 }
 
 sint	_rtw_init_mlme_priv(_adapter *padapter)
@@ -428,7 +433,6 @@ struct	wlan_network *_rtw_alloc_network(struct	mlme_priv *pmlmepriv) /* (_queue 
 	pnetwork->network_type = 0;
 	pnetwork->fixed = _FALSE;
 	pnetwork->last_scanned = rtw_get_current_time();
-	pnetwork->last_non_hidden_ssid_ap = pnetwork->last_scanned;
 #if defined(CONFIG_RTW_MESH) && CONFIG_RTW_MESH_ACNODE_PREVENT
 	pnetwork->acnode_stime = 0;
 	pnetwork->acnode_notify_etime = 0;
@@ -2514,8 +2518,6 @@ void rtw_join_timeout_handler(void *ctx)
 {
 	_adapter *adapter = (_adapter *)ctx;
 	struct	mlme_priv *pmlmepriv = &adapter->mlmepriv;
-	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
-	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 
 #if 0
 	if (dev_is_drv_stopped(adapter_to_dvobj(adapter))) {
@@ -2554,9 +2556,6 @@ void rtw_join_timeout_handler(void *ctx)
 				rtw_ft_reset_status(adapter);
 #endif
 				rtw_indicate_disconnect(adapter, pmlmepriv->join_status, _FALSE);
-				pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
-				pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_JOINBSS_TIMEOUT;
-				pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 #ifdef CONFIG_STA_CMD_DISPR
 				rtw_connect_abort(adapter);
 #endif
@@ -2573,9 +2572,6 @@ void rtw_join_timeout_handler(void *ctx)
 #endif /* CONFIG_STA_CMD_DISPR */
 
 		rtw_indicate_disconnect(adapter, pmlmepriv->join_status, _FALSE);
-		pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
-		pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_JOINBSS_TIMEOUT;
-		pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 		free_scanqueue(pmlmepriv);/* ??? */
 
 #ifdef CONFIG_IOCTL_CFG80211
@@ -2646,9 +2642,6 @@ static void rtw_auto_scan_handler(_adapter *padapter)
 {
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	u8 reason = RTW_AUTO_SCAN_REASON_UNSPECIFIED;
-#ifdef CONFIG_LAYER2_ROAMING
-	struct recv_info	*precvinfo = &padapter->recvinfo;
-#endif
 
 	rtw_mlme_reset_auto_scan_int(padapter, &reason);
 
@@ -2663,29 +2656,10 @@ static void rtw_auto_scan_handler(_adapter *padapter)
 		goto exit;
 #endif
 
-#ifdef CONFIG_LAYER2_ROAMING
-	if (is_client_associated_to_ap(padapter) &&
-		rtw_chk_roam_flags(padapter, RTW_ROAM_ACTIVE)) {
-		RTW_INFO("avg_val = %d, need_to_roam=%d\n", precvinfo->signal_strength_data.avg_val, pmlmepriv->need_to_roam);
-		if (precvinfo->signal_strength_data.avg_val < pmlmepriv->roam_rssi_threshold) {
-			pmlmepriv->need_to_roam = _TRUE;
-			if (rtw_get_passing_time_ms(pmlmepriv->last_roaming) >= pmlmepriv->roam_scan_int*2000) {
-#ifdef CONFIG_RTW_80211K
-				rtw_roam_nb_discover(padapter, _FALSE);
-#endif
-				reason = RTW_AUTO_SCAN_REASON_ROAM_ACTIVE;
-				pmlmepriv->last_roaming = rtw_get_current_time();
-				goto do_scan;
-			}
-		} else
-			pmlmepriv->need_to_roam = _FALSE;
-	}
-#endif
-
 	if (pmlmepriv->auto_scan_int_ms == 0
 	    || rtw_get_passing_time_ms(pmlmepriv->scan_start_time) < pmlmepriv->auto_scan_int_ms)
 		goto exit;
-do_scan:
+
 	rtw_drv_scan_by_self(padapter, reason);
 
 exit:
@@ -2710,8 +2684,6 @@ void rtw_iface_dynamic_check_handlder(struct _ADAPTER *a)
 
 	/* auto site survey */
 	rtw_auto_scan_handler(a);
-	linked_status_chk(a, 0);
-	traffic_status_watchdog(a, 0);
 
 #ifdef CONFIG_BR_EXT
 if (!adapter_use_wds(a)) {
@@ -2900,21 +2872,6 @@ static void collect_traffic_statistics(_adapter *padapter)
 #endif
 	
 }
-
-static void rtw_accumulate_fa_count(struct dvobj_priv *dvobj)
-{
-	u32 fa_count;
-	enum phl_band_idx band_idx;
-
-	for (band_idx = HW_BAND_0; band_idx < HW_BAND_MAX; band_idx++) {
-		fa_count = rtw_phl_get_phy_stat_info(GET_PHL_INFO(dvobj),
-						     band_idx,
-						     STAT_INFO_FA_ALL);
-		ATOMIC_ADD((ATOMIC_T *)&dvobj->fa_cnt_acc[band_idx],
-			   (int)fa_count);
-	}
-}
-
 #if 0 /*#ifdef CONFIG_CORE_DM_CHK_TIMER*/
 void rtw_dynamic_check_timer_handlder(void *ctx)
 {
@@ -2970,7 +2927,6 @@ void rtw_core_watchdog_sw_hdlr(void *drv_priv)
 	collect_sta_traffic_statistics(adapter);
 	rtw_mi_dynamic_check_handlder(adapter);
 	rtw_dynamic_chk_wk_sw_hdl(adapter);
-	rtw_accumulate_fa_count(pdvobj);
 
 exit:
 	return;
@@ -3275,12 +3231,8 @@ int rtw_select_and_join_from_scanned_queue(struct mlme_priv *pmlmepriv)
 #ifdef CONFIG_ANTENNA_DIVERSITY
 	u8		bSupportAntDiv = _FALSE;
 #endif
-	struct mlme_ext_priv *pmlmeext;
-	struct mlme_ext_info *pmlmeinfo;
 
 	adapter = (_adapter *)pmlmepriv->nic_hdl;
-	pmlmeext = &adapter->mlmeextpriv;
-	pmlmeinfo = &pmlmeext->mlmext_info;
 
 	_rtw_spinlock_bh(&(pmlmepriv->scanned_queue.lock));
 
@@ -3354,10 +3306,6 @@ candidate_exist:
 			   )
 				rtw_free_assoc_resources_cmd(adapter, _TRUE, 0);
 			rtw_indicate_disconnect(adapter, 0, _FALSE);
-
-			pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
-			pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_CONNECTION_EXIST;
-			pmlmeinfo->wifi_reason_code = WLAN_REASON_DEAUTH_LEAVING;
 		}
 	}
 
@@ -3897,18 +3845,6 @@ sint rtw_restruct_sec_ie(_adapter *adapter, u8 *out_ie)
 		ielength = rtw_rsn_sync_pmkid(adapter, out_ie, ielength, iEntry);
 	}
 
-	if ((psecuritypriv->auth_type == MLME_AUTHTYPE_SAE) &&
-		(psecuritypriv->rsnx_ie_len >= 3)) {
-		u8 *_pos = out_ie + \
-			(psecuritypriv->supplicant_ie[1] + 2);
-		_rtw_memcpy(_pos, psecuritypriv->rsnx_ie,
-			psecuritypriv->rsnx_ie_len);
-		ielength += psecuritypriv->rsnx_ie_len;
-		RTW_INFO_DUMP("update IE for RSNX :",
-			out_ie, ielength);
-	}
-
-
 	return ielength;
 }
 
@@ -4311,7 +4247,7 @@ unsigned int rtw_restructure_ht_ie(_adapter *padapter, u8 *in_ie, u8 *out_ie, ui
 	_rtw_memcpy(ht_capie.supp_mcs_set, pmlmeext->default_supported_mcs_set, 16);
 
 	/* update default supported_mcs_set */
-	rx_nss = get_phy_rx_nss(padapter);
+	rx_nss = GET_HAL_RX_NSS(adapter_to_dvobj(padapter));
 
 	switch (rx_nss) {
 	case 1:
@@ -4494,7 +4430,7 @@ void rtw_update_ht_cap(_adapter *padapter, u8 *pie, uint ie_len, u8 channel)
 		int i;
 		u8 rx_nss = 0;
 
-		rx_nss = get_phy_rx_nss(padapter);
+		rx_nss = GET_HAL_RX_NSS(adapter_to_dvobj(padapter));
 
 
 		/* update the MCS set */
@@ -4701,10 +4637,6 @@ void rtw_append_extended_cap(_adapter *padapter, u8 *out_ie, uint *pout_len)
 	/* CONFIG_80211AX_HE_TODO */
 #endif /* CONFIG_80211AX_HE */
 
-#ifdef CONFIG_STA_MULTIPLE_BSSID
-	rtw_add_ext_cap_info(ext_cap_data, ext_cap_data_len, MULTI_BSSID);
-#endif
-
 	/*
 		From 802.11 specification,if a STA does not support any of capabilities defined
 		in the Extended Capabilities element, then the STA is not required to
@@ -4745,8 +4677,6 @@ void _rtw_roaming(_adapter *padapter, struct wlan_network *tgt_network)
 {
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	struct wlan_network *cur_network = &pmlmepriv->cur_network;
-	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 	int do_join_r;
 
 	if (0 < rtw_to_roam(padapter)) {
@@ -4778,9 +4708,6 @@ void _rtw_roaming(_adapter *padapter, struct wlan_network *tgt_network)
 					rtw_ft_reset_status(padapter);
 #endif
 					rtw_indicate_disconnect(padapter, 0, _FALSE);
-					pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
-					pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_LAYER2_ROAMING_TERMINATE;
-					pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 					break;
 				}
 			}
@@ -5543,7 +5470,7 @@ enum rtw_phl_status rtw_connect_cmd(struct _ADAPTER *a,
 			status = RTW_PHL_STATUS_RESOURCE;
 			goto exit;
 		}
-		rtw_mi_buddy_disconnect(a, DISCONNECTION_BY_DRIVER_DUE_TO_EACH_IFACE_CHBW_NOT_SYNC);
+		rtw_mi_buddy_disconnect(a);
 	}
 
 	cmd_req = &a->connect_req;
@@ -5914,7 +5841,7 @@ static enum phl_mdl_ret_code _disconnect_msg_hdlr(void* dispr, void* priv,
 		status = _disconnect_done_notify(a);
 		if (status == RTW_PHL_STATUS_SUCCESS)
 			break;
-		fallthrough;
+		fallthrough;	/* fall through */
 	case MSG_EVT_DISCONNECT:
 		RTW_DBG(FUNC_ADPT_FMT ": MSG_EVT_DISCONNECT\n",
 			FUNC_ADPT_ARG(a));

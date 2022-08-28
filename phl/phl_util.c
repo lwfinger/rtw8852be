@@ -42,23 +42,14 @@ void pq_reset(void *d, struct phl_queue *q, enum lock_type type)
 u8 pq_push(void *d, struct phl_queue *q, _os_list *obj, u8 pos, enum lock_type type)
 {
 	_os_spinlockfg sp_flags;
-	int need_unlock = 0;
 
-	/* The logs contain a splat that indicates that this routine is sometimes called
-	 * with hardware irp's disabled. Detect this case */
-	if (!in_hardirq()) {
-		_os_spinlock(d, &q->lock, type, &sp_flags);
-		need_unlock = 1;
-	}
+	_os_spinlock(d, &q->lock, type, &sp_flags);
 	if(pos == _first)
 		list_add(obj, &q->queue);
 	else
 		list_add_tail(obj, &q->queue);
 	q->cnt++;
-	if (need_unlock) {
-		_os_spinunlock(d, &q->lock, type, &sp_flags);
-		need_unlock = 0;
-	}
+	_os_spinunlock(d, &q->lock, type, &sp_flags);
 	return true;
 }
 
@@ -68,8 +59,6 @@ u8 pq_pop(void *d, struct phl_queue *q, _os_list **obj, u8 pos, enum lock_type t
 	int need_unlock = 0;
 
 	(*obj) = NULL;
-	/* The logs contain a splat that indicates that this routine is sometimes called
-	 * with hardware irp's disabled. Detect this case */
 	if (!in_hardirq()) {
 		_os_spinlock(d, &q->lock, type, &sp_flags);
 		need_unlock = 1;
@@ -153,8 +142,6 @@ u8 pq_search_node(void *d, struct phl_queue *q, _os_list **obj,
 	int need_unlock =0;
 
 	(*obj) = NULL;
-	/* The logs contain a splat that indicates that this routine is sometimes called
-	 * with hardware irp's disabled. Detect this case */
 	if (!in_hardirq()) {
 		_os_spinlock(d, &q->lock, type, &sp_flags);
 		need_unlock = 1;
@@ -179,10 +166,10 @@ u8 pq_search_node(void *d, struct phl_queue *q, _os_list **obj,
 		}
 
 		newobj = newobj->next;
-	};
-	if (!in_hardirq()) {
-		_os_spinlock(d, &q->lock, type, &sp_flags);
-		need_unlock = 1;
+	}
+	if (need_unlock) {
+		_os_spinunlock(d, &q->lock, type, &sp_flags);
+		need_unlock = 0;
 	}
 
 	return ((*obj) == NULL || (*obj) == &(q->queue)) ? (false) : (true);

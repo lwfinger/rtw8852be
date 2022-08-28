@@ -135,7 +135,7 @@ rtw_phl_sound_start(void *phl, u8 wrole_idx, u8 st_dlg_tkn, u8 period, u8 test_f
 	struct phl_sound_obj *snd = (struct phl_sound_obj *)phl_info->snd_obj;
 	struct phl_snd_start_req snd_req;
 
-	snd_req.wrole = (void *)rtw_phl_get_wrole_by_ridx(phl_info->phl_com, wrole_idx);
+	snd_req.wrole = (void *)phl_get_wrole_by_ridx(phl_info, wrole_idx);
 
 	snd_req.dialog_token = (st_dlg_tkn == 0) ?
 					snd->snd_param.snd_dialog_token : st_dlg_tkn;
@@ -618,7 +618,7 @@ phl_snd_func_grouping(struct phl_info_t *phl_info, u8 wroleidx)
 	u8 gidx = 0;
 	u8 cnt = 0;
 
-	wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, wroleidx);
+	wrole = phl_get_wrole_by_ridx(phl_info, wroleidx);
 
 	/* if wrole(STA) is linked, seft = AP */
 	/* if wrole is AP, self = ???? */
