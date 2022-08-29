@@ -79,6 +79,9 @@ struct chan_info_t * rtw_phl_recycle_busy_chaninfo(void *drvpriv, struct rtw_phl
 
 enum rtw_phl_status rtw_phl_ser_l2_notify(struct rtw_phl_com_t *phl_com);
 
+struct rtw_wifi_role_t *
+rtw_phl_get_wrole_by_ridx(struct rtw_phl_com_t *phl_com, u8 rold_idx);
+
 #ifdef CONFIG_CMD_DISP
 enum rtw_phl_status
 rtw_phl_cmd_notify(struct rtw_phl_com_t *phl_com,

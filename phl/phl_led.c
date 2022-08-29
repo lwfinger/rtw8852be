@@ -30,6 +30,7 @@ struct phl_led_timer_args_t {
 	_os_timer timer;
 	u32 delay_unit;
 	bool timer_alive;
+	bool is_avail;
 	u32 led_manage_mask;
 };
 
@@ -51,6 +52,7 @@ struct phl_led_ctrl_t {
 	struct phl_led_event_args_t *event_args_list_arr[RTW_LED_EVENT_LENGTH];
 	struct rtw_led_intervals_t intervals_arr[PHL_LED_INTERVALS_ARR_LEN_MAX];
 	enum rtw_led_state state;
+	struct phl_led_timer_args_t *toggle_timer_args[RTW_LED_TIMER_LENGTH];
 };
 
 static void _phl_led_timer_release(struct phl_led_timer_args_t *timer_args)
@@ -71,7 +73,7 @@ static void _phl_led_remove_from_timer(struct phl_led_info_t *led_info,
 
 	if (led_info->toggle_timer_args != NULL) {
 		mask = &(led_info->toggle_timer_args->led_manage_mask);
-		*mask = ~((~*mask) | BIT(led_id));
+		*mask &= ~(BIT(led_id));
 
 		if (*mask == 0)
 			led_info->toggle_timer_args->timer_alive = false;
@@ -81,26 +83,21 @@ static void _phl_led_remove_from_timer(struct phl_led_info_t *led_info,
 	}
 }
 
-static void
-_phl_led_all_remove_from_timer(struct phl_led_timer_args_t *timer_args)
+static void _phl_led_timer_cb_done(void* priv, struct phl_msg* msg)
 {
-	enum rtw_led_id led_id = 0;
-	struct phl_led_ctrl_t *led_ctrl =
-	    (struct phl_led_ctrl_t *)(timer_args->phl_info->led_ctrl);
+	struct phl_led_timer_args_t *timer_args =
+		 (struct phl_led_timer_args_t *)(msg->inbuf);
 
-	for (led_id = 0; led_id < RTW_LED_ID_LENGTH; led_id++) {
-		if ((timer_args->led_manage_mask & BIT(led_id)) == 0)
-			continue;
-
-		_phl_led_remove_from_timer(&(led_ctrl->led_info_arr[led_id]),
-					   led_id);
-	}
+	if (!timer_args->timer_alive)
+		timer_args->is_avail = true;
 }
 
 static void _phl_led_timer_cb(void *args)
 {
 	struct phl_led_timer_args_t *timer_args =
 			(struct phl_led_timer_args_t *) args;
+	enum rtw_phl_status phl_status = RTW_PHL_STATUS_SUCCESS;
+	struct phl_info_t *phl_info = timer_args->phl_info;
 
 	struct phl_msg msg = {0};
 	struct phl_msg_attribute attr = {0};
@@ -111,7 +108,16 @@ static void _phl_led_timer_cb(void *args)
 	msg.inbuf = (u8 *)(timer_args);
 	msg.inlen = sizeof(struct phl_led_timer_args_t);
 
-	phl_disp_eng_send_msg(timer_args->phl_info, &msg, &attr, NULL);
+	attr.completion.completion = _phl_led_timer_cb_done;
+	attr.completion.priv = phl_info;
+
+	phl_status = phl_disp_eng_send_msg(timer_args->phl_info,
+						&msg, &attr, NULL);
+	if(phl_status != RTW_PHL_STATUS_SUCCESS){
+		PHL_ERR("%s: phl_disp_eng_send_msg failed!\n", __func__);
+		timer_args->timer_alive = false;
+		_phl_led_timer_cb_done(phl_info, &msg);
+	}
 }
 
 static enum rtw_phl_status _phl_led_ctrl_write_opt(void *hal,
@@ -285,8 +291,6 @@ _phl_led_ctrl_toggle_hdlr(struct phl_led_timer_args_t *timer_args)
 	if (timer_args->timer_alive)
 		_os_set_timer(drv_priv, &(timer_args->timer),
 			      timer_args->delay_unit);
-	else
-		_phl_led_timer_release(timer_args);
 
 	return status;
 }
@@ -298,12 +302,12 @@ _phl_led_ctrl_action_hdlr(struct phl_info_t *phl_info, enum rtw_led_id led_id,
 			  struct phl_led_timer_args_t **timer_args_ptr)
 {
 	enum rtw_phl_status status = RTW_PHL_STATUS_SUCCESS;
-	void *drv_priv = phl_to_drvpriv(phl_info);
 
 	struct phl_led_ctrl_t *led_ctrl =
 	    (struct phl_led_ctrl_t *)(phl_info->led_ctrl);
 	struct phl_led_info_t *led_info = &(led_ctrl->led_info_arr[led_id]);
 	enum rtw_led_ctrl_mode target_ctrl_mode;
+	u8 i = 0;
 
 	PHL_TRACE(COMP_PHL_LED, _PHL_INFO_,
 		  "%s: led_id == %d, action == 0X%X\n", __func__, led_id,
@@ -382,20 +386,24 @@ _phl_led_ctrl_action_hdlr(struct phl_info_t *phl_info, enum rtw_led_id led_id,
 		led_info->toggle_curr_interval_idx = 0;
 
 		if (*timer_args_ptr == NULL) {
-			if (NULL ==
-			    (*timer_args_ptr = _os_mem_alloc(
-				 drv_priv,
-				 sizeof(struct phl_led_timer_args_t)))) {
+			for (i = 0; i < RTW_LED_TIMER_LENGTH; i++) {
+				if (led_ctrl->toggle_timer_args[i] == NULL)
+					continue;
+				if (led_ctrl->toggle_timer_args[i]->is_avail ==
+									true) {
+					*timer_args_ptr =
+						led_ctrl->toggle_timer_args[i];
+					(*timer_args_ptr)->is_avail = false;
+					break;
+				}
+			}
 
-				PHL_ERR("%s: alloc buffer failed!\n", __func__);
-				status = RTW_PHL_STATUS_FAILURE;
+			if (*timer_args_ptr == NULL) {
+				PHL_ERR("%s: get available timer failed!\n", __func__);
 				break;
 			}
 
 			(*timer_args_ptr)->phl_info = phl_info;
-			_os_init_timer(drv_priv, &((*timer_args_ptr)->timer),
-				       _phl_led_timer_cb, *timer_args_ptr,
-				       "phl_led_timer");
 			(*timer_args_ptr)->led_manage_mask = 0;
 			(*timer_args_ptr)->timer_alive = true;
 			(*timer_args_ptr)->delay_unit = 0;
@@ -506,7 +514,9 @@ static enum phl_mdl_ret_code _phl_led_module_init(void *phl, void *dispr,
 	struct phl_led_info_t *led_info = NULL;
 
 	struct rtw_led_intervals_t *intervals = NULL;
-	u8 intervals_idx = 0;
+	u8 intervals_idx = 0, i = 0;
+
+	struct phl_led_timer_args_t *timer_args = NULL;
 
 	PHL_TRACE(COMP_PHL_LED, _PHL_INFO_, "===> _phl_led_module_init()\n");
 
@@ -552,6 +562,28 @@ static enum phl_mdl_ret_code _phl_led_module_init(void *phl, void *dispr,
 		intervals->len = 0;
 	}
 
+	for (i = 0; i < RTW_LED_TIMER_LENGTH; i++) {
+		if (NULL == (timer_args = _os_mem_alloc( drv_priv,
+				sizeof(struct phl_led_timer_args_t)))) {
+
+			PHL_ERR("%s: alloc #%d timer buffer failed!\n", __func__, i);
+			led_ctrl->toggle_timer_args[i] = NULL;
+			continue;
+		}
+
+		timer_args->phl_info = phl_info;
+
+		_os_init_timer(drv_priv, &(timer_args->timer),
+				_phl_led_timer_cb, timer_args, "phl_led_timer");
+
+		timer_args->delay_unit = 0;
+		timer_args->timer_alive = false;
+		timer_args->is_avail = true;
+		timer_args->led_manage_mask = 0;
+
+		led_ctrl->toggle_timer_args[i] = timer_args;
+	}
+
 	return MDL_RET_SUCCESS;
 }
 
@@ -567,11 +599,10 @@ static void _phl_led_module_deinit(void *dispr, void *priv)
 	struct phl_led_event_args_t *event_args_next = NULL;
 
 	struct rtw_led_intervals_t *intervals = NULL;
-	u8 intervals_idx = 0;
+	u8 intervals_idx = 0, i = 0;
 
 	enum rtw_led_id led_id = 0;
 	struct phl_led_info_t *led_info = NULL;
-	struct phl_led_timer_args_t *timer_args = NULL;
 
 	PHL_TRACE(COMP_PHL_LED, _PHL_INFO_, "===> _phl_led_module_deinit()\n");
 
@@ -620,9 +651,13 @@ static void _phl_led_module_deinit(void *dispr, void *priv)
 		if (led_info->toggle_timer_args == NULL)
 			continue;
 
-		timer_args = led_info->toggle_timer_args;
-		_phl_led_all_remove_from_timer(led_info->toggle_timer_args);
-		_phl_led_timer_release(timer_args);
+		_phl_led_remove_from_timer(led_info, led_id);
+	}
+	for (i = 0; i < RTW_LED_TIMER_LENGTH; i++) {
+		if (led_ctrl->toggle_timer_args[i] == NULL)
+			continue;
+
+		_phl_led_timer_release(led_ctrl->toggle_timer_args[i]);
 	}
 
 	_os_mem_free(drv_priv, led_ctrl, sizeof(struct phl_led_ctrl_t));
@@ -669,10 +704,12 @@ static enum phl_mdl_ret_code _phl_led_module_start(void *dispr, void *priv)
 static enum phl_mdl_ret_code _phl_led_module_stop(void *dispr, void *priv)
 {
 	struct phl_info_t *phl_info = (struct phl_info_t *)priv;
+	void *drv_priv = phl_to_drvpriv(phl_info);
 	struct phl_led_ctrl_t *led_ctrl =
 	    (struct phl_led_ctrl_t *)(phl_info->led_ctrl);
 
 	enum phl_mdl_ret_code ret = MDL_RET_SUCCESS;
+	u8 i = 0;
 
 	PHL_TRACE(COMP_PHL_LED, _PHL_INFO_, "===> _phl_led_module_stop()\n");
 
@@ -689,6 +726,12 @@ static enum phl_mdl_ret_code _phl_led_module_stop(void *dispr, void *priv)
 	if (RTW_PHL_STATUS_SUCCESS !=
 	    _phl_led_ctrl_event_hdlr(phl_info, RTW_LED_EVENT_PHL_STOP))
 		ret = MDL_RET_FAIL;
+
+	for (i = 0; i < RTW_LED_TIMER_LENGTH; i++) {
+		_os_cancel_timer(drv_priv, &(led_ctrl->toggle_timer_args[i]->timer));
+		led_ctrl->toggle_timer_args[i]->timer_alive = false;
+		led_ctrl->toggle_timer_args[i]->is_avail = true;
+	}
 
 	return ret;
 }
@@ -726,10 +769,8 @@ static enum phl_mdl_ret_code _phl_led_module_msg_hdlr(void *dispr, void *priv,
 				  __func__);
 			timer_args = (struct phl_led_timer_args_t *)(msg->inbuf);
 
-			if (!timer_args->timer_alive) {
-				_phl_led_timer_release(timer_args);
+			if (!timer_args->timer_alive)
 				return MDL_RET_SUCCESS;
-			}
 
 			if (RTW_PHL_STATUS_SUCCESS !=
 		    	    _phl_led_ctrl_toggle_hdlr(timer_args))

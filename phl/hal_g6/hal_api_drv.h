@@ -168,6 +168,9 @@ enum rtw_hal_status rtw_hal_reset(struct rtw_hal_com_t *hal_com,
 #define rtw_hal_btc_wl_rfk_ntfy(hal_com, phy_idx, rfk_type, rfk_process) 0
 #else
 u8 rtw_hal_btc_wl_rfk_ntfy(struct rtw_hal_com_t *hal_com, u8 phy_idx, u8 rfk_type, u8 rfk_process);
+
+enum rtw_hal_status rtw_hal_btc_cfg_tx_1ss(struct rtw_hal_com_t *hal_com,
+			struct rtw_phl_com_t *phl_com, u8 rid, bool enable);
 #endif
 void rtw_hal_btc_power_on_ntfy(void *hinfo);
 void rtw_hal_btc_power_off_ntfy(void *hinfo);

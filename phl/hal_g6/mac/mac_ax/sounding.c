@@ -1670,8 +1670,8 @@ u32 mac_set_csi_para_reg(struct mac_ax_adapter *adapter,
 u32 mac_set_csi_para_cctl(struct mac_ax_adapter *adapter,
 			  struct mac_cctl_csi_para *csi_para)
 {
-	struct mac_ax_cctl_info info;
-	struct mac_ax_cctl_info mask;
+	struct rtw_hal_mac_ax_cctl_info info;
+	struct rtw_hal_mac_ax_cctl_info mask;
 	struct mac_ax_ops *ax_ops = adapter_to_mac_ops(adapter);
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u32 ret, val32;

@@ -186,7 +186,7 @@ static inline void *_os_pkt_buf_map_rx(void *d, _dma *bus_addr_l, _dma *bus_addr
 }
 
 static inline void *_os_pkt_buf_alloc_rx(void *d, _dma *bus_addr_l,
-			_dma *bus_addr_h, u32 buf_sz, void **os_priv)
+			_dma *bus_addr_h, u32 buf_sz, u8 cache, void **os_priv)
 {
 	struct _SHARED_MEMORY share_mem;
 
@@ -210,7 +210,7 @@ static inline void *_os_pkt_buf_alloc_rx(void *d, _dma *bus_addr_l,
 	return (u8 *)share_mem.VirtualAddress;
 }
 static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, _dma bus_addr_l,
-			_dma bus_addr_h, u32 buf_sz, void *os_priv)
+			_dma bus_addr_h, u32 buf_sz, u8 cache, void *os_priv)
 {
 	struct _SHARED_MEMORY share_mem;
 
@@ -247,8 +247,17 @@ static inline void _os_cache_wback(void *d, _dma *bus_addr_l,
 {
 }
 
+static inline void *_os_dma_pool_create(void *d, char *name, u32 wd_page_sz)
+{
+	return NULL;
+}
+
+static inline void _os_dma_pool_destory(void *d, void *pool)
+{
+}
+
 /* txbd, rxbd, wd */
-static inline void *_os_shmem_alloc(void *d, _dma *bus_addr_l,
+static inline void *_os_shmem_alloc(void *d, void *pool, _dma *bus_addr_l,
 				    _dma *bus_addr_h, u32 buf_sz,
 				    u8 cache, u8 direction, void **os_rsvd)
 {

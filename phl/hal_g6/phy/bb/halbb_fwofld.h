@@ -35,6 +35,7 @@
 struct bb_info;
 /*@--------------------------[Prptotype]-------------------------------------*/
 #ifdef HALBB_FW_OFLD_SUPPORT
+bool halbb_fw_set_reg(struct bb_info *bb, u32 addr, u32 mask, u32 val, u8 lc);
 bool halbb_fwcfg_bb_phy_8852a_2(struct bb_info *bb, u32 addr, u32 data,
 			    enum phl_phy_idx phy_idx);
 bool halbb_fwofld_bw_ch_8852a_2(struct bb_info *bb, u8 pri_ch, u8 central_ch,

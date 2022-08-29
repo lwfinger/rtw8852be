@@ -37,6 +37,8 @@ inline struct proc_dir_entry *get_rtw_drv_proc(void)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0))
 #define PDE_DATA(inode) PDE((inode))->data
 #define proc_get_parent_data(inode) PDE((inode))->parent->data
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+#define PDE_DATA(inode) pde_data(inode)
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
@@ -290,11 +292,7 @@ const int drv_proc_hdls_num = sizeof(drv_proc_hdls) / sizeof(struct rtw_proc_hdl
 static int rtw_drv_proc_open(struct inode *inode, struct file *file)
 {
 	/* struct net_device *dev = proc_get_parent_data(inode); */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	ssize_t index = (ssize_t)PDE_DATA(inode);
-#else
-	ssize_t index = (ssize_t)pde_data(inode);
-#endif
 	const struct rtw_proc_hdl *hdl = drv_proc_hdls + index;
 	void *private = NULL;
 
@@ -323,11 +321,7 @@ static int rtw_drv_proc_open(struct inode *inode, struct file *file)
 
 static ssize_t rtw_drv_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
-#else
-	ssize_t index = (ssize_t)pde_data(file_inode(file));
-#endif
 	const struct rtw_proc_hdl *hdl = drv_proc_hdls + index;
 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
 
@@ -1189,7 +1183,7 @@ static int proc_get_tx_info_msg(struct seq_file *m, void *v)
 	struct sta_priv *pstapriv = &padapter->stapriv;
 	int i;
 	_list	*plist, *phead;
-	u8 current_rate_id = 0, current_sgi = 0;
+	u16 current_rate_id = 0, current_sgi = 0;
 
 	char *BW, *status;
 
@@ -1240,7 +1234,7 @@ static int proc_get_tx_info_msg(struct seq_file *m, void *v)
 					BW = "";
 					break;
 				}
-				current_rate_id = rtw_hal_get_current_tx_rate(adapter, psta);
+				current_rate_id = rtw_get_current_tx_rate(adapter, psta);
 				current_sgi = rtw_get_current_tx_sgi(adapter, psta);
 
 				RTW_PRINT_SEL(m, "==============================\n");
@@ -1258,17 +1252,53 @@ static int proc_get_tx_info_msg(struct seq_file *m, void *v)
 
 }
 
-#ifdef ROKU_PRIVATE
-static u32 rtw_tx_sts_total(u32 *tx_sts, u8 num)
+static int proc_get_false_alarm_accumulated(struct seq_file *m, void *v)
 {
-	u32 ret = 0;
-	int i = 0;
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
+	struct rtw_wifi_role_t *wrole = padapter->phl_role;
+	enum phl_band_idx hw_band = wrole->hw_band;
 
-	for (i = 0; i < num; i++)
-		ret += tx_sts[i];
-	return ret;
+	_RTW_PRINT_SEL(m , "Accumulated False Alarm:%u\n",
+		       ATOMIC_READ((ATOMIC_T *)&dvobj->fa_cnt_acc[hw_band]));
+
+	return 0;
 }
 
+static ssize_t proc_set_false_alarm_accumulated(struct file *file,
+						const char __user *buffer,
+						size_t count, loff_t *pos,
+						void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
+	struct rtw_wifi_role_t *wrole = padapter->phl_role;
+	enum phl_band_idx hw_band = wrole->hw_band;
+	char tmp[32];
+	u32 false_clr;
+
+	if (count < 1)
+		return -EINVAL;
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		u32 num = sscanf(tmp, "%u ", &false_clr);
+		ATOMIC_SET((ATOMIC_T *)&dvobj->fa_cnt_acc[hw_band],
+			   (int)false_clr);
+	} else {
+		return -EFAULT;
+	}
+
+	return count;
+}
+
+#ifdef ROKU_PRIVATE
 static int proc_get_roku_trx_info_msg(struct seq_file *m, void *v)
 {
 	struct net_device *dev = m->private;
@@ -1287,17 +1317,6 @@ static int proc_get_roku_trx_info_msg(struct seq_file *m, void *v)
 	u32 tx_retry_cnt[PHL_AC_QUEUE_TOTAL] = {0};
 	u32 tx_fail_cnt[PHL_AC_QUEUE_TOTAL] = {0};
 	u32 tx_ok_cnt[PHL_AC_QUEUE_TOTAL] = {0};
-
-#if 0
-	struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
-	struct sta_recv_dframe_info *psta_dframe_info;
-	char cnt_str[168] = {0};
-	char tmp_str[21] = {0};
-	u8 rx_nss_num = hal_spec->rx_nss_num;
-	char *BW;
-	u8 isCCKrate = 0, rf_path = 0;
-	u8 tx_stats_category = 1; /* 0: pass, 1:drop */
-#endif
 
 #if 0
 	psta = rtw_get_stainfo(pstapriv, get_bssid(pmlmepriv));
@@ -1431,17 +1450,8 @@ static int proc_get_roku_trx_info_msg(struct seq_file *m, void *v)
 #endif
 
 		if(psta) {
-			rtw_phl_get_tx_retry_rpt(GET_PHL_INFO(adapter_to_dvobj(adapter)),psta->phl_sta,
-				tx_retry_cnt, PHL_AC_QUEUE_TOTAL);
-			rtw_phl_get_tx_fail_rpt(GET_PHL_INFO(adapter_to_dvobj(adapter)), psta->phl_sta,
-				tx_fail_cnt, PHL_AC_QUEUE_TOTAL);
-			rtw_phl_get_tx_ok_rpt(GET_PHL_INFO(adapter_to_dvobj(adapter)), psta->phl_sta,
-				tx_ok_cnt, PHL_AC_QUEUE_TOTAL);
+			rtw_get_sta_tx_stat(adapter, psta);
 			pstats = &psta->sta_stats;
-			pstats->tx_retry_cnt = rtw_tx_sts_total(tx_retry_cnt, PHL_AC_QUEUE_TOTAL);
-			pstats->tx_fail_cnt = rtw_tx_sts_total(tx_fail_cnt, PHL_AC_QUEUE_TOTAL);
-			pstats->tx_ok_cnt =  rtw_tx_sts_total(tx_ok_cnt, PHL_AC_QUEUE_TOTAL);
-			pstats->total_tx_retry_cnt += pstats->tx_retry_cnt;
 
 			RTW_PRINT_SEL(m, "MAC: " MAC_FMT " sent: %u fail: %u retry: %u\n",
 			MAC_ARG(&sta_mac[i][0]), pstats->tx_ok_cnt, pstats->tx_fail_cnt, pstats->tx_retry_cnt);
@@ -5076,6 +5086,9 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("dis_turboedca", proc_get_turboedca_ctrl, proc_set_turboedca_ctrl),
 	RTW_PROC_HDL_SSEQ("tx_info_msg", proc_get_tx_info_msg, NULL),
 	RTW_PROC_HDL_SSEQ("rx_info_msg", proc_get_rx_info_msg, proc_set_rx_info_msg),
+	RTW_PROC_HDL_SSEQ("false_alarm_accumulated",
+			  proc_get_false_alarm_accumulated,
+			  proc_set_false_alarm_accumulated),
 #ifdef ROKU_PRIVATE
 	RTW_PROC_HDL_SSEQ("roku_trx_info_msg", proc_get_roku_trx_info_msg, NULL),
 #endif
@@ -5211,6 +5224,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("rx_stat", proc_get_rx_stat, NULL),
 
 	RTW_PROC_HDL_SSEQ("tx_stat", proc_get_tx_stat, NULL),
+	RTW_PROC_HDL_SSEQ("sta_tx_stat", proc_get_sta_tx_stat, proc_set_sta_tx_stat),
 	/**** PHY Capability ****/
 	RTW_PROC_HDL_SSEQ("phy_cap", proc_get_phy_cap, NULL),
 #ifdef CONFIG_80211N_HT
@@ -5332,17 +5346,18 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 #ifdef ROKU_PRIVATE
 	RTW_PROC_HDL_SSEQ("vendor_ie_filter", proc_get_vendor_ie_filter, proc_set_vendor_ie_filter),
 #endif
+#ifdef RTW_DETECT_HANG
+	RTW_PROC_HDL_SSEQ("hang_info", proc_get_hang_info, NULL),
+#endif
+	RTW_PROC_HDL_SSEQ("disconnect_info", proc_get_disconnect_info,
+			  proc_set_disconnect_info),
 };
 
 const int adapter_proc_hdls_num = sizeof(adapter_proc_hdls) / sizeof(struct rtw_proc_hdl);
 
 static int rtw_adapter_proc_open(struct inode *inode, struct file *file)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	ssize_t index = (ssize_t)PDE_DATA(inode);
-#else
-	ssize_t index = (ssize_t)pde_data(inode);
-#endif
 	const struct rtw_proc_hdl *hdl = adapter_proc_hdls + index;
 	void *private = proc_get_parent_data(inode);
 
@@ -5372,11 +5387,7 @@ static int rtw_adapter_proc_open(struct inode *inode, struct file *file)
 
 static ssize_t rtw_adapter_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
-#else
-	ssize_t index = (ssize_t)pde_data(file_inode(file));
-#endif
 	const struct rtw_proc_hdl *hdl = adapter_proc_hdls + index;
 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
 
@@ -5608,11 +5619,7 @@ const int odm_proc_hdls_num = sizeof(odm_proc_hdls) / sizeof(struct rtw_proc_hdl
 
 static int rtw_odm_proc_open(struct inode *inode, struct file *file)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	ssize_t index = (ssize_t)PDE_DATA(inode);
-#else
-	ssize_t index = (ssize_t)pde_data(inode);
-#endif
 	const struct rtw_proc_hdl *hdl = odm_proc_hdls + index;
 	void *private = proc_get_parent_data(inode);
 
@@ -5642,11 +5649,7 @@ static int rtw_odm_proc_open(struct inode *inode, struct file *file)
 
 static ssize_t rtw_odm_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
-#else
-	ssize_t index = (ssize_t)pde_data(file_inode(file));
-#endif
 	const struct rtw_proc_hdl *hdl = odm_proc_hdls + index;
 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
 

@@ -17,6 +17,7 @@
 #include "btc/hal_btc.h"
 
 #ifdef CONFIG_BTCOEX
+
 /*******************************************
  * C2H FW message
  *******************************************/
@@ -233,62 +234,9 @@ void rtw_hal_btc_update_role_info_ntfy(void *hinfo,  u8 role_id,
 	struct hal_info_t *h = (struct hal_info_t *)hinfo;
 	struct btc_t *btc = (struct btc_t *)h->btc;
 	struct btc_ops *ops = btc->ops;
-	struct btc_wl_link_info r = {0};
-#ifdef CONFIG_PHL_P2PPS
-	u8 i =0;
-#endif /* CONFIG_PHL_P2PPS */
-
-	if (role_id >= MAX_WIFI_ROLE_NUMBER)
-		return;
-
-
-	if (wrole) {
-		r.role = wrole->type;
-#ifdef RTW_WKARD_ROLE_TYPE
-		if (wrole->mstate != MLME_NO_LINK &&
-			wrole->real_type != PHL_RTYPE_NONE) {
-			r.role = wrole->real_type;
-			PHL_INFO("[BTC], rtw_hal_btc_update_role_info_ntfy(): set r.role from type(%d) to real_type(%d)\n",
-				wrole->type, wrole->real_type);
-		}
-#endif /* RTW_WKARD_ROLE_TYPE */
-#ifdef CONFIG_PHL_P2PPS
-		r.noa = 0;
-		r.noa_duration = 0;
-		for (i = 0; i < MAX_NOA_DESC; i++) {
-			if (wrole->noa_desc[i].enable) {
-				r.noa = 1;
-				r.noa_duration = wrole->noa_desc[i].duration;
-				break;
-			}
-		}
-#endif /* CONFIG_PHL_P2PPS */
-		r.phy = wrole->hw_band;
-		r.pid = wrole->hw_port;
-		r.active = wrole->active;
-		r.connected = wrole->mstate;
-		r.mode = wrole->cap.wmode;
-		r.client_cnt = wrole->assoc_sta_queue.cnt;
-		#ifdef RTW_PHL_BCN
-		r.bcn_period = wrole->bcn_cmn.bcn_interval;
-		r.dtim_period = wrole->dtim_period;
-		#endif
-		/* Remove it after btc ready */
-		r.band = wrole->chandef.band;
-		r.ch = wrole->chandef.center_ch;
-		r.bw = wrole->chandef.bw;
-		hal_mem_cpy(h->hal_com, &r.chdef, &wrole->chandef,
-			    sizeof(struct rtw_chan_def));
-		hal_mem_cpy(h->hal_com, r.mac_addr, wrole->mac_addr, MAC_ALEN);
-	}
-
-	if (sta && wrole->type == PHL_RTYPE_STATION) {/*associated node info??*/
-		r.mac_id = sta->macid;
-		r.mode = (u8)sta->wmode;
-	}
 
 	if (ops && ops->ntfy_role_info)
-		ops->ntfy_role_info(btc, role_id, &r, rstate);
+		ops->ntfy_role_info(btc, role_id, wrole, sta, rstate);
 }
 
 void rtw_hal_btc_power_on_ntfy(void *hinfo)
@@ -397,40 +345,10 @@ void rtw_hal_btc_wl_status_ntfy(void *hinfo, struct rtw_phl_com_t *phl_com, u8 n
 	struct hal_info_t *h = (struct hal_info_t *)hinfo;
 	struct btc_t *btc = (struct btc_t *)h->btc;
 	struct btc_ops *ops = btc->ops;
-	struct btc_wl_stat_info stat_info[MAX_WIFI_ROLE_NUMBER] = {0};
-	struct btc_traffic *t;
-	struct rtw_stats *phl_stats = &phl_com->phl_stats;
-	struct rtw_phl_rainfo ra_info = {0};
-	u8 i;
-
-	if(ntfy_num == 0)
-		return;
-
-	for (i = 0; i < ntfy_num; i++) {
-		_os_mem_set(halcom_to_drvpriv(h->hal_com), &ra_info, 0,
-			    sizeof(ra_info));
-
-		stat_info[i].pid = sta[i]->wrole->id;
-		stat_info[i].stat.rssi = sta[i]->hal_sta->rssi_stat.rssi >> 1;
-
-		t = &stat_info[i].stat.traffic;
-		t->tx_lvl = phl_stats->tx_traffic.lvl;
-		t->tx_sts = phl_stats->tx_traffic.sts;
-
-		t->rx_lvl = phl_stats->rx_traffic.lvl;
-		t->rx_sts = phl_stats->rx_traffic.sts;
-
-	        if (RTW_HAL_STATUS_SUCCESS ==
-		    rtw_hal_bb_query_rainfo(h, sta[i]->hal_sta, &ra_info))
-			t->tx_rate = ra_info.rate;
-		else
-			t->tx_rate = RTW_DATA_RATE_MAX;
-
-		t->rx_rate = h->hal_com->trx_stat.rx_rate_plurality;
-	}
 
 	if (ops && ops->ntfy_wl_sta)
-		ops->ntfy_wl_sta(btc, ntfy_num, stat_info, reason);
+		ops->ntfy_wl_sta(btc, &phl_com->phl_stats,
+				 ntfy_num, sta, reason);
 
 }
 

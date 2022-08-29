@@ -56,6 +56,10 @@
 #define WMAC_SPEC_SIFS_OFDM_52C 0x11
 #define WMAC_SPEC_SIFS_CCK	 0xA
 
+/* RRSR disable 5.5M CCK*/
+#define WMAC_CCK_EN_1M 0x1
+#define WMAC_RRSR_RATE_LEGACY_EN 0x1
+
 /* SRAM fifo address */
 #define CMAC_TBL_BASE_ADDR	0x18840000
 
@@ -180,14 +184,16 @@ u32 mac_check_access(struct mac_ax_adapter *adapter, u32 offset);
  */
 
 /**
- * @brief mac_trx_init
+ * @brief cmac_init
  *
  * @param *adapter
  * @param *info
+ * @param band
  * @return Please Place Description here.
  * @retval u32
  */
-u32 mac_trx_init(struct mac_ax_adapter *adapter, struct mac_ax_trx_info *info);
+u32 cmac_init(struct mac_ax_adapter *adapter, struct mac_ax_trx_info *info,
+	      enum mac_ax_band band);
 /**
  * @}
  * @}
@@ -201,16 +207,14 @@ u32 mac_trx_init(struct mac_ax_adapter *adapter, struct mac_ax_trx_info *info);
  */
 
 /**
- * @brief mac_dbcc_enable
+ * @brief mac_trx_init
  *
  * @param *adapter
  * @param *info
- * @param dbcc_en
  * @return Please Place Description here.
  * @retval u32
  */
-u32 mac_dbcc_enable(struct mac_ax_adapter *adapter,
-		    struct mac_ax_trx_info *info, u8 dbcc_en);
+u32 mac_trx_init(struct mac_ax_adapter *adapter, struct mac_ax_trx_info *info);
 /**
  * @}
  * @}

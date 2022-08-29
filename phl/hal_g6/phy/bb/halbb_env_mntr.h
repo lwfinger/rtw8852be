@@ -368,7 +368,8 @@ struct bb_env_mntr_info {
 	u8			nhm_idle_ratio; /*percent*/
 	u8			nhm_ratio; /*percent*/
 	u16			nhm_result_sum; /*sample cnt*/
-	u8			nhm_pwr; /*dBm+110*/
+	u8			nhm_pwr; /*110+x => dBm, unit = 1dB*/
+	u8			nhm_pwr_0p5; /*110+x/2 => dBm, unit = 0.5dB*/
 	u8			ifs_clm_tx_ratio; /*percent*/
 	u8			ifs_clm_edcca_excl_cca_ratio; /*percent*/
 	u8			ifs_clm_cck_fa_ratio; /*percent*/
@@ -385,7 +386,8 @@ struct bb_env_mntr_info {
 	u16			fahm_result_sum; /*sample cnt*/
 	u8			fahm_ratio; /*percent*/
 	u8			fahm_denom_ratio; /*percent*/
-	u8			fahm_pwr; /*dBm+110*/
+	u8			fahm_pwr; /*110+x => dBm, unit = 1dB*/
+	u8			fahm_pwr_0p5; /*110+x/2 => dBm, unit = 0.5dB*/
 	u8			edcca_clm_ratio; /*percent*/
 	u8			edcca_noise_bg; /*dBm+110, only for 52A*/
 	struct env_mntr_rpt	env_mntr_rpt_bg;

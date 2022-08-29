@@ -138,7 +138,7 @@ void phl_mr_dump_info(const char *caller, const int line, bool show_caller,
 
 	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
 		if (mr_ctl->role_map & BIT(i)) {
-			wrole = phl_get_wrole_by_ridx(phl_info, i);
+			wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, i);
 			PHL_DUMP_ROLE(phl_info, wrole);
 		}
 	}
@@ -1520,6 +1520,14 @@ _mrc_module_msg_post_hdl(void *dispr, void *priv, struct phl_msg *msg)
 #endif
 		ret = MDL_RET_SUCCESS;
 		break;
+	case MSG_EVT_SER_M5_READY:
+		if (MSG_MDL_ID_FIELD(msg->msg_id) != PHL_MDL_SER)
+			return MDL_RET_IGNORE;
+
+		PHL_INFO("%s: MSG_EVT_SER_M5_READY\n", __func__);
+		phl_mr_err_recovery(phl_info, MSG_EVT_ID_FIELD(msg->msg_id));
+		ret = MDL_RET_SUCCESS;
+		break;
 	default:
 		ret = MDL_RET_SUCCESS;
 		break;
@@ -1706,7 +1714,7 @@ phl_mr_chandef_sync(struct phl_info_t *phl_info, struct hw_band_ctl_t *band_ctrl
 	_os_spinlock(drv, &band_ctrl->chan_ctx_queue.lock, _ps, NULL);
 	for (ridx = 0; ridx < MAX_WIFI_ROLE_NUMBER; ridx++) {
 		if (chanctx->role_map & BIT(ridx)) {
-			wrole = phl_get_wrole_by_ridx(phl_info, ridx);
+			wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, ridx);
 			if (wrole == NULL) {
 				PHL_ERR("ridx :%d wrole == NULL\n", ridx);
 				_os_warn_on(1);
@@ -2850,7 +2858,9 @@ bool phl_mr_noa_dur_lim_change (struct phl_info_t *phl_info, struct rtw_wifi_rol
 			but will process tdmra if need_tdmra = true
 			then, tdmra will qurey NoA parameter
 		*/
+#ifdef CONFIG_MCC_SUPPORT
 		need_tdmra = _mr_tdmra_need(phl_info, wrole->hw_band, &ap_role_idx);
+#endif
 		if (need_tdmra)
 			ctrl_by_tdmra = true;
 		else
@@ -3278,6 +3288,17 @@ phl_mr_check_ecsa(struct phl_info_t *phl_info,
 			}
 		}
 	}
+
+	if (sta_wr == NULL) {
+		PHL_TRACE(COMP_PHL_ECSA, _PHL_WARNING_, "[ECSA] Sta role not found!\n");
+		return;
+	}
+
+	if (ap_wr == NULL) {
+		PHL_TRACE(COMP_PHL_ECSA, _PHL_WARNING_, "[ECSA] AP role not found!\n");
+		return;
+	}
+
 	if(sta_band_type == BAND_ON_24G){
 		if(ap_band_type == BAND_ON_24G)
 			reason = ECSA_START_MCC_24G_TO_24G;
@@ -3410,6 +3431,19 @@ u8 rtw_phl_mr_query_mcc_inprogress (void *phl, struct rtw_wifi_role_t *wrole,
 	return phl_mr_query_mcc_inprogress(phl_info, wrole, check_type);
 }
 #endif
+
+enum rtw_phl_status
+phl_mr_err_recovery(struct phl_info_t *phl, enum phl_msg_evt_id eid)
+{
+	enum rtw_phl_status status = RTW_PHL_STATUS_SUCCESS;
+
+	if (eid == MSG_EVT_SER_M5_READY) {
+		/* SER L1 DONE event */
+		rtw_phl_mcc_recovery(phl, HW_BAND_0);
+	}
+
+	return status;
+}
 
 /* MR coex related code */
 #ifdef CONFIG_MCC_SUPPORT

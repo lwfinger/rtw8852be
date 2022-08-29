@@ -96,9 +96,11 @@ typedef struct rtl_priv_pattern {
 } rtl_priv_pattern_t;
 
 struct wow_priv {
-	struct rtw_wow_wake_info wow_wake_event;
 	struct rtw_wow_gpio_info wow_gpio;
 	struct rtw_disc_det_info wow_disc;
+#ifdef CONFIG_PNO_SUPPORT
+	struct rtw_nlo_info wow_nlo;
+#endif
 	enum pattern_type wow_ptrn_valid[MAX_WKFM_CAM_NUM];
 };
 
@@ -130,57 +132,16 @@ void rtw_wowlan_set_pattern_cast_type(_adapter *adapter, struct rtw_wowcam_upd_i
 #endif /* CONFIG_WOWLAN */
 
 #ifdef CONFIG_PNO_SUPPORT
-#define MAX_PNO_LIST_COUNT 16
-#define MAX_SCAN_LIST_COUNT 14	/* 2.4G only */
-#define MAX_HIDDEN_AP 8		/* 8 hidden AP */
-
-typedef struct pno_nlo_info {
-	u32 fast_scan_period;				/* Fast scan period */
-	u8	ssid_num;				/* number of entry */
-	u8	hidden_ssid_num;
-	u32	slow_scan_period;			/* slow scan period */
-	u32	fast_scan_iterations;			/* Fast scan iterations */
-	u8	ssid_length[MAX_PNO_LIST_COUNT];	/* SSID Length Array */
-	u8	ssid_cipher_info[MAX_PNO_LIST_COUNT];	/* Cipher information for security */
-	u8	ssid_channel_info[MAX_PNO_LIST_COUNT];	/* channel information */
-	u8	loc_probe_req[MAX_HIDDEN_AP];		/* loc_probeReq */
-} pno_nlo_info_t;
-
-typedef struct pno_ssid {
-	u32		SSID_len;
-	u8		SSID[32];
-} pno_ssid_t;
-
-typedef struct pno_ssid_list {
-	pno_ssid_t	node[MAX_PNO_LIST_COUNT];
-} pno_ssid_list_t;
-
-typedef struct pno_scan_channel_info {
-	u8	channel;
-	u8	tx_power;
-	u8	timeout;
-	u8	active;				/* set 1 means active scan, or pasivite scan. */
-} pno_scan_channel_info_t;
-
-typedef struct pno_scan_info {
-	u8	enableRFE;			/* Enable RFE */
-	u8	period_scan_time;		/* exclusive with fast_scan_period and slow_scan_period */
-	u8	periodScan;			/* exclusive with fast_scan_period and slow_scan_period */
-	u8	orig_80_offset;			/* original channel 80 offset */
-	u8	orig_40_offset;			/* original channel 40 offset */
-	u8	orig_bw;			/* original bandwidth */
-	u8	orig_ch;			/* original channel */
-	u8	channel_num;			/* number of channel */
-	u64	rfe_type;			/* rfe_type && 0x00000000000000ff */
-	pno_scan_channel_info_t ssid_channel_info[MAX_SCAN_LIST_COUNT];
-} pno_scan_info_t;
-
-int rtw_parse_ssid_list_tlv(char **list_str, pno_ssid_t *ssid, int max, int *bytes_left);
-int rtw_dev_pno_set(struct net_device *net, pno_ssid_t *ssid, int num,
-		    int pno_time, int pno_repeat, int pno_freq_expo_max);
-#ifdef CONFIG_PNO_SET_DEBUG
-	void rtw_dev_pno_debug(struct net_device *net);
-#endif /* CONFIG_PNO_SET_DEBUG */
+#define MAX_NLO_SCAN_PLANS 2
+#define MAX_NLO_SCAN_PERIOD 60
+#define MAX_NLO_NORMAL_SCAN_CYCLE 255
+#define NLO_DEFAULT_SCAN_DELAY 3
+int rtw_nlo_enable(struct net_device *net, struct cfg80211_ssid *ssids,
+		   int n_ssids, struct ieee80211_channel **channels,
+		   u32 n_channels, u32 delay, u32 interval, u32 iterations,
+		   u32 slow_interval);
+int rtw_nlo_disable(struct net_device *net);
+void rtw_nlo_debug(struct net_device * net);
 #endif /* CONFIG_PNO_SUPPORT */
 
 #endif /* __RTW_WOW_H_ */

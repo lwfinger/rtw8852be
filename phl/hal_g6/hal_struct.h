@@ -96,7 +96,8 @@ struct hal_trx_ops {
 				struct rx_base_desc *rxbd, u8 ch, u16 rxcnt);
 
 	u16 (*handle_wp_rpt)(struct hal_info_t *hal, u8 *rp, u16 len,
-			     u8 *sw_retry, u8 *dma_ch, u16 *wp_seq, u8 *txsts);
+			     u8 *sw_retry, u8 *dma_ch, u16 *wp_seq, u8 *mac_id,
+			     u8 *ac_queue, u8 *txsts);
 #endif /*CONFIG_PCI_HCI*/
 
 #ifdef CONFIG_USB_HCI

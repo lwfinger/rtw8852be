@@ -30,6 +30,7 @@ const char * const _pw_lmt_regu_type_str[PW_LMT_MAX_REGULATION_NUM] = {
 	[PW_LMT_REGU_UKRAINE]		= "UKRAINE",
 	[PW_LMT_REGU_CN]		= "CN",
 	[PW_LMT_REGU_QATAR]		= "QATAR",
+	[PW_LMT_REGU_UK]		= "UK",
 	[PW_LMT_REGU_EXT_PWR]		= "EXT",
 	[PW_LMT_REGU_NULL]		= NULL,
 };
@@ -72,6 +73,7 @@ const enum halrf_pw_lmt_regulation_type _tpo_to_pw_lmt_regu_type[TPO_NA] = {
 	[TPO_QATAR]		= PW_LMT_REGU_QATAR,
 	[TPO_UKRAINE]		= PW_LMT_REGU_UKRAINE,
 	[TPO_CN]		= PW_LMT_REGU_CN,
+	/*[TPO_UK]		= PW_LMT_REGU_UK,*/
 };
 
 u8 halrf_get_regulation_info(struct rf_info *rf, u8 band)
@@ -137,6 +139,19 @@ u8 halrf_get_regulation_info(struct rf_info *rf, u8 band)
 const char *halrf_get_pw_lmt_regu_type_str(struct rf_info *rf, u8 band)
 {
 	u8 reg = halrf_get_regulation_info(rf, band);
+
+	return pw_lmt_regu_type_str(reg);
+}
+
+const char *halrf_get_pw_lmt_regu_type_str_extra(struct rf_info *rf, u8 band)
+{
+	struct rtw_para_pwrlmt_info_t *pwrlmt_info = NULL;
+	u8 reg = halrf_get_regulation_info(rf, band);
+
+	pwrlmt_info = &rf->phl_com->phy_sw_cap[HW_PHY_0].rf_txpwrlmt_info;
+
+	if (reg >= PW_LMT_REGU_PREDEF_NUM)
+		return pwrlmt_info->ext_regd_name[reg];
 
 	return pw_lmt_regu_type_str(reg);
 }
@@ -1191,7 +1206,7 @@ u8 halrf_get_power_limit_extra(struct rf_info *rf)
 	struct _halrf_file_regd_ext *array = NULL;
 	struct rtw_regulation_info rg_info = {0};
 	struct rtw_hal_com_t *hal = rf->hal_com;
-	u8 i, j, regd_idx = 0xff;
+	u16 i, j, regd_idx = 0xff;
 
 	pwrlmt_info = &rf->phl_com->phy_sw_cap[HW_PHY_0].rf_txpwrlmt_info;
 	pregd_codemap = (struct _halrf_file_regd_ext *) pwrlmt_info->ext_reg_codemap;
@@ -1227,7 +1242,7 @@ u8 halrf_get_power_limit_extra(struct rf_info *rf)
 			for (j = 0; j <= pwrlmt_info->ext_regd_arridx; j++) {
 				if (_os_strcmp(array->reg_name, pwrlmt_info->ext_regd_name[j]) == 0) {
 					regd_idx = j;
-					i = (u8)pwrlmt_info->ext_reg_map_num;
+					i = pwrlmt_info->ext_reg_map_num;
 					RF_DBG(rf, DBG_RF_POWER, "======>   Search regd_idx=%d\n", regd_idx);
 					break;
 				}
@@ -1250,7 +1265,7 @@ u8 halrf_get_power_limit_extra(struct rf_info *rf)
 			for (j = 0; j <= pwrlmt_info->ext_regd_arridx; j++) {
 				if (_os_strcmp(array->reg_name, pwrlmt_info->ext_regd_name[j]) == 0) {
 					regd_idx = j;
-					i = (u8)pwrlmt_info->ext_reg_map_num;
+					i = pwrlmt_info->ext_reg_map_num;
 					RF_DBG(rf, DBG_RF_POWER, "======>   Search regd_idx=%d\n", regd_idx);
 					break;
 				}
@@ -1261,7 +1276,7 @@ u8 halrf_get_power_limit_extra(struct rf_info *rf)
 
 	RF_DBG(rf, DBG_RF_POWER, "Return regd_idx = %d\n", regd_idx);
 
-	return regd_idx;
+	return (u8)regd_idx;
 }
 
 void halrf_reload_pwr_limit_tbl_and_set(struct rf_info *rf,

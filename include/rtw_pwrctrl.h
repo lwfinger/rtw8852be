@@ -281,12 +281,6 @@ struct pwrctrl_priv {
 	u8		wowlan_pattern_idx;
 	u64		wowlan_fw_iv;
 	struct rtl_priv_pattern	patterns[MAX_WKFM_CAM_NUM];
-#ifdef CONFIG_PNO_SUPPORT
-	u8		pno_inited;
-	pno_nlo_info_t	*pnlo_info;
-	pno_scan_info_t	*pscan_info;
-	pno_ssid_list_t	*pno_ssid_list;
-#endif /* CONFIG_PNO_SUPPORT */
 	_mutex	wowlan_pattern_cam_mutex;
 	u8		wowlan_aoac_rpt_loc;
 	struct aoac_report wowlan_aoac_rpt;

@@ -42,7 +42,7 @@
 #define halrf_w16(rf, addr, val) hal_write16((rf)->hal_com, (addr | RF_OFST), val)
 #define halrf_w8(rf, addr, val) hal_write8((rf)->hal_com, (addr | RF_OFST), val)
 #define halrf_rrf(rf, path, addr, mask) rtw_hal_read_rf_reg((rf)->hal_com, path, addr, mask)
-#define halrf_wrf(rf, path, addr, mask, val) rtw_hal_write_rf_reg((rf)->hal_com, path, addr, mask, val)
+/*#define halrf_wrf(rf, path, addr, mask, val) rtw_hal_write_rf_reg((rf)->hal_com, path, addr, mask, val)*/
 #define halrf_wmac32(rf, addr, val) hal_write32((rf)->hal_com, addr, val)
 #define halrf_rmac32(rf, addr) hal_read32((rf)->hal_com, addr)
 
@@ -126,6 +126,8 @@ u32 halrf_get_sys_time(struct rf_info *rf);
 void halrf_wreg(struct rf_info *rf, u32 addr, u32 bit_mask, u32 val);
 
 u32 halrf_rreg(struct rf_info *rf, u32 addr, u32 bit_mask);
+
+void halrf_wrf(struct rf_info *rf, enum rf_path path, u32 addr, u32 mask, u32 val);
 
 void halrf_fill_h2c_cmd(struct rf_info *rf, u16 cmdlen, u8 cmdid,
 			u8 classid, u32 cmdtype, u32 *pval);

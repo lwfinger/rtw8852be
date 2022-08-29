@@ -21,16 +21,18 @@ enum phl_ps_mode {
 	PS_MODE_IPS
 };
 
+#define PS_MACID_NONE 0xFFFF
+
 /* use to configure specific pwr mode along with pwr lvl and others */
 struct ps_cfg {
 	/* common */
 	u8 ps_mode;
 	u8 cur_pwr_lvl;
 	u8 pwr_lvl;
+	u16 macid;
 	/* lps */
 	bool pwr_cfg; /* whether to configure pwr lvl */
 	bool proto_cfg; /* whether to configure protocol */
-	u16 macid;
 	u32 *token;
 	u8 listen_bcn_mode;
 	u8 awake_interval;
@@ -45,6 +47,8 @@ const char *phl_ps_ps_mode_to_str(u8 ps_mode);
 const char *phl_ps_pwr_lvl_to_str(u8 pwr_lvl);
 u8 phl_ps_judge_pwr_lvl(u8 ps_cap, u8 ps_mode, u8 ps_en);
 
+enum rtw_phl_status
+phl_ps_ips_cfg(struct phl_info_t *phl_info, struct ps_cfg *cfg, u8 ips_en);
 enum rtw_phl_status phl_ps_lps_cfg(struct phl_info_t *phl_info, struct ps_cfg *cfg, u8 lps_en);
 enum rtw_phl_status phl_ps_cfg_pwr_lvl(struct phl_info_t *phl_info, u8 ps_mode, u8 cur_pwr_lvl, u8 req_pwr_lvl);
 

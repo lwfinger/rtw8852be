@@ -74,6 +74,7 @@
 	#include "halbb_8852b/halbb_8852b.h"
 	#include "halbb_8852b/halbb_8852b_api.h"
 	#include "halbb_8852b/halbb_8852b_api_ex.h"
+	#include "halbb_8852b/halbb_8852b_fwofld_api.h"
 	#include "halbb_8852b/halbb_hwimg_8852b.h"
 	#include "halbb_8852b/halbb_reg_cfg_8852b.h"
 	#include "halbb_8852b/halbb_version_rtl8852b.h"
@@ -115,6 +116,7 @@
 #include "halbb_la_mode_ex.h"
 #include "halbb_la_mode.h"
 #include "halbb_psd.h"
+#include "halbb_ul_tb_ctrl.h"
 #include "halbb_pwr_ctrl_ex.h"
 #include "halbb_pwr_ctrl.h"
 #include "halbb_mp_ex.h"
@@ -138,6 +140,7 @@
 #include "halbb_dbcc.h"
 #include "halbb_rua_tbl.h"
 #include "halbb_fwofld.h"
+#include "halbb_fwofld_ex.h"
 #include "halbb_ex.h"
 #include "halbb.h"
 

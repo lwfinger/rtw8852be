@@ -65,10 +65,9 @@
 #define RXBD_SEP_TRUNC_NEW_SIZE 16
 
 #define BD_MAX_NUM 0x3FF
+#define BD_IDX_INVALID 0xFFFF
 #define TXBD_BYTE_ALIGN 8
 #define RXBD_BYTE_ALIGN 4
-
-#define B_AX_CLK_CALIB_EN BIT12
 
 #define CMAC_CLK_ALLEN 0xFFFFFFFF
 
@@ -76,6 +75,14 @@
 #define PC_POWER_DOWN 0
 #define BIT_WAKE_CTRL BIT5
 #define PCIE_DEFAULT_AGG_NUM 0x40
+
+#define PCIE_AUTOK_DIV_2048 0x0
+#define PCIE_AUTOK_MGN 0x8
+#define PCIE_AUTOK_MGN_2048 64
+#define PCIE_AUTOK_UD_CNT 30
+#define PCIE_DPHY_DLY_25US 0x1
+#define PCIE_AUTOK_4 0x3
+
 /*--------------------Define MACRO--------------------------------------*/
 /*--------------------Define Enum---------------------------------------*/
 enum pcie_clkdly_hw {
@@ -881,4 +888,38 @@ u32 pcie_get_txagg_num(struct mac_ax_adapter *adapter, u8 band);
  * @}
  */
 
+/**
+ * @brief pcie_autok_counter_avg
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 pcie_autok_counter_avg(struct mac_ax_adapter *adapter);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup HCI
+ * @{
+ * @addtogroup PCIE
+ * @{
+ */
+
+/**
+ * @brief dbcc_hci_ctrl_pcie
+ *
+ * @param *adapter
+ * @param *info
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 dbcc_hci_ctrl_pcie(struct mac_ax_adapter *adapter,
+		       struct mac_ax_dbcc_hci_ctrl *info);
+/**
+ * @}
+ * @}
+ */
 #endif

@@ -711,11 +711,16 @@ void rtw_ft_roam_timer_hdl(void *ctx)
 {
 	_adapter *padapter = (_adapter *)ctx;
 	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
 
 	RTW_FT_INFO("%s : try roaming\n", __func__);
 	receive_disconnect(padapter,
 			pmlmepriv->cur_network.network.MacAddress,
 			WLAN_REASON_ACTIVE_ROAM, _FALSE);
+	pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+	pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_FT;
+	pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 }
 
 void rtw_ft_roam_status_reset(_adapter *padapter)

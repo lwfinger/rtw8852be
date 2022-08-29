@@ -329,4 +329,23 @@ static u32 mac_fw_role_maintain(struct mac_ax_adapter *adapter,
  * @}
  */
 
+/**
+ * @addtogroup Association
+ * @{
+ * @addtogroup Role_Related
+ * @{
+ */
+/**
+ * @brief mac_role_sync
+ *
+ * @param *adapter
+ * @param *info
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_role_sync(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info);
+/**
+ * @}
+ * @}
+ */
 #endif

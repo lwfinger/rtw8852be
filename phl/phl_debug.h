@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2019 Realtek Corporation.
+ * Copyright(c) 2019 - 2021 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -92,7 +92,7 @@ struct dbg_mem_ctx {
 #define PHL_DATA(comp, level, fmt, ...)     \
 	do {\
 		if(((comp) & phl_log_components) && (level <= phl_log_level)) {\
-			_os_dbgdump(KERN_CONT fmt, ##__VA_ARGS__);\
+			_os_dbgdump_c(fmt, ##__VA_ARGS__);\
 		} \
 	} while (0)
 
@@ -146,7 +146,7 @@ void rt_free_dbg_buf(void *phl, u8 *buf_ptr, u32 buf_size,
 		const u8 *file_name, u32 line_num, const u8 *func_name);
 void rt_mem_dbg_init(void *phl);
 void rt_mem_dbg_deinit(void *phl);
-u32 rtw_phl_dbg_ctrl_comp(u8 ctrl, u8 comp_bit);
+u32 rtw_phl_dbg_ctrl_comp(u8 ctrl, u32 comp_bit);
 void debug_dump_mac_address(u8 *mac_addr);
 
 #define phl_ops_error_msg(ops_fun)	  \

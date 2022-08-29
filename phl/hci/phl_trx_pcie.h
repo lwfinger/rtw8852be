@@ -79,6 +79,7 @@ struct rtw_wd_page_ring {
 	struct rtw_h2c_work h2c_work;
 	struct rtw_wp_tag wp_tag[WP_MAX_SEQ_NUMBER];
 	u16 wp_seq;
+	u16 cur_hw_res;
 };
 
 struct phl_buf {

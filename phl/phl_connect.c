@@ -24,6 +24,9 @@ enum rtw_phl_status rtw_phl_connect_prepare(void *phl,
 	struct phl_msg msg = {0};
 	struct phl_msg_attribute attr = {0};
 
+	/* Update STBC cap */
+	phl_wifi_role_change(phl_info, wrole, WR_CHG_STBC_CFG, NULL);
+
 	SET_MSG_MDL_ID_FIELD(msg.msg_id, PHL_FG_MDL_CONNECT);
 	SET_MSG_EVT_ID_FIELD(msg.msg_id, MSG_EVT_CONNECT_START);
 	msg.band_idx = wrole->hw_band;

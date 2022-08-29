@@ -57,6 +57,7 @@ enum HALBTC_CMD_ID {
 	HALBTC_SET_GNT_BT,
 	HALBTC_SET_BT_PSD,
 	HALBTC_GET_WL_NHM_DBM,
+	HALBTC_SET_WL_TX1SS,
 	HALBTC_DBG
 };
 
@@ -81,6 +82,7 @@ struct halbtc_cmd_info halbtc_cmd_i[] = {
 	{"gbt", HALBTC_SET_GNT_BT},
 	{"bpsd", HALBTC_SET_BT_PSD},
 	{"wnhm", HALBTC_GET_WL_NHM_DBM},
+	{"wtx1ss", HALBTC_SET_WL_TX1SS},
 	{"dbg", HALBTC_DBG}
 };
 
@@ -259,9 +261,9 @@ static void _show_wl_role_info(struct btc_t *btc, u32 *used, char input[][MAX_AR
 		t = plink->stat.traffic;
 
 		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
-			 "tx[rate:%s/busy_level:%d/sts:0x%x], ",
+			 "tx[rate:%s/busy_level:%d/sts:0x%x/1ss:%s], ",
 			 id_to_str(BTC_STR_RATE, (u32)t.tx_rate),
-			 t.tx_lvl, t.tx_sts);
+			 t.tx_lvl, t.tx_sts, (t.tx_1ss_limit ? "Y" : "N"));
 
 		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 			 "rx[rate:%s/busy_level:%d/sts:0x%x/drop:%d]",
@@ -361,7 +363,7 @@ static void _show_bt_profile_info(struct btc_t *btc, u32 *used, char input[][MAX
 		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 			 "\n\r %-15s : type:%s%s%s%s%s pair-cnt:%d, sut_pwr:%d, golden-rx:%d",
 			 "[HID]",
-			 (hid.type & BTC_HID_218? "2/18," : ""),
+			 (hid.type == BTC_HID_218? "2/18," : ""),
 			 (hid.type & BTC_HID_418? "4/18," : ""),
 			 (hid.type & BTC_HID_BLE? "BLE," : ""),
 			 (hid.type & BTC_HID_RCU? "RCU," : ""),
@@ -402,7 +404,6 @@ static void _show_bt_info(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 	struct btc_module *module = &btc->mdinfo;
 	struct btc_bt_link_info *bt_linfo = &bt->link_info;
 	u8 *afh = bt_linfo->afh_map;
-	u16 polt_cnt = 0;
 
 	if (!(btc->dm.coex_info_map & BTC_COEX_INFO_BT))
 		return;
@@ -492,21 +493,13 @@ static void _show_bt_info(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 		 cx->cnt_bt[BTC_BCNT_INFOUPDATE],
 		 cx->cnt_bt[BTC_BCNT_INFOSAME]);
 
-	/* To avoid I/O if WL LPS or power-off  */
-	if (wl->status.map.lps == 1 || wl->status.map.rf_off)
-		return;
-
-	btc->chip->ops->update_bt_cnt(btc);
-	_chk_btc_err(btc, BTC_DCNT_BTCNT_FREEZE, 0);
-	rtw_hal_mac_get_bt_polt_cnt(btc->hal, HW_PHY_0, &polt_cnt);
-
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 		 "\n\r %-15s : Hi-rx = %d, Hi-tx = %d, Lo-rx = %d, Lo-tx = %d (bt_polut_wl_tx = %d)",
 		 "[trx_req_cnt]", cx->cnt_bt[BTC_BCNT_HIPRI_RX],
 		 cx->cnt_bt[BTC_BCNT_HIPRI_TX],
 		 cx->cnt_bt[BTC_BCNT_LOPRI_RX],
 		 cx->cnt_bt[BTC_BCNT_LOPRI_TX],
-		 polt_cnt);
+		 cx->cnt_bt[BTC_BCNT_POLUT]);
 }
 
 static void _show_fbtc_tdma(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
@@ -575,9 +568,10 @@ static void _show_dm_info(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 		 "(Mis-Match!!)" : ""), dm->error.val);
 
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
-		 "\n\r %-15s : wl_tx_limit[en:%d/max_t:%dus/max_retry:%d], bt_slot_req:%d-TU, bt_scan_rx_low_pri:%d",
-		 "[dm_drv_ctrl]", dm->wl_tx_limit.enable, dm->wl_tx_limit.tx_time,
-		 dm->wl_tx_limit.tx_retry, btc->bt_req_len, bt->scan_rx_low_pri);
+		 "\n\r %-15s : wl_tx_limit[en:%d/max_t:%dus/max_retry:%d/1ss:%d], bt_slot_req:%d-TU, bt_scan_rx_low_pri:%d",
+		 "[dm_drv_ctrl]", dm->wl_tx_limit.en,
+		 dm->wl_tx_limit.tx_time, dm->wl_tx_limit.tx_retry,
+		 dm->wl_tx_limit.tx_1ss, btc->bt_req_len, bt->scan_rx_low_pri);
 
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 		 "\n\r %-15s : wl[rssi_lvl:%d/para_lvl:%d/tx_pwr:%d/rx_lvl:%d/_btg_rx:%d/stb_chg:%d] ",
@@ -620,8 +614,8 @@ static void _show_mreg(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 		 bt->scbd, cx->cnt_bt[BTC_BCNT_SCBDREAD],
 		 cx->cnt_bt[BTC_BCNT_SCBDUPDATE]);
 
-		/* To avoid I/O if WL LPS or power-off  */
-	if (wl->status.map.lps != 1 && !wl->status.map.rf_off) {
+	/* To avoid I/O if WL LPS or power-off  */
+	if (wl->status.map.lps != BTC_LPS_RF_OFF && !wl->status.map.rf_off) {
 		rtw_hal_mac_get_grant(h, (u8*)gnt);
 
 		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
@@ -710,7 +704,8 @@ static void _show_summary(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 		 "%s", "\n\r========== [Statistics] ==========");
 
 	pcinfo = &pfwinfo->rpt_ctrl.cinfo;
-	if (pcinfo->valid && wl->status.map.lps != 1 && !wl->status.map.rf_off) {
+	if (pcinfo->valid && wl->status.map.lps != BTC_LPS_RF_OFF &&
+	    !wl->status.map.rf_off) {
 		prptctrl = &pfwinfo->rpt_ctrl.finfo;
 
 		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
@@ -724,9 +719,6 @@ static void _show_summary(struct btc_t *btc, u32 *used, char input[][MAX_ARGV],
 			 "rpt_cnt=%d(fw_send:%d), rpt_map=0x%x",
 			 pfwinfo->event[BTF_EVNT_RPT], prptctrl->rpt_info.cnt,
 			 prptctrl->rpt_info.en);
-
-		_chk_btc_err(btc, BTC_DCNT_RPT_FREEZE,
-			     pfwinfo->event[BTF_EVNT_RPT]);
 
 		if (dm->error.map.wl_fw_hang)
 			BTC_CNSL(out_len, *used, output + *used,
@@ -908,9 +900,6 @@ static void _show_fbtc_cysta(struct btc_t *btc, u32 *used, char input[][MAX_ARGV
 			 ", skip:%d", pcysta->skip_cnt);
 	}
 
-	_chk_btc_err(btc, BTC_DCNT_W1_FREEZE, pcysta->slot_cnt[CXST_W1]);
-	_chk_btc_err(btc, BTC_DCNT_B1_FREEZE, pcysta->slot_cnt[CXST_B1]);
-
 	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
 		 "\n\r %-15s : cycle:%d, avg_t[wl:%d/bt:%d/lk:%d.%03d]",
 		 "[cycle_time]",
@@ -927,8 +916,6 @@ static void _show_fbtc_cysta(struct btc_t *btc, u32 *used, char input[][MAX_ARGV
 		 ", maxdiff_t[wl:%d/bt:%d]",
 		 pcysta->cycle_time.tmaxdiff[CXT_WL],
 		 pcysta->cycle_time.tmaxdiff[CXT_BT]);
-
-	_chk_btc_err(btc, BTC_DCNT_CYCLE_FREEZE, (u32)pcysta->cycles);
 
 	if (a2dp->exist) {
 		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
@@ -1915,6 +1902,65 @@ help:
 	return;
 }
 
+u8 _btc_set_wl_tx_1ss(struct btc_t *btc, u8 port_id, bool enable)
+{
+	struct rtw_hal_com_t *h = btc->hal;
+	enum rtw_hal_status set_reult;
+
+	set_reult = rtw_hal_btc_cfg_tx_1ss(h, btc->phl, port_id, enable);
+	if (set_reult != RTW_HAL_STATUS_SUCCESS)
+		return 1;
+	return 0;
+}
+
+static void _cmd_set_wl_tx_1ss(struct btc_t *btc, u32 *used,
+			       char input[][MAX_ARGV], u32 input_num,
+			       char *output, u32 out_len)
+{
+	u32 port_id = 0xFFFFFFFF;
+	u8 j;
+	u8 set_reult;
+	bool enable = false;
+	u32 enable_input;
+
+	if (input_num < 2)
+		goto help;
+
+	_os_sscanf(input[1], "%d", &enable_input);
+	if (input_num >= 3)
+		_os_sscanf(input[2], "%d", &port_id);
+
+	enable = enable_input == 1 ? true : false;
+
+	if (port_id == 0xFFFFFFFF) {
+		for( j = 0; j < MAX_WIFI_ROLE_NUMBER; j++) {
+			set_reult = _btc_set_wl_tx_1ss(btc, j, enable);
+			if (set_reult == 1)
+				BTC_CNSL(out_len,
+					 *used, output + *used, out_len - *used,
+					 "port %d set 1ss to %d fail\n",
+					 j, enable);
+		}
+	} else if (port_id < MAX_WIFI_ROLE_NUMBER) {
+		set_reult = _btc_set_wl_tx_1ss(btc, (u8)(port_id & 0xFF),
+					       enable);
+		if (set_reult == 1)
+			BTC_CNSL(out_len,
+				 *used, output + *used, out_len - *used,
+				 "port %d set 1ss to %d fail\n",
+				 port_id, enable);
+	} else {
+		BTC_CNSL(out_len, *used, output + *used, out_len - *used,
+				"port %d is invalid\n", port_id);
+	}
+	return ;
+
+help:
+	BTC_CNSL(out_len, *used, output + *used, out_len - *used,
+		 " wtx1ss <enable(1/0), port_id(default:All)> \n");
+	return;
+}
+
 void halbtc_cmd_parser(struct btc_t *btc, char input[][MAX_ARGV],
 		      u32 input_num, char *output, u32 out_len)
 {
@@ -1996,11 +2042,16 @@ void halbtc_cmd_parser(struct btc_t *btc, char input[][MAX_ARGV],
 	case HALBTC_GET_WL_NHM_DBM:
 		_cmd_get_wl_nhm_dbm(btc, &used, input, input_num, output, out_len);
 		break;
+	case HALBTC_SET_WL_TX1SS:
+		_cmd_set_wl_tx_1ss(btc, &used, input, input_num, output, out_len);
+		break;
 	default:
 		BTC_CNSL(out_len, used, output + used, out_len - used,
 			 "command not supported !!\n");
 
-		fallthrough;	/* fall through */
+		fallthrough;
+		/* fall through */
+
 	case HALBTC_HELP:
 		BTC_CNSL(out_len, used, output + used, out_len - used,
 			 "BTC cmd ==>\n");

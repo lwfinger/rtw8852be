@@ -95,4 +95,26 @@ u32 mac_parse_dfs(struct mac_ax_adapter *adapter,
  * @}
  */
 
+/**
+ * @addtogroup Common
+ * @{
+ * @addtogroup BB_Related
+ * @{
+ */
+
+/**
+ * @brief mac_get_phy_rpt_cfg
+ *
+ * @param *adapter
+ * @param *rpt
+ * @return Please Place Description here.
+ * @retval u32
+ */
+
+u32 mac_get_phy_rpt_cfg(struct mac_ax_adapter *adapter,
+			struct mac_ax_phy_rpt_cfg *rpt);
+/**
+ * @}
+ * @}
+ */
 #endif

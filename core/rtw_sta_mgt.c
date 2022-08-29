@@ -382,10 +382,12 @@ static void	_rtw_free_sta_recv_priv_lock(struct sta_recv_priv *psta_recvpriv)
 
 }
 
+void rtw_mfree_stainfo(struct sta_info *psta);
 void rtw_mfree_stainfo(struct sta_info *psta)
 {
 
-	_rtw_spinlock_free(&psta->lock);
+	if (&psta->lock != NULL)
+		_rtw_spinlock_free(&psta->lock);
 
 	_rtw_free_sta_xmit_priv_lock(&psta->sta_xmitpriv);
 	_rtw_free_sta_recv_priv_lock(&psta->sta_recvpriv);
@@ -564,6 +566,8 @@ static struct sta_info *_rtw_alloc_core_stainfo(struct sta_priv *pstapriv,
 
 		pstapriv->asoc_sta_count++;
 
+		rtw_mi_update_iface_status(&(pstapriv->padapter->mlmepriv), 0);
+
 		/* _rtw_spinunlock_bh(&(pstapriv->sta_hash_lock)); */
 
 		/* Commented by Albert 2009/08/13
@@ -677,30 +681,6 @@ struct sta_info *rtw_alloc_stainfo(struct	sta_priv *stapriv, const u8 *hwaddr)
 
 	/* can not use in interrupt context */
 	_rtw_alloc_phl_stainfo(sta, stapriv, hwaddr);
-
-	return sta;
-}
-
-struct sta_info *rtw_alloc_stainfo_sw(struct	sta_priv *stapriv, const u8 *hwaddr)
-{
-	struct sta_info *sta;
-	/* can use in interrupt context */
-	sta = _rtw_alloc_core_stainfo(stapriv, hwaddr);
-
-	if (sta != NULL) {
-		sta->phl_sta = rtw_phl_alloc_stainfo_sw(
-			GET_PHL_INFO(adapter_to_dvobj(stapriv->padapter)),
-			(u8 *)hwaddr, stapriv->padapter->phl_role);
-
-		if (sta->phl_sta) {
-			rtw_dump_phl_sta_info(RTW_DBGDUMP, sta);
-		} else {
-			RTW_ERR(FUNC_ADPT_FMT ": fail to alloc PHL sta "
-				"for " MAC_FMT " !\n",
-				FUNC_ADPT_ARG(stapriv->padapter),
-				MAC_ARG(hwaddr));
-		}
-	}
 
 	return sta;
 }
@@ -1003,6 +983,32 @@ static void _rtw_free_phl_stainfo(_adapter *adapter, struct sta_info *sta, u8 on
 			/* free stainfo success, set pointer to NULL */
 			sta->phl_sta = NULL;
 	}
+}
+
+struct sta_info *rtw_alloc_stainfo_sw(struct	sta_priv *stapriv, const u8 *hwaddr)
+{
+	struct sta_info *sta;
+	/* can use in interrupt context */
+	sta = _rtw_alloc_core_stainfo(stapriv, hwaddr);
+
+	if (sta != NULL) {
+		sta->phl_sta = rtw_phl_alloc_stainfo_sw(
+			GET_PHL_INFO(adapter_to_dvobj(stapriv->padapter)),
+			(u8 *)hwaddr, stapriv->padapter->phl_role);
+
+		if (sta->phl_sta) {
+			rtw_dump_phl_sta_info(RTW_DBGDUMP, sta);
+		} else {
+			RTW_ERR(FUNC_ADPT_FMT ": fail to alloc PHL sta "
+				"for " MAC_FMT " !\n",
+				FUNC_ADPT_ARG(stapriv->padapter),
+				MAC_ARG(hwaddr));
+			_rtw_free_core_stainfo(stapriv->padapter, sta);
+			sta = NULL;
+		}
+	}
+
+	return sta;
 }
 
 u32	rtw_free_stainfo(_adapter *padapter, struct sta_info *psta)

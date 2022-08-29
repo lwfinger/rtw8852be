@@ -92,3 +92,19 @@ enum rtw_hal_status rtw_hal_set_dfs_tb_ctrl(void *hal, u8 set)
 	return rtw_hal_mac_set_dfs_tb_ctrl(hal_info, set);
 }
 
+u32 rtw_hal_get_phy_stat_info(void *hal, enum phl_band_idx hw_band,
+			      enum phl_stat_info_query phy_stat)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
+	struct rtw_hal_stat_info *stat_info = &hal_com->band[hw_band].stat_info;
+
+	switch (phy_stat) {
+	case STAT_INFO_FA_ALL:
+		return stat_info->cnt_fail_all;
+	case STAT_INFO_CCA_ALL:
+		return stat_info->cnt_cca_all;
+	default:
+		return 0;
+	}
+}

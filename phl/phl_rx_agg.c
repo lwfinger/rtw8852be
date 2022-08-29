@@ -255,3 +255,30 @@ rtw_phl_start_rx_ba_session(void *phl, struct rtw_phl_stainfo_t *sta,
 
 	return RTW_PHL_STATUS_SUCCESS;
 }
+
+void phl_notify_reorder_sleep(void *phl, struct rtw_phl_stainfo_t *sta)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	void *drv = phl_to_drvpriv(phl_info);
+	struct phl_tid_ampdu_rx *r;
+	u16 tid = 0;
+
+	if (NULL == sta) {
+		PHL_TRACE(COMP_PHL_RECV, _PHL_WARNING_,
+		          "rtw_phl_stop_rx_ba_session: station info is NULL!\n");
+		return;
+	}
+
+	_os_spinlock(drv, &sta->tid_rx_lock, _bh, NULL);
+	for (tid = 0; tid < ARRAY_SIZE(sta->tid_rx); tid++) {
+		if (!sta->tid_rx[tid])
+			continue;
+
+		PHL_INFO("Notify rx BA session sleep for sta=0x%p, tid=%u\n",
+		         sta, tid);
+		r = sta->tid_rx[tid];
+		r->sleep = true;
+		PHL_INFO("Rx BA session for sta=0x%p, tid=%u sleep\n", sta, tid);
+	}
+	_os_spinunlock(drv, &sta->tid_rx_lock, _bh, NULL);
+}

@@ -48,12 +48,6 @@
 	+ (CONFIG_IEEE80211_BAND_6GHZ ? MAX_CHANNEL_NUM_6G : 0) \
 	)
 
-/*
-* MAX_CHANNEL_NUM_OF_BAND is used by  op_class_pref_t only.
-* TODO: consider 6G band or remove this after allocate op_class_pref_t dynamically
-*/
-#define MAX_CHANNEL_NUM_OF_BAND rtw_max(MAX_CHANNEL_NUM_2G, MAX_CHANNEL_NUM_5G)
-
 extern u8 center_ch_2g[CENTER_CH_2G_NUM];
 extern u8 center_ch_2g_40m[CENTER_CH_2G_40M_NUM];
 
@@ -163,7 +157,7 @@ struct op_class_pref_t {
 	u8 ch_num; /* number of chs */
 	u8 op_ch_num; /* channel number which is not static non operable */
 	u8 ir_ch_num; /* channel number which can init radiation */
-	struct op_ch_t chs[MAX_CHANNEL_NUM_OF_BAND]; /* zero(ch) terminated array */
+	struct op_ch_t chs[];
 };
 
 int op_class_pref_init(_adapter *adapter);

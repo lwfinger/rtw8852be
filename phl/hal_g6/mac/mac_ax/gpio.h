@@ -258,7 +258,7 @@ u32 mac_sw_gpio_ctrl(struct mac_ax_adapter *adapter,
  * @retval u32
  */
 u32 mac_set_sw_gpio_mode(struct mac_ax_adapter *adapter,
-			 enum mac_ax_sw_io_mode mode, u8 gpio);
+			 enum rtw_gpio_mode mode, u8 gpio);
 /**
  * @}
  * @}

@@ -330,6 +330,9 @@ void halbb_cr_cfg_dig_init(struct bb_info *bb);
 
 void* halbb_get_dig_fa_statistic(struct bb_info *bb);
 void halbb_set_dig_pause_val(struct bb_info *bb, u32 *val_buf, u8 val_len);
+u8 halbb_get_lna_idx(struct bb_info *bb, enum rf_path path);
+u8 halbb_get_tia_idx(struct bb_info *bb, enum rf_path path);
+u8 halbb_get_rxb_idx(struct bb_info *bb, enum rf_path path);
 #ifdef HALBB_DIG_MCC_SUPPORT
 void Halbb_init_mccdm(struct bb_info *bb);
 void halbb_mccdm_switch(struct bb_info *bb);

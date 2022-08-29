@@ -38,6 +38,7 @@ halmac-y +=		$(path_hm_d1)/addr_cam.o \
 			$(path_hm_d1)/cmac_tx.o \
 			$(path_hm_d1)/coex.o \
 			$(path_hm_d1)/cpuio.o \
+			$(path_hm_d1)/dbcc.o \
 			$(path_hm_d1)/dbgpkg.o \
 			$(path_hm_d1)/dbgport_hw.o \
 			$(path_hm_d1)/dbg_cmd.o \
@@ -67,8 +68,10 @@ halmac-y +=		$(path_hm_d1)/addr_cam.o \
 			$(path_hm_d1)/rrsr.o \
 			$(path_hm_d1)/ser.o \
 			$(path_hm_d1)/security_cam.o \
+			$(path_hm_d1)/ftm.o \
 			$(path_hm_d1)/sounding.o \
 			$(path_hm_d1)/status.o \
+			$(path_hm_d1)/sta_sch.o \
 			$(path_hm_d1)/tblupd.o \
 			$(path_hm_d1)/tcpip_checksum_offload.o \
 			$(path_hm_d1)/trx_desc.o \

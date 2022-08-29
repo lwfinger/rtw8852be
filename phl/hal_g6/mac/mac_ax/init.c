@@ -576,6 +576,12 @@ u32 mac_hal_deinit(struct mac_ax_adapter *adapter)
 		return ret;
 	}
 
+	ret = rst_dbcc_info(adapter);
+	if (ret != MACSUCCESS) {
+		PLTFM_MSG_ERR("[ERR]reset dbcc info %d\n", ret);
+		return ret;
+	}
+
 	ret = free_sec_info_tbl(adapter, SEC_CAM_NORMAL);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]remove security info tbl\n");
@@ -833,6 +839,8 @@ u32 mix_info_init(struct mac_ax_adapter *adapter)
 	PLTFM_MUTEX_INIT(&adapter->hw_info->mdio_lock);
 #endif
 	PLTFM_MUTEX_INIT(&adapter->h2c_agg_info.h2c_agg_lock);
+	PLTFM_MUTEX_INIT(&adapter->scanofld_info.drv_chlist_state_lock);
+	PLTFM_MUTEX_INIT(&adapter->scanofld_info.fw_chlist_state_lock);
 	adapter->hw_info->ind_aces_cnt = 0;
 	adapter->hw_info->dbg_port_cnt = 0;
 
@@ -856,6 +864,8 @@ u32 mix_info_exit(struct mac_ax_adapter *adapter)
 	PLTFM_MUTEX_DEINIT(&adapter->hw_info->mdio_lock);
 #endif
 	PLTFM_MUTEX_DEINIT(&adapter->h2c_agg_info.h2c_agg_lock);
+	PLTFM_MUTEX_DEINIT(&adapter->scanofld_info.drv_chlist_state_lock);
+	PLTFM_MUTEX_DEINIT(&adapter->scanofld_info.fw_chlist_state_lock);
 	adapter->hw_info->ind_aces_cnt = 0;
 	adapter->hw_info->dbg_port_cnt = 0;
 

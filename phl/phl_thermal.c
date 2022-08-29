@@ -30,7 +30,7 @@ static void _phl_thermal_protect_disable_all_txop(
 
 	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
 		if (mr_ctl->role_map & BIT(i)) {
-			wrole = phl_get_wrole_by_ridx(phl_info, i);
+			wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, i);
 			if(wrole){
 				if(wrole->mstate == MLME_LINKED)
 					break;
@@ -71,7 +71,7 @@ static void _phl_thermal_protect_reduce_ampdu_num(
 
 	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
 		if (mr_ctl->role_map & BIT(i)) {
-			wrole = phl_get_wrole_by_ridx(phl_info, i);
+			wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, i);
 			if(wrole){
 				if(wrole->mstate == MLME_LINKED)
 					break;

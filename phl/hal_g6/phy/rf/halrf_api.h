@@ -39,6 +39,21 @@ enum halrf_rfk_process {
 	RFK_ONESHOT_STOP	= 3
 };
 
+enum halrf_event_idx {
+	RF_EVENT_PWR_TRK = 0,
+	RF_EVENT_IQK = 1,
+	RF_EVENT_DPK = 2,
+	RF_EVENT_TXGAPK = 3,
+	RF_EVENT_DACK = 4
+};
+
+enum halrf_event_func {
+	RF_EVENT_OFF = 0,
+	RF_EVENT_ON = 1,
+	RF_EVENT_TRIGGER = 2
+};
+
+
 /*@--------------------------[Structure]-------------------------------------*/
  
 /*@--------------------------[Prptotype]-------------------------------------*/
@@ -77,11 +92,8 @@ void halrf_fast_chl_sw_backup(struct rf_info *rf, u8 chl_index, u8 t_index);
 void halrf_fast_chl_sw_reload(struct rf_info *rf, u8 chl_index, u8 t_index);
 
 /*FW Offload*/
-void halrf_wreg_fw(struct rf_info *rf, u32 addr, u32 mask, u32 val);
-void halrf_wrf_fw(struct rf_info *rf,
-			  enum rf_path path, u32 addr, u32 mask, u32 val);
-void halrf_wmac_fw(struct rf_info *rf, enum phl_phy_idx phy,
-			u32 addr, u32 mask, u32 val);
-void halrf_write_fw_final(struct rf_info *rf);
+void halrf_write_fwofld_start(struct rf_info *rf);
+void halrf_write_fwofld_end(struct rf_info *rf);
+
 void  halrf_quick_check_rf(void *rf_void);
 #endif

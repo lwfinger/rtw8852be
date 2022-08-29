@@ -23,6 +23,7 @@
 #define RSVD_EFUSE_SIZE		16
 #define RSVD_CS_EFUSE_SIZE	24
 #define EFUSE_WAIT_CNT		10000
+#define EFUSE_WAIT_CNT_PLUS	30000
 #define EFUSE_C2HREG_WAIT_CNT	10000
 #define EFUSE_C2HREG_RETRY_WAIT_US 1
 #define EFUSE_FW_DUMP_WAIT_CNT	100000
@@ -115,120 +116,46 @@ enum efuse_map_sel {
 };
 
 /**
- * @enum mac_info_offset
+ * @struct efuse_info_item
+ * @brief efuse_info_item
  *
- * @brief mac_info_offset
- *
- * @var mac_info_offset::OFS_ADDR_AU
- * Please Place Description here.
- * @var mac_info_offset::OFS_PID_AU
- * Please Place Description here.
- * @var mac_info_offset::OFS_VID_AU
- * Please Place Description here.
- * @var mac_info_offset::OFS_ADDR_AE
- * Please Place Description here.
- * @var mac_info_offset::OFS_DID_AE
- * Please Place Description here.
- * @var mac_info_offset::OFS_VID_AE
- * Please Place Description here.
- * @var mac_info_offset::OFS_SVID_AE
- * Please Place Description here.
- * @var mac_info_offset::OFS_SMID_AE
- * Please Place Description here.
- * @var mac_info_offset::OFS_ADDR_AS
- * Please Place Description here.
+ * @var efuse_info_item::mac_addr
+ * MAC Address
+ * @var efuse_info_item::pid
+ * Product ID
+ * @var efuse_info_item::did
+ * Device ID
+ * @var efuse_info_item::vid
+ * Vendor ID
+ * @var efuse_info_item::svid
+ * Sybsystem Vendor ID
+ * @var efuse_info_offset::smid
+ * Sybsystem Device ID
  */
-enum mac_info_offset {
-	/*USB*/
-	OFS_ADDR_AU = 0x438,
-	OFS_PID_AU = 0x432,
-	OFS_VID_AU = 0x430,
-	/*PCIE*/
-	OFS_ADDR_AE = 0x400,
-	OFS_DID_AE = 0x408,
-	OFS_VID_AE = 0x406,
-	OFS_SVID_AE = 0x40A,
-	OFS_SMID_AE = 0x40C,
-	/*SDIO*/
-	OFS_ADDR_AS = 0x41A,
+struct efuse_info_item {
+	u32 mac_addr;
+	u32 pid;
+	u32 did;
+	u32 vid;
+	u32 svid;
+	u32 smid;
 };
 
 /**
- * @enum mac_info_length
+ * @struct efuse_info
+ * @brief efuse_info
  *
- * @brief mac_info_length
- *
- * @var mac_info_length::LEN_ADDR_AU
- * Please Place Description here.
- * @var mac_info_length::LEN_PID_AU
- * Please Place Description here.
- * @var mac_info_length::LEN_VID_AU
- * Please Place Description here.
- * @var mac_info_length::LEN_ADDR_AE
- * Please Place Description here.
- * @var mac_info_length::LEN_DID_AE
- * Please Place Description here.
- * @var mac_info_length::LEN_VID_AE
- * Please Place Description here.
- * @var mac_info_length::LEN_SVID_AE
- * Please Place Description here.
- * @var mac_info_length::LEN_SMID_AE
- * Please Place Description here.
- * @var mac_info_length::LEN_ADDR_AS
- * Please Place Description here.
+ * @var efuse_info::offset
+ * Efuse information offset
+ * @var efuse_info::def_val
+ * Efuse information default value
+ * @var efuse_info::len
+ * Efuse information length
  */
-enum mac_info_length {
-	/*USB*/
-	LEN_ADDR_AU = 6,
-	LEN_PID_AU = 2,
-	LEN_VID_AU = 2,
-	/*PCIE*/
-	LEN_ADDR_AE = 6,
-	LEN_DID_AE = 2,
-	LEN_VID_AE = 2,
-	LEN_SVID_AE = 2,
-	LEN_SMID_AE = 2,
-	/*SDIO*/
-	LEN_ADDR_AS = 6,
-};
-
-/**
- * @enum mac_info_default_value
- *
- * @brief mac_info_default_value
- *
- * @var mac_info_default_value::VAL_ADDR_AU
- * Please Place Description here.
- * @var mac_info_default_value::VAL_PID_AU
- * Please Place Description here.
- * @var mac_info_default_value::VAL_VID_AU
- * Please Place Description here.
- * @var mac_info_default_value::VAL_ADDR_AE
- * Please Place Description here.
- * @var mac_info_default_value::VAL_DID_AE
- * Please Place Description here.
- * @var mac_info_default_value::VAL_VID_AE
- * Please Place Description here.
- * @var mac_info_default_value::VAL_SVID_AE
- * Please Place Description here.
- * @var mac_info_default_value::VAL_SMID_AE
- * Please Place Description here.
- * @var mac_info_default_value::VAL_ADDR_AS
- * Please Place Description here.
- */
-enum mac_info_default_value {
-	/*USB*/
-	VAL_ADDR_AU = 0x0,
-	VAL_PID_AU = 0x5A,
-	VAL_VID_AU = 0xDA,
-	/*PCIE*/
-	VAL_ADDR_AE = 0x0,
-	VAL_DID_AE = 0x52,
-	VAL_VID_AE = 0xEC,
-	VAL_SVID_AE = 0xEC,
-	VAL_SMID_AE = 0x52,
-	/*SDIO*/
-	VAL_ADDR_AS = 0x0,
+struct efuse_info {
+	struct efuse_info_item *offset;
+	struct efuse_info_item *def_val;
+	struct efuse_info_item *len;
 };
 
 /**
@@ -1039,6 +966,17 @@ u32 mac_check_OTP(struct mac_ax_adapter *adapter, u8 is_start);
  */
 u32 mac_disable_rf(struct mac_ax_adapter *adapter,
 		   enum mac_ax_disable_rf_func func, enum mac_ax_net_type type);
+
+/**
+ * @brief mac_check_OTP
+ *
+ * @param *adapter
+ * @param *is_start
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_check_OTP(struct mac_ax_adapter *adapter, u8 is_start);
+
 /**
  * @}
  */

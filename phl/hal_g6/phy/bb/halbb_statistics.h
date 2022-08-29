@@ -83,6 +83,8 @@ struct bb_cca_info {
 
 struct bb_crc_info {
 	u32		cnt_ampdu_miss;
+	u32		cnt_ampdu_crc_error;
+	u32		cnt_ampdu_crc_ok;
 	u32		cnt_cck_crc32_error;
 	u32		cnt_cck_crc32_ok;
 	u32		cnt_ofdm_crc32_error;
@@ -282,6 +284,10 @@ struct bb_stat_cr_info {
 	u32 ampdu_rxon_m;
 	u32 ampdu_miss;
 	u32 ampdu_miss_m;
+	u32 ampdu_crc_ok;
+	u32 ampdu_crc_ok_m;
+	u32 ampdu_crc_err;
+	u32 ampdu_crc_err_m;
 	u32 hesu_err_sig_a_crc4;
 	u32 hesu_err_sig_a_crc4_m;
 	u32 heersu_err_sig_a_crc4;

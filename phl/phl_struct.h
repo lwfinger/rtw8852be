@@ -31,6 +31,7 @@ struct hci_info_t {
 #if defined(PCIE_TRX_MIT_EN)
 	u8 fixed_mitigation; /*no watchdog dynamic setting*/
 #endif
+	void *wd_dma_pool;
 #elif defined(CONFIG_USB_HCI)
 	u16 usb_bulkout_size;
 #elif defined(CONFIG_SDIO_HCI)
@@ -48,6 +49,14 @@ struct hci_info_t {
 	u16 wp_seq[PHL_MACID_MAX_NUM]; 	/* maximum macid number */
 
 };
+
+#if defined(CONFIG_PCI_HCI)
+enum rx_channel_type {
+	RX_CH = 0,
+	RP_CH = 1,
+	RX_CH_TYPE_MAX = 0xFF
+};
+#endif
 
 
 #define MAX_PHL_RING_STATUS_NUMBER 64
@@ -119,6 +128,7 @@ struct phl_hci_trx_ops {
 #ifdef CONFIG_PCI_HCI
 	enum rtw_phl_status (*recycle_busy_wd)(struct phl_info_t *phl);
 	enum rtw_phl_status (*recycle_busy_h2c)(struct phl_info_t *phl);
+	void (*read_hw_rx)(struct phl_info_t *phl, enum rx_channel_type rx_ch);
 #endif
 
 #ifdef CONFIG_USB_HCI
@@ -156,7 +166,8 @@ struct phl_tid_ampdu_rx {
 	u16 buf_size;
 	u16 tid;
 	u8 started:1,
-	   removed:1;
+ 	   removed:1,
+	   sleep:1;
 
 	void *drv_priv;
 	struct phl_info_t *phl_info;
@@ -245,6 +256,13 @@ enum data_ctrl_err_code {
 	CTRL_ERR_MAX = 0xFF
 };
 
+#ifdef CONFIG_POWER_SAVE
+struct phl_ps_info {
+	bool init;
+	_os_atomic tx_ntfy;
+};
+#endif
+
 #define PHL_CTRL_TX BIT0
 #define PHL_CTRL_RX BIT1
 #define POLL_SW_TX_PAUSE_CNT 100
@@ -323,6 +341,10 @@ struct phl_info_t {
 #endif
 
 	struct phl_wow_info wow_info;
+
+#ifdef CONFIG_POWER_SAVE
+	struct phl_ps_info ps_info;
+#endif
 
 #ifdef CONFIG_RTW_ACS
 	struct auto_chan_sel acs;

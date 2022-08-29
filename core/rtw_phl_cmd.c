@@ -364,8 +364,7 @@ u32 rtw_enqueue_phl_cmd(struct cmd_obj *pcmd)
 			return PHL_RES2RES(res);
 		}
 	}
-
-	/* fall through */
+		fallthrough;
 	default:
 		rtw_phl_job_fill_fptr(dvobj->phl, &job,
 			phl_run_core_cmd, padapter,

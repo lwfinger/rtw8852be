@@ -43,6 +43,12 @@ u32 halrf_cal_bit_shift(u32 bit_mask)
 void halrf_wreg(struct rf_info *rf, u32 addr, u32 mask, u32 val)
 {
 	u32 ori_val, bit_shift;
+#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	struct rtw_mac_cmd cmd = {0};
+	struct halrf_fw_offload *fwofld_info = &rf->fwofld;
+	u32 fw_ofld = rf->phl_com->dev_cap.fw_cap.offload_cap & BIT(0);
+	u32 rtn;
+#endif
 
 //	u32 page_temp;
 //	u32 offset_temp;	
@@ -56,12 +62,44 @@ void halrf_wreg(struct rf_info *rf, u32 addr, u32 mask, u32 val)
 //			temp = halrf_r32(rf, offset_temp | 0x4c00);
 //	}
 
-	if (mask != MASKDWORD) {
-		ori_val = halrf_r32(rf, addr);
-		bit_shift = halrf_cal_bit_shift(mask);
-		val = ((ori_val) & (~mask)) |( ((val << bit_shift)) & mask);
+#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	if (fw_ofld == true && rf->fw_ofld_enable == true) {
+		RF_DBG(rf, DBG_RF_FW,
+			"[FW_Ofld] addr=0x%08x   mask=0x%08x   val=0x%08x\n",
+			addr, mask, val);
+
+		hal_mem_set(rf->hal_com, fwofld_info, 0, sizeof(*fwofld_info));
+
+		cmd.src = RTW_MAC_BB_CMD_OFLD;
+		cmd.type = RTW_MAC_WRITE_OFLD;
+		cmd.lc = 0;
+		cmd.offset = (u16)addr;
+		cmd.value = val;
+		cmd.mask = mask;
+
+		fwofld_info->src = RTW_MAC_BB_CMD_OFLD;
+		fwofld_info->type = RTW_MAC_WRITE_OFLD;
+		fwofld_info->lc = 1;
+		fwofld_info->offset = (u16)addr;
+		fwofld_info->value = val;
+		fwofld_info->mask = mask;
+
+		rtn = halrf_mac_add_cmd_ofld(rf, &cmd);
+		if (rtn) {
+			RF_WARNING("======>%s return fail error code = %d !!!\n",
+				__func__, rtn);
+		}
 	}
-	halrf_w32(rf, addr, val);
+	else
+#endif
+	{
+		if (mask != MASKDWORD) {
+			ori_val = halrf_r32(rf, addr);
+			bit_shift = halrf_cal_bit_shift(mask);
+			val = ((ori_val) & (~mask)) |( ((val << bit_shift)) & mask);
+		}
+		halrf_w32(rf, addr, val);
+	}
 
 //	if ((page_temp != 0x4c00) && (page_temp != 0x4d00)) {
 //		if (offset_temp <= 0x9c)
@@ -79,6 +117,48 @@ u32 halrf_rreg(struct rf_info *rf, u32 addr, u32 mask)
 
 	return reg_val;
 }
+
+void halrf_wrf(struct rf_info *rf, enum rf_path path, u32 addr, u32 mask, u32 val)
+{
+#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	struct rtw_mac_cmd cmd = {0};
+	struct halrf_fw_offload *fwofld_info = &rf->fwofld;
+	u32 fw_ofld = rf->phl_com->dev_cap.fw_cap.offload_cap & BIT(0);
+	u32 rtn;
+
+	if (fw_ofld == true && rf->fw_ofld_enable == true) {
+		RF_DBG(rf, DBG_RF_FW,
+			"[FW_Ofld] addr=0x%08x   mask=0x%08x   val=0x%08x   path=%d\n",
+			addr, mask, val, path);
+
+		hal_mem_set(rf->hal_com, fwofld_info, 0, sizeof(*fwofld_info));
+
+		cmd.src = RTW_MAC_RF_CMD_OFLD;
+		cmd.type = RTW_MAC_WRITE_OFLD;
+		cmd.lc = 0;
+		cmd.rf_path = path;
+		cmd.offset = (u16)addr;
+		cmd.value = val;
+		cmd.mask = mask;
+
+		fwofld_info->src = RTW_MAC_RF_CMD_OFLD;
+		fwofld_info->type = RTW_MAC_WRITE_OFLD;
+		fwofld_info->lc = 1;
+		fwofld_info->rf_path = path;
+		fwofld_info->offset = (u16)addr;
+		fwofld_info->value = val;
+		fwofld_info->mask = mask;
+
+		rtn = halrf_mac_add_cmd_ofld(rf, &cmd);
+		if (rtn) {
+			RF_WARNING("======>%s return fail error code = %d !!!\n",
+				__func__, rtn);
+		}
+	} else
+#endif
+		rtw_hal_write_rf_reg((rf)->hal_com, path, addr, mask, val);
+}
+
 
 void halrf_delay_10us(struct rf_info *rf, u32 count)
 {

@@ -424,22 +424,6 @@ enum {
 	RTW_ROAM_ACTIVE = BIT2,
 };
 
-struct beacon_keys {
-	u8 ssid[IW_ESSID_MAX_SIZE];
-	u32 ssid_len;
-	u8 ch;
-	u8 bw;
-	u8 offset;
-	u8 proto_cap; /* PROTO_CAP_XXX */
-	u8 rate_set[12];
-	u8 rate_num;
-	int encryp_protocol;
-	int pairwise_cipher;
-	int group_cipher;
-	u32 akm;
-};
-
-
 #define UNASOC_STA_SRC_RX_BMC		0
 #define UNASOC_STA_SRC_RX_NMY_UC	1
 #define UNASOC_STA_SRC_NUM			2
@@ -558,6 +542,9 @@ struct mlme_priv {
 	struct ht_priv	htpriv;
 
 #endif
+
+	/* VHT or HE IE is configured by upper layer or not (hostapd or wpa_supplicant) */
+	u8 upper_layer_setting;
 
 #ifdef CONFIG_80211AC_VHT
 	struct vht_priv	vhtpriv;
@@ -768,7 +755,8 @@ struct mlme_priv {
 #define RTW_AUTO_SCAN_REASON_2040_BSS			BIT0
 #define RTW_AUTO_SCAN_REASON_ACS				BIT1
 #define RTW_AUTO_SCAN_REASON_ROAM				BIT2
-#define RTW_AUTO_SCAN_REASON_MESH_OFFCH_CAND	BIT3
+#define RTW_AUTO_SCAN_REASON_ROAM_ACTIVE			BIT3
+#define RTW_AUTO_SCAN_REASON_MESH_OFFCH_CAND		BIT4
 
 void rtw_mlme_reset_auto_scan_int(_adapter *adapter, u8 *reason);
 

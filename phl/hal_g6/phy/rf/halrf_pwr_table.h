@@ -105,6 +105,7 @@ enum halrf_pw_lmt_regulation_type {
 	PW_LMT_REGU_UKRAINE = 11,
 	PW_LMT_REGU_CN = 12,
 	PW_LMT_REGU_QATAR = 13,
+	PW_LMT_REGU_UK = 14,
 	/* place predefined ones above */
 	PW_LMT_REGU_EXT_PWR,
 	PW_LMT_REGU_PREDEF_NUM,
@@ -356,6 +357,8 @@ extern const enum halrf_pw_lmt_regulation_type _regulation_to_pw_lmt_regu_type[R
 
 extern const enum halrf_pw_lmt_regulation_type _tpo_to_pw_lmt_regu_type[TPO_NA];
 #define tpo_to_pw_lmt_regu_type(reg) ((reg) < TPO_NA ? _tpo_to_pw_lmt_regu_type[(reg)] : PW_LMT_REGU_WW13)
+
+const char *halrf_get_pw_lmt_regu_type_str_extra(struct rf_info *rf, u8 band);
 
 u8 halrf_get_regulation_info(struct rf_info *rf, u8 band);
 

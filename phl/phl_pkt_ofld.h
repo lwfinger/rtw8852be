@@ -17,7 +17,8 @@
 
 #define TYPE_DATA_FRAME 0x08
 #define TYPE_ACTION_FRAME 0xD0
-#define	TYPE_NULL_FRAME 0x48
+#define TYPE_NULL_FRAME 0x48
+#define TYPE_PROBE_REQ_FRAME 0x40
 
 #define HDR_OFFSET_FRAME_CONTROL 0
 #define HDR_OFFSET_DURATION 2
@@ -67,8 +68,9 @@
 #define NOT_USED 0xFF
 #define NULL_PACKET_LEN 24
 #define MAC_HDR_LEN 24
+#define FCS_LEN 4
 
-#define MAC_HDR_LEN 24
+#define MAX_MSDU_LEN 2304
 
 /* 11w SA-Query */
 #define SAQ_ACTION_LEN 4
@@ -152,7 +154,10 @@ struct pkt_ofld_req {
 	u32 req_name_len;
 };
 
-
+struct rtw_pkt_ofld_probe_req_info {
+	u8 a2[MAC_ADDRESS_LENGTH];
+	void (* construct_pbreq)(void *priv, u8 *pkt_buf, u16 *len);
+};
 
 struct rtw_pkt_ofld_null_info {
 	u8 a1[MAC_ADDRESS_LENGTH];

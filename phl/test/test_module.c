@@ -227,6 +227,7 @@ int test_thread(void *param)
 			test_mgnt->cur_test_obj = NULL;
 		}
 	}
+	_os_thread_wait_stop(d, &test_mgnt->thread);
 	CLEAR_STATUS_FLAG(test_mgnt->status, TM_STATUS_THREAD_START);
 	PHL_INFO("[TM]: test mgnt thread is down\n");
 	return 0;
@@ -505,8 +506,14 @@ u8 rtw_phl_test_is_test_complete(struct rtw_phl_com_t* phl_com)
 	return false;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
+static void _test_obj_thread_callback(unsigned long priv)
+{
+        void *context = (void *)priv;
+#else
 static void _test_obj_thread_callback(void *context)
 {
+#endif
 	struct rtw_phl_handler *phl_handler
 		= (struct rtw_phl_handler *)phl_container_of(context,
 							     struct rtw_phl_handler,

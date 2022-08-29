@@ -292,47 +292,19 @@ void halrf_wifi_event_notify(void *rf_void,
 	}
 }
 
-void halrf_wreg_fw(struct rf_info *rf, u32 addr, u32 mask, u32 val)
+void halrf_write_fwofld_start(struct rf_info *rf)
 {
 #ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-	struct rtw_mac_cmd cmd = {0};
-	struct halrf_fw_offload *fwofld_info = &rf->fwofld;
 	bool fw_ofld = rf->phl_com->dev_cap.fw_cap.offload_cap & BIT(0);
-	u32 rtn;
 
-	RF_DBG(rf, DBG_RF_TX_PWR_TRACK,
-		"======>%s addr=0x%x mask=0x%x val=0x%x fw_ofld=%d\n",
-		__func__, addr, mask, val, fw_ofld);
+	rf->fw_ofld_enable = true;
 
-	hal_mem_set(rf->hal_com, fwofld_info, 0, sizeof(*fwofld_info));
-
-	if (fw_ofld) {
-		cmd.src = RTW_MAC_BB_CMD_OFLD;
-		cmd.type = RTW_MAC_WRITE_OFLD;
-		cmd.lc = 0;
-		cmd.offset = (u16)addr;
-		cmd.value = val;
-		cmd.mask = mask;
-
-		fwofld_info->src = RTW_MAC_BB_CMD_OFLD;
-		fwofld_info->type = RTW_MAC_WRITE_OFLD;
-		fwofld_info->lc = 1;
-		fwofld_info->offset = (u16)addr;
-		fwofld_info->value = val;
-		fwofld_info->mask = mask;
-
-		rtn = halrf_mac_add_cmd_ofld(rf, &cmd);
-		if (rtn) {
-			RF_WARNING("======>%s return fail error code = %d !!!\n",
-				__func__, rtn);
-		}
-	} else
+	RF_DBG(rf, DBG_RF_FW, "======> %s   fw_ofld=%d   rf->fw_ofld_enable=%d\n",
+		__func__, fw_ofld, rf->fw_ofld_enable);
 #endif
-		halrf_wreg(rf, addr, mask, val);
 }
 
-void halrf_wrf_fw(struct rf_info *rf,
-			  enum rf_path path, u32 addr, u32 mask, u32 val)
+void halrf_write_fwofld_end(struct rf_info *rf)
 {
 #ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
 	struct rtw_mac_cmd cmd = {0};
@@ -340,97 +312,12 @@ void halrf_wrf_fw(struct rf_info *rf,
 	bool fw_ofld = rf->phl_com->dev_cap.fw_cap.offload_cap & BIT(0);
 	u32 rtn;
 
-	RF_DBG(rf, DBG_RF_INIT,
-		"======>%s addr=0x%x mask=0x%x val=0x%x fw_ofld=%d path=%d\n",
-		__func__, addr, mask, val, fw_ofld, path);
-
-	RF_DBG(rf, DBG_RF_TX_PWR_TRACK,
-		"======>%s addr=0x%x mask=0x%x val=0x%x fw_ofld=%d path=%d\n",
-		__func__, addr, mask, val, fw_ofld, path);
-
-	hal_mem_set(rf->hal_com, fwofld_info, 0, sizeof(*fwofld_info));
-
-	if (fw_ofld) {
-		cmd.src = RTW_MAC_RF_CMD_OFLD;
-		cmd.type = RTW_MAC_WRITE_OFLD;
-		cmd.lc = 0;
-		cmd.rf_path = path;
-		cmd.offset = (u16)addr;
-		cmd.value = val;
-		cmd.mask = mask;
-
-		fwofld_info->src = RTW_MAC_RF_CMD_OFLD;
-		fwofld_info->type = RTW_MAC_WRITE_OFLD;
-		fwofld_info->lc = 1;
-		fwofld_info->rf_path = path;
-		fwofld_info->offset = (u16)addr;
-		fwofld_info->value = val;
-		fwofld_info->mask = mask;
-
-		rtn = halrf_mac_add_cmd_ofld(rf, &cmd);
-		if (rtn) {
-			RF_WARNING("======>%s return fail error code = %d !!!\n",
-				__func__, rtn);
-		}
-	} else
-#endif
-		halrf_wrf(rf, path, addr, mask, val);
-}
-
-void halrf_wmac_fw(struct rf_info *rf, enum phl_phy_idx phy,
-			u32 addr, u32 mask, u32 val)
-{
-#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-	struct rtw_mac_cmd cmd = {0};
-	struct halrf_fw_offload *fwofld_info = &rf->fwofld;
-	bool fw_ofld = rf->phl_com->dev_cap.fw_cap.offload_cap & BIT(0);
-	u32 rtn;
-
-	RF_DBG(rf, DBG_RF_POWER,
-		"======>%s addr=0x%x mask=0x%x val=0x%x fw_ofld=%d\n",
-		__func__, addr, mask, val, fw_ofld);
-
-	hal_mem_set(rf->hal_com, fwofld_info, 0, sizeof(*fwofld_info));
-
-	if (fw_ofld) {
-		cmd.src = RTW_MAC_MAC_CMD_OFLD;
-		cmd.type = RTW_MAC_WRITE_OFLD;
-		cmd.lc = 0;
-		cmd.offset = (u16)addr;
-		cmd.value = val;
-		cmd.mask = mask;
-
-		fwofld_info->src = RTW_MAC_MAC_CMD_OFLD;
-		fwofld_info->type = RTW_MAC_WRITE_OFLD;
-		fwofld_info->lc = 1;
-		fwofld_info->offset = (u16)addr;
-		fwofld_info->value = val;
-		fwofld_info->mask = mask;
-
-		rtn = halrf_mac_add_cmd_ofld(rf, &cmd);
-		if (rtn) {
-			RF_WARNING("======>%s return fail error code = %d !!!\n",
-				__func__, rtn);
-		}
-	} else
-#endif
-		halrf_mac_set_pwr_reg(rf, phy, addr, mask, val);
-}
-
-void halrf_write_fw_final(struct rf_info *rf)
-{
-#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-	struct rtw_mac_cmd cmd = {0};
-	struct halrf_fw_offload *fwofld_info = &rf->fwofld;
-	bool fw_ofld = rf->phl_com->dev_cap.fw_cap.offload_cap & BIT(0);
-	u32 rtn;
-
-	RF_DBG(rf, DBG_RF_TX_PWR_TRACK | DBG_RF_POWER,
+	RF_DBG(rf, DBG_RF_FW,
 		"======>%s src=%d type=%d lc=%d rf_path=%d\n",
 		__func__, fwofld_info->src, fwofld_info->type,
 		fwofld_info->lc, fwofld_info->rf_path);
 
-	RF_DBG(rf, DBG_RF_TX_PWR_TRACK | DBG_RF_POWER,
+	RF_DBG(rf, DBG_RF_FW,
 		"======>%s offset=0x%x mask=0x%x value=0x%x fw_ofld=%d\n",
 		__func__, fwofld_info->offset, fwofld_info->mask,
 		fwofld_info->value, fw_ofld);
@@ -450,6 +337,8 @@ void halrf_write_fw_final(struct rf_info *rf)
 				__func__, rtn);
 		}
 	}
+
+	rf->fw_ofld_enable = false;
 #endif
 }
 
@@ -462,4 +351,64 @@ void halrf_ctrl_bw_ch(void *rf_void, enum phl_phy_idx phy, u8 central_ch,
 	halrf_ctl_bw(rf, bw);
 	halrf_rxbb_bw(rf, phy, bw);
 }
+
+u32 halrf_test_event_trigger(void *rf_void,
+		enum phl_phy_idx phy, enum halrf_event_idx idx, enum halrf_event_func func) {
+
+	struct rf_info *rf = (struct rf_info *)rf_void;
+
+	switch (idx) {
+		case RF_EVENT_PWR_TRK:
+			if (func == RF_EVENT_OFF)
+				halrf_tssi_disable(rf, phy);
+			else if (func == RF_EVENT_ON)
+				halrf_tssi_enable(rf, phy);
+			else if (func == RF_EVENT_TRIGGER)
+				halrf_tssi_trigger(rf, phy);
+		break;
+
+		case RF_EVENT_IQK:
+			if (func == RF_EVENT_OFF)
+				halrf_iqk_onoff(rf, true);
+			else if (func == RF_EVENT_ON)
+				halrf_iqk_onoff(rf, false);
+			else if (func == RF_EVENT_TRIGGER) {
+				halrf_nbiqk_enable(rf, false); 		
+				halrf_iqk_trigger(rf, phy, false);
+			}
+		break;
+
+		case RF_EVENT_DPK:
+			if (func == RF_EVENT_OFF)
+				halrf_dpk_onoff(rf, false);
+			else if (func == RF_EVENT_ON)
+				halrf_dpk_onoff(rf, true);
+			else if (func == RF_EVENT_TRIGGER)
+				halrf_dpk_trigger(rf, phy, false);
+		break;
+
+		case RF_EVENT_TXGAPK:
+			if (func == RF_EVENT_OFF)
+				halrf_gapk_disable(rf, phy);
+			else if (func == RF_EVENT_ON)
+				halrf_gapk_enable(rf, phy);
+			else if (func == RF_EVENT_TRIGGER)
+				halrf_gapk_trigger(rf, phy, true);
+		break;
+
+		case RF_EVENT_DACK:
+			if (func == RF_EVENT_OFF)
+				halrf_dack_onoff(rf, false);
+			else if (func == RF_EVENT_ON)
+				halrf_dack_onoff(rf, true);
+			else if (func == RF_EVENT_TRIGGER)
+				halrf_dack_trigger(rf, true);
+		break;
+
+		default:
+		break;
+	}
+	return 0;
+}
+
 

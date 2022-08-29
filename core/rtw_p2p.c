@@ -1470,6 +1470,7 @@ u32 process_assoc_req_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pframe, uint l
 
 	while (p2p_ie) {
 		/* Check P2P Capability ATTR */
+		attr_contentlen = sizeof(cap_attr);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CAPABILITY, (u8 *)&cap_attr, (uint *) &attr_contentlen)) {
 			RTW_INFO("[%s] Got P2P Capability Attr!!\n", __FUNCTION__);
 			cap_attr = le16_to_cpu(cap_attr);
@@ -2353,6 +2354,7 @@ int process_p2p_cross_connect_ie(_adapter *padapter, u8 *IEs, u32 IELength)
 
 	while (p2p_ie) {
 		/* Get P2P Manageability IE. */
+		attr_contentlen = sizeof(p2p_attr);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_MANAGEABILITY, p2p_attr, &attr_contentlen)) {
 			if ((p2p_attr[0] & (BIT(0) | BIT(1))) == 0x01)
 				ret = _FALSE;
@@ -2383,12 +2385,7 @@ void process_p2p_ps_ie(_adapter *padapter, u8 *IEs, u32 IELength)
 	if (rtw_p2p_chk_role(pwdinfo, P2P_ROLE_DISABLE) ||
 	    rtw_p2p_chk_role(pwdinfo, P2P_ROLE_DEVICE))
 		return;
-#ifdef CONFIG_CONCURRENT_MODE
-#ifndef CONFIG_FW_MULTI_PORT_SUPPORT
-	if (padapter->hw_port != HW_PORT0)
-		return;
-#endif
-#endif
+
 	if (IELength <= _BEACON_IE_OFFSET_)
 		return;
 
@@ -2465,55 +2462,78 @@ void process_p2p_ps_ie(_adapter *padapter, u8 *IEs, u32 IELength)
 
 void p2p_ps_wk_hdl(_adapter *padapter, u8 p2p_ps_state)
 {
-	struct pwrctrl_priv		*pwrpriv = adapter_to_pwrctl(padapter);
-	struct wifidirect_info	*pwdinfo = &(padapter->wdinfo);
-	u32 ps_deny = 0;
+	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(padapter);
+	struct wifidirect_info *pwdinfo = &padapter->wdinfo;
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
+	int i;
 
 	/* Pre action for p2p state */
 	switch (p2p_ps_state) {
 	case P2P_PS_DISABLE:
+		RTW_INFO("%s, P2P PS disabled\n", __func__);
+
+		rtw_phl_p2pps_noa_disable_all(GET_PHL_INFO(dvobj),
+					      padapter->phl_role);
+		pwdinfo->p2p_ps_mode = P2P_PS_NONE;
 		pwdinfo->p2p_ps_state = p2p_ps_state;
-
-		rtw_hal_set_hwreg(padapter, HW_VAR_H2C_FW_P2P_PS_OFFLOAD, (u8 *)(&p2p_ps_state));
-
-		if (pwdinfo->opp_ps == 1) {
-			if (pwrpriv->smart_ps == 0) {
-				pwrpriv->smart_ps = 2;
-				if (pwrpriv->pwr_mode != PM_PS_MODE_ACTIVE)
-					rtw_hal_set_hwreg(padapter, HW_VAR_H2C_FW_PWRMODE, (u8 *)(&(pwrpriv->pwr_mode)));
-			}
-		}
 		pwdinfo->noa_index = 0;
 		pwdinfo->ctwindow = 0;
 		pwdinfo->opp_ps = 0;
 		pwdinfo->noa_num = 0;
-		pwdinfo->p2p_ps_mode = P2P_PS_NONE;
+		for (i = 0; i < P2P_MAX_NOA_NUM; i++) {
+			pwdinfo->noa_count[i] = 0;
+			pwdinfo->noa_duration[i] = 0;
+			pwdinfo->noa_interval[i] = 0;
+			pwdinfo->noa_start_time[i] = 0;
+		}
 
 		break;
 	case P2P_PS_ENABLE:
-		_enter_pwrlock(&adapter_to_pwrctl(padapter)->lock);
-		ps_deny = rtw_ps_deny_get(padapter);
-		_exit_pwrlock(&adapter_to_pwrctl(padapter)->lock);
-
-		if ((ps_deny & (PS_DENY_SCAN | PS_DENY_JOIN))
-			|| rtw_mi_check_fwstate(padapter, (WIFI_UNDER_SURVEY | WIFI_UNDER_LINKING))) {
-			pwdinfo->p2p_ps_mode = P2P_PS_NONE;
-			RTW_DBG(FUNC_ADPT_FMT" Block P2P PS under site survey or LINKING\n", FUNC_ADPT_ARG(padapter));
+		if (pwdinfo->p2p_ps_mode <= P2P_PS_NONE)
 			return;
-		}
-		if (pwdinfo->p2p_ps_mode > P2P_PS_NONE) {
-			pwdinfo->p2p_ps_state = p2p_ps_state;
 
-			if (pwdinfo->ctwindow > 0) {
-				if (pwrpriv->smart_ps != 0) {
-					pwrpriv->smart_ps = 0;
-					RTW_INFO("%s(): Enter CTW, change SmartPS\n", __FUNCTION__);
-					if (pwrpriv->pwr_mode != PM_PS_MODE_ACTIVE)
-						rtw_hal_set_hwreg(padapter, HW_VAR_H2C_FW_PWRMODE, (u8 *)(&(pwrpriv->pwr_mode)));
-				}
-			}
-			rtw_hal_set_hwreg(padapter, HW_VAR_H2C_FW_P2P_PS_OFFLOAD, (u8 *)(&p2p_ps_state));
+		RTW_INFO("%s, P2P PS enabled\n", __func__);
+
+		/* Disable all NoA desc before update NoA desc */
+		rtw_phl_p2pps_noa_disable_all(GET_PHL_INFO(dvobj),
+					      padapter->phl_role);
+
+		for (i = 0; i < pwdinfo->noa_num; i++) {
+			struct rtw_phl_noa_desc desc = {0};
+			enum rtw_phl_status phl_sts;
+
+			desc.enable = _TRUE;
+			/* config NOA start time */
+			desc.start_t_h = (u32)(pmlmeext->TSFValue >> 32);
+			desc.start_t_l = pwdinfo->noa_start_time[i];
+			/* config NOA duration */
+			desc.duration = pwdinfo->noa_duration[i];
+			/* config NOA interval */
+			desc.interval = pwdinfo->noa_interval[i];
+			/* config NOA count */
+			desc.count = pwdinfo->noa_count[i];
+			desc.w_role = padapter->phl_role;
+			if (pwdinfo->noa_count[i] == 255)
+				desc.tag = P2PPS_TRIG_GC_255;
+			else
+				desc.tag = P2PPS_TRIG_GC;
+
+			RTW_INFO("[NoA Desc]- entry: %d\n", i);
+			RTW_INFO("[NoA Desc]- duration: %u\n", desc.duration);
+			RTW_INFO("[NoA Desc]- interval: %u\n", desc.interval);
+			RTW_INFO("[NoA Desc]- high_start_time: %u\n",
+				 desc.start_t_h);
+			RTW_INFO("[NoA Desc]- low_start_time: %u\n",
+				 desc.start_t_l);
+			RTW_INFO("[NoA Desc]- count: %u\n",desc.count);
+
+			phl_sts = rtw_phl_p2pps_noa_update(GET_PHL_INFO(dvobj),
+							   &desc);
+			if (phl_sts != RTW_PHL_STATUS_SUCCESS)
+				RTW_ERR("rtw_phl_p2pps_noa_update failed\n");
 		}
+
 		break;
 	case P2P_PS_SCAN:
 	case P2P_PS_SCAN_DONE:
@@ -2538,13 +2558,7 @@ u8 p2p_ps_wk_cmd(_adapter *padapter, u8 p2p_ps_state, u8 enqueue)
 
 
 	if (rtw_p2p_chk_role(pwdinfo, P2P_ROLE_DISABLE) ||
-	    rtw_p2p_chk_role(pwdinfo, P2P_ROLE_DEVICE) ||
-#ifdef CONFIG_CONCURRENT_MODE
-#ifndef CONFIG_FW_MULTI_PORT_SUPPORT
-	    (padapter->hw_port != HW_PORT0) ||
-#endif
-#endif
-	    0)
+	    rtw_p2p_chk_role(pwdinfo, P2P_ROLE_DEVICE))
 		return res;
 
 	if (enqueue) {
@@ -2925,7 +2939,7 @@ int rtw_p2p_enable(_adapter *padapter, enum P2P_ROLE role)
 	struct wifidirect_info *pwdinfo = &(padapter->wdinfo);
 
 	if (role == P2P_ROLE_DEVICE || role == P2P_ROLE_CLIENT || role == P2P_ROLE_GO) {
-#ifndef RTW_USE_CFG80211_REPORT_PROBE_REQ
+#ifndef CONFIG_CFG80211_REPORT_PROBE_REQ
 #if defined(CONFIG_CONCURRENT_MODE) && !RTW_P2P_GROUP_INTERFACE
 		/*	Commented by Albert 2011/12/30 */
 		/*	The driver just supports 1 P2P group operation. */

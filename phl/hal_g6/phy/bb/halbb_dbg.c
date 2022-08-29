@@ -60,6 +60,18 @@ void halbb_dbg_comp_init(struct bb_info *bb)
 
 }
 
+void halbb_print_devider(struct bb_info *bb, u8 len, bool with_space)
+{
+
+	if (len == BB_DEVIDER_LEN_32)
+		BB_TRACE("--------------------------------\n");
+	else
+		BB_TRACE("----------------\n");
+
+	if (with_space)
+		BB_TRACE("\n");
+}
+
 #ifdef HALBB_TDMA_CR_SUPPORT
 
 void halbb_tdma_cr_sel_io_en(struct bb_info *bb)
@@ -559,44 +571,176 @@ u16 halbb_rx_avg_phy_rate(struct bb_info *bb)
 	return (u16)HALBB_DIV(phy_rate_sum, pkt_cnt_tmp); /*avg_phy_rate*/
 }
 
-void halbb_basic_dbg_msg_mac_phy_intf(struct bb_info *bb)
+void halbb_get_mac_phy_intf(struct bb_info *bb)
 {
 	struct bb_dbg_cr_info *cr = &bb->bb_dbg_i.bb_dbg_cr_i;
+	struct bb_dbg_info *dbg = &bb->bb_dbg_i;
+	struct bb_mac_phy_intf *txinfo = &dbg->mac_phy_intf_i;
+	u32 ofst_0 = 0, ofst_4 = 0, ofst_8 = 0, ofst_16 = 0, ofst_20 = 0, ofst_24 = 0;
+	u32 ofst_28 = 0, ofst_56 = 0, ofst_72 = 0, ofst_76 = 0;
+	u32 n_dbps = 0, n_dbps_last_init = 0;
+	u16 vht_n_sd[4] = {52, 108, 234, 468};
+	u16 he_n_sd[4] = {234, 468, 980, 1960};
+	u16 he_n_sd_short[4] = {60, 120, 240, 492};
+	u8 r_n_bpscs_12[12] = {6, 12, 18, 24, 36, 48, 54, 60, 72, 80, 90, 100};
+	u16 n_sym_init = 0;
+	u8 nss = 0, n_tail = 0, m_stbc = 0, a = 0, a_init = 0;
+	bool ldpc_extra = false;
+
+	ofst_0 = halbb_get_reg(bb, cr->mac_phy_ppdu_type, MASKDWORD);
+	ofst_4 = halbb_get_reg(bb, cr->mac_phy_txsc, MASKDWORD);
+	ofst_8 = halbb_get_reg(bb, cr->mac_phy_n_usr, MASKDWORD);
+	ofst_16 = halbb_get_reg(bb, cr->mac_phy_stbc, MASKDWORD);
+	ofst_20 = halbb_get_reg(bb, cr->mac_phy_ndp_en, MASKDWORD);
+	ofst_24 = halbb_get_reg(bb, cr->mac_phy_n_sts, MASKDWORD);
+	ofst_28 = halbb_get_reg(bb, cr->mac_phy_mcs_5_4, MASKDWORD);
+	ofst_56 = halbb_get_reg(bb, cr->mac_phy_n_sym, MASKDWORD);
+	txinfo->l_sig = halbb_get_reg(bb, cr->mac_phy_lsig, MASKDWORD);
+	ofst_72 = halbb_get_reg(bb, cr->mac_phy_siga_0, MASKDWORD);
+	ofst_76 = halbb_get_reg(bb, cr->mac_phy_siga_1, MASKDWORD);
+	txinfo->sig_b = halbb_get_reg(bb, cr->mac_phy_vht_sigb_0, MASKDWORD);
+
+	txinfo->type = (u8)(ofst_0 & 0xf);
+	txinfo->tx_path_en = (u8)((ofst_0 & 0xF000) >> 12);
+	txinfo->txcmd_num = (u8)((ofst_0 & 0x3f000000) >> 24);
+	txinfo->txsc = (u8)((ofst_4 & 0xf0) >> 4);
+	txinfo->bw = (u8)((ofst_4 & 0x30000) >> 16);
+	txinfo->tx_pw = (u16)((ofst_4 & 0x7FC0000) >> 18);
+	txinfo->n_usr = (u8)((ofst_8 & 0xff0) >> 4);
+	txinfo->stbc= (bool)(ofst_16 & 0x1);
+	txinfo->gi = (u8)((ofst_16 & 0x30) >> 4);
+	txinfo->ltf = (u8)((ofst_16 & 0xC0) >> 6);
+	txinfo->ndp_en = (bool)((ofst_20 & 0x10) >> 4);
+	txinfo->n_sts = (u8)((ofst_24 & 0x7000000) >> 24);
+	txinfo->fec = (bool)((ofst_24 & 0x08000000) >> 27);
+	txinfo->mcs = (u8)((u8)((ofst_24 & 0xf0000000) >> 28) +
+			 (u8)((ofst_28 & 0x3) << 4));
+	txinfo->dcm = (bool)((ofst_28 & 0x4) >> 2);
+	txinfo->n_sym = (u16)(ofst_56 & 0x7ff); /*excluding disambiguation but including ldpc_extra*/
+	ldpc_extra = (bool)((ofst_56 & 0x01000000) >> 24);
+	txinfo->pkt_ext = (u8)((ofst_56 & 0x0E000000) >> 25);
+	txinfo->pre_fec = (u8)((ofst_56 & 0x30000000) >> 28);
+
+	if (txinfo->type > 6) { // === HE === //
+		txinfo->sig_a1 = ofst_72 & 0x3ffffff;
+		txinfo->sig_a2 = ((ofst_76 & 0xfffff) << 6) |
+				((ofst_72 & 0xfc000000) >> 26);
+		/*t_data = n_sym * t_sym = 4 * ceil(n_sym * t_syms / 4)*/
+		if (txinfo->gi == 1) /*13.6us*/
+			txinfo->t_data = (u16)(4 * HALBB_CEIL(txinfo->n_sym * 34, 10));
+		else if (txinfo->gi == 2) /*14.4us*/
+			txinfo->t_data = (u16)(4 * HALBB_CEIL(txinfo->n_sym * 36, 10));
+		else if (txinfo->gi == 3) /*16us*/
+			txinfo->t_data = (u16)(16 * txinfo->n_sym);
+		else /*no gi = 0.4 us in he mode*/
+			txinfo->t_data = 0;
+		/*psdu_length = floor(((n_sym - m_stbc) * n_dbps + m_stbc * n_dbps_last - 16 - n_tail) / 8)*/
+		if (txinfo->mcs > 11) { /*Avoid n_dbps error*/
+			txinfo->psdu_length = 0;
+		} else {
+			nss = txinfo->stbc ? txinfo->n_sts : txinfo->n_sts + 1;
+			n_dbps = (u32)((nss * r_n_bpscs_12[txinfo->mcs] *
+				he_n_sd[txinfo->bw] / 12) >> txinfo->dcm);
+			n_tail = txinfo->fec ? 0 : 6;
+			m_stbc = txinfo->stbc + 1;
+			a = (txinfo->pre_fec == 0) ? 4 : txinfo->pre_fec;
+			if (txinfo->fec && ldpc_extra && (a == 1)) {
+				a_init = 4;
+				n_sym_init = txinfo->n_sym - m_stbc;
+			} else if (txinfo->fec && ldpc_extra && (a > 1)) {
+				a_init = a - 1;
+				n_sym_init = txinfo->n_sym;
+			} else {
+				a_init = a;
+				n_sym_init = txinfo->n_sym;
+			}
+			n_dbps_last_init = (u32)((a_init == 4) ? n_dbps : a_init *
+					 (nss * r_n_bpscs_12[txinfo->mcs] *
+					 he_n_sd_short[txinfo->bw] / 12) >> txinfo->dcm);
+			txinfo->psdu_length = (u32)(((n_sym_init - m_stbc) * n_dbps +
+					     m_stbc * n_dbps_last_init -
+					     16 - n_tail) / 8);
+		}
+	} else if (txinfo->type > 4) { // === VHT === //
+		txinfo->sig_a1 = ofst_72 & 0xffffff;
+		txinfo->sig_a2 = ((ofst_76 & 0xffff) << 8) |
+				((ofst_72 & 0xff000000) >> 24);
+		/*t_data = n_sym * t_sym = 4 * ceil(n_sym * t_syms / 4)*/
+		if (txinfo->gi == 0) /*3.6us*/
+			txinfo->t_data = (u16)(4 * HALBB_CEIL(txinfo->n_sym * 9, 10));
+		else if (txinfo->gi == 1) /*4us*/
+			txinfo->t_data = (u16)(4 * txinfo->n_sym);
+		else
+			txinfo->t_data = 0;
+		if (txinfo->bw == 0)
+			txinfo->psdu_length = (u32)((txinfo->sig_b & 0x1ffff) << 2);
+		else if (txinfo->bw == 1)
+			txinfo->psdu_length = (u32)((txinfo->sig_b & 0x7ffff) << 2);
+		else
+			txinfo->psdu_length = (u32)((txinfo->sig_b & 0x1fffff) << 2);
+	} else if (txinfo->type > 2) { // === HT === //
+		txinfo->sig_a1 = ofst_72 & 0xffffff;
+		txinfo->sig_a2 = ((ofst_76 & 0xffff) << 8) |
+				((ofst_72 & 0xff000000) >> 24);
+		/*t_data = n_sym * t_sym = 4 * ceil(n_sym * t_syms / 4)*/
+		if (txinfo->gi == 0) /*3.6us*/
+			txinfo->t_data = (u16)(4 * HALBB_CEIL(txinfo->n_sym * 9, 10));
+		else if (txinfo->gi == 1) /*4us*/
+			txinfo->t_data = (u16)(4 * txinfo->n_sym);
+		else
+			txinfo->t_data = 0;
+		txinfo->psdu_length = (u32)((txinfo->sig_a1 & 0x00FFFF00) >> 8);
+	} else if (txinfo->type > 1) { // === OFDM === //
+		/*t_data = n_sym * t_sym = 4 * n_sym*/
+		txinfo->t_data = (u16)(4 * txinfo->n_sym);
+		txinfo->psdu_length = (u32)((txinfo->l_sig & 0x0001FFE0) >> 5);
+		/*not support*/
+		txinfo->sig_a1 = 0;
+		txinfo->sig_a2 = 0;
+	} else { // === CCK === //
+		/*not support*/
+		txinfo->sig_a1 = 0;
+		txinfo->sig_a2 = 0;
+		txinfo->t_data = 0;
+		txinfo->psdu_length = 0;
+	}
+}
+
+void halbb_basic_dbg_msg_mac_phy_intf(struct bb_info *bb)
+{
+	struct bb_dbg_info *dbg = &bb->bb_dbg_i;
+	struct bb_mac_phy_intf *txinfo = &dbg->mac_phy_intf_i;
 	s32 pw = 0;
 	//u8 i = 0, usr_ofst = 0;
-	u32 tmp_32 = 0;
-	u32 tx_pw = 0, l_sig = 0, sig_a1 = 0, sig_a2 = 0;
-	u8 txpath_en =0, type = 0, mcs = 0;
 	char ppdu[][10] = {{"L-CCK"}, {"S-CCK"}, {"Legacy"}, {"HT"},
 			   {"HT GF"}, {"VHT SU"}, {"VHT MU"}, {"HE SU"},
-			   {"HE ER SU"}, {"HE MU"}, {"HE TB"}};
+			   {"HE ER SU"}, {"HE MU"}, {"HE TB"}, {"RSVD-11"},
+			   {"RSVD-12"}, {"RSVD-13"}, {"RSVD-14"}, {"RSVD-15"}};
 	char gi_type[][4] = {{"0.4"}, {"0.8"}, {"1.6"}, {"3.2"}};
 	char fec_type[][5] = {{"BCC"}, {"LDPC"}};
 	char *txcmd = NULL;
-	u8 txcmd2 = 0;
 	bool no_txcmd_hit = false;
 
 	if (bb->bb_watchdog_mode != BB_WATCHDOG_NORMAL)
 		return;
 
-	txpath_en = (u8)halbb_get_reg(bb, cr->mac_phy_txpath_en, 0xF000);
-	l_sig = halbb_get_reg(bb, cr->mac_phy_lsig, MASKDWORD);
-	tx_pw = halbb_get_reg(bb, cr->mac_phy_tx_pw, 0x7FC0000);
+	if ((bb->ic_type == BB_RTL8852C) && (bb->hal_com->cv == CAV))
+		return;
 
-	if ((txpath_en == 0) && (l_sig == 0) && (tx_pw == 0)) {
+	/*Store the whole mac_phy_interface register to avoid timing issue*/
+	halbb_get_mac_phy_intf(bb);
+
+	if ((txinfo->tx_path_en == 0) && (txinfo->tx_pw == 0) && (txinfo->l_sig == 0)) {
 		BB_DBG(bb, DBG_CMN,
 		       "[MAC/PHY Intf]Txinfo is empty!BB reset has been probably toggled.\n");
 		return;
 	}
 
-	type = (u8)halbb_get_reg(bb, cr->mac_phy_ppdu_type, 0xf);
-	mcs = (u8)(halbb_get_reg(bb, cr->mac_phy_mcs_3_0, 0xf0000000) +
-	      (halbb_get_reg(bb, cr->mac_phy_mcs_5_4, 0x3) << 4));
+	pw = halbb_cnvrt_2_sign((u32)txinfo->tx_pw, 9);
+	halbb_print_sign_frac_digit(bb, (u32)pw, 9, 2, bb->dbg_buf, HALBB_SNPRINT_SIZE);
 
-	halbb_print_sign_frac_digit(bb, tx_pw, 9, 2, bb->dbg_buf, HALBB_SNPRINT_SIZE);
-
-	tmp_32 = halbb_get_reg(bb, cr->mac_phy_txcmd, 0x3f000000);
-	switch (tmp_32) {
+	/*Move txcmd to array declaration would cause warning due to larger frame size*/
+	switch (txinfo->txcmd_num) {
 	case 0:
 		txcmd = "data";
 		break;
@@ -682,50 +826,70 @@ void halbb_basic_dbg_msg_mac_phy_intf(struct bb_info *bb)
 		txcmd = "TRIG-BASIC-DATA";
 		break;
 	default:
-		txcmd = "RSVD";
-		txcmd2 = (u8)tmp_32;
 		no_txcmd_hit = true;
 		break;
 	}
-
 	if (no_txcmd_hit)
 		BB_DBG(bb, DBG_CMN,
 		       "[MAC/PHY Intf][%s][RSVD-%d] BW=%dM, TxSC=%d, TxPw=%s dBm, TxPathEn=%d\n",
-		       ppdu[type], txcmd2,
-		       20 << (halbb_get_reg(bb, cr->mac_phy_bw, 0x30000)),
-		       halbb_get_reg(bb, cr->mac_phy_txsc, 0xf0),
-		       bb->dbg_buf, txpath_en);
+		       ppdu[txinfo->type], txinfo->txcmd_num, 20 << txinfo->bw,
+		       txinfo->txsc, bb->dbg_buf, txinfo->tx_path_en);
 	else
 		BB_DBG(bb, DBG_CMN,
 		       "[MAC/PHY Intf][%s][%s] BW=%dM, TxSC=%d, TxPw=%s dBm, TxPathEn=%d\n",
-		       ppdu[type], txcmd, 
-		       20 << (halbb_get_reg(bb, cr->mac_phy_bw, 0x30000)),
-		       halbb_get_reg(bb, cr->mac_phy_txsc, 0xf0),
-		       bb->dbg_buf, txpath_en);
+		       ppdu[txinfo->type], txcmd, 20 << txinfo->bw, txinfo->txsc,
+		       bb->dbg_buf, txinfo->tx_path_en);
 
-	BB_DBG(bb, DBG_CMN,
-	       "User_num=%d, STBC=%d, FEC=%s, GILTF=%dx%s, NDP_en=%d, N_sts=%d, MCS=%d\n",
-	       halbb_get_reg(bb, cr->mac_phy_n_usr, 0xff0),
-	       halbb_get_reg(bb, cr->mac_phy_stbc, BIT(0)),
-	       fec_type[halbb_get_reg(bb, cr->mac_phy_fec, BIT(27))],
-	       1 << halbb_get_reg(bb, cr->mac_phy_ltf, 0xC0),
-	       gi_type[halbb_get_reg(bb, cr->mac_phy_gi, 0x30)],
-	       halbb_get_reg(bb, cr->mac_phy_ndp_en, BIT(4)),
-	       halbb_get_reg(bb, cr->mac_phy_n_sts, 0x7000000), mcs);
-
-	/*SIG*/
-	tmp_32 = halbb_get_reg(bb, cr->mac_phy_siga_0, MASKDWORD);
-	if (type > 6) { // === HE === //
-		sig_a1 = tmp_32 & 0x3ffffff;
-		sig_a2 = (halbb_get_reg(bb, cr->mac_phy_siga_1, 0xfffff) << 6) |
-			 ((tmp_32 & 0xfc000000) >> 26);
-	} else if (type > 2) { // === HT / VHT === //
-		sig_a1 = tmp_32 & 0xffffff;
-		sig_a2 = (halbb_get_reg(bb, cr->mac_phy_siga_1, 0xffff) << 8) |
-			 ((tmp_32 & 0xff000000) >> 24);
+	if (txinfo->type > 6) { // === HE === //
+		BB_DBG(bb, DBG_CMN,
+		       "User_num=%d, STBC=%d, FEC=%s, GILTF=%dx%s, NDP_en=%d, N_sts=%d, MCS=%d\n",
+		       txinfo->n_usr, txinfo->stbc, fec_type[txinfo->fec],
+		       1 << txinfo->ltf, gi_type[txinfo->gi], txinfo->ndp_en,
+		       txinfo->n_sts, txinfo->mcs);
+		BB_DBG(bb, DBG_CMN,
+		       "DCM=%d, pre_fec=%d, pkt_ext=%d us\n",
+		       txinfo->dcm, txinfo->pre_fec, txinfo->pkt_ext << 2);
+		/*SIG*/
+		BB_DBG(bb, DBG_CMN,
+		       "L-SIG/HE-SIG-A1/HE-SIG-A2={0x%08x, 0x%08x, 0x%08x}\n",
+		       txinfo->l_sig, txinfo->sig_a1, txinfo->sig_a2);
+		BB_DBG(bb, DBG_CMN, "n_sym=%d, t_data=%d us, PSDU_length=%d Bytes\n",
+		       txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else if (txinfo->type > 4) { // === VHT === //
+		BB_DBG(bb, DBG_CMN,
+		       "User_num=%d, STBC=%d, FEC=%s, GI=%s, NDP_en=%d, N_sts=%d, MCS=%d\n",
+		       txinfo->n_usr, txinfo->stbc, fec_type[txinfo->fec],
+		       gi_type[txinfo->gi], txinfo->ndp_en, txinfo->n_sts,
+		       txinfo->mcs);
+		/*SIG*/
+		BB_DBG(bb, DBG_CMN,
+		       "L-SIG/VHT-SIG-A1/VHT-SIG-A2/VHT-SIG-B={0x%08x, 0x%08x, 0x%08x, 0x%08x}\n",
+		       txinfo->l_sig, txinfo->sig_a1, txinfo->sig_a2, txinfo->sig_b);
+		BB_DBG(bb, DBG_CMN, "n_sym=%d, t_data=%d us, VHT_length=%d Bytes\n",
+		       txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else if (txinfo->type > 2) { // === HT === //
+		BB_DBG(bb, DBG_CMN,
+		       "User_num=%d, STBC=%d, FEC=%s, GI=%s, NDP_en=%d, N_sts=%d, MCS=%d\n",
+		       txinfo->n_usr, txinfo->stbc, fec_type[txinfo->fec],
+		       gi_type[txinfo->gi], txinfo->ndp_en, txinfo->n_sts,
+		       txinfo->mcs);
+		/*SIG*/
+		BB_DBG(bb, DBG_CMN,
+		       "L-SIG/HT-SIG1/HT-SIG2={0x%08x, 0x%08x, 0x%08x}\n",
+		       txinfo->l_sig, txinfo->sig_a1, txinfo->sig_a2);
+		BB_DBG(bb, DBG_CMN, "n_sym=%d, t_data=%d us, HT_length=%d Bytes\n",
+		       txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else if (txinfo->type > 1) { // === OFDM === //
+		BB_DBG(bb, DBG_CMN, "User_num=%d, rate=%dM\n", txinfo->n_usr,
+		       bb_phy_rate_table[4 + txinfo->mcs]);
+		/*SIG*/
+		BB_DBG(bb, DBG_CMN, "L-SIG={0x%08x}\n", txinfo->l_sig);
+		BB_DBG(bb, DBG_CMN, "n_sym=%d, t_data=%d us, L_length=%d Bytes\n",
+		       txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else { // === CCK === //
+		BB_DBG(bb, DBG_CMN, "User_num=%d\n", txinfo->n_usr);
+		/*txinfo->mcs of b mode cannot be used*/
 	}
-	BB_DBG(bb, DBG_CMN, "SIG-L/A1/A2= {0x%08x, 0x%08x, 0x%08x}\n", l_sig, sig_a1,
-	       sig_a2);
 #if 0
 	BB_DBG(bb, DBG_CMN, "============ [User-specified Info] ============\n");
 	for (i = 0; i < n_user; i++) {
@@ -748,7 +912,6 @@ void halbb_basic_dbg_msg_mac_phy_intf(struct bb_info *bb)
 		BB_DBG(bb, DBG_CMN, "TxBF En: %d\n", txinfo_value);
 	}
 #endif
-
 }
 
 void halbb_basic_dbg_msg_pmac(struct bb_info *bb)
@@ -775,13 +938,14 @@ void halbb_basic_dbg_msg_pmac(struct bb_info *bb)
 	       stat->bb_tx_cnt_i.ofdm_mac_txen,
 	       stat->bb_tx_cnt_i.ofdm_phy_txon);
 	BB_DBG(bb, DBG_CMN,
-	       "[CRC]{B/G/N/AC/AX/All} OK:{%d, %d, %d, %d, %d, %d} Err:{%d, %d, %d, %d, %d, %d}\n",
+	       "[CRC]{B/G/N/AC/AX/All/MPDU} OK:{%d, %d, %d, %d, %d, %d, %d} Err:{%d, %d, %d, %d, %d, %d, %d}\n",
 	       crc->cnt_cck_crc32_ok, crc->cnt_ofdm_crc32_ok,
 	       crc->cnt_ht_crc32_ok, crc->cnt_vht_crc32_ok,
 	       crc->cnt_he_crc32_ok, crc->cnt_crc32_ok_all,
-	       crc->cnt_cck_crc32_error, crc->cnt_ofdm_crc32_error,
-	       crc->cnt_ht_crc32_error, crc->cnt_vht_crc32_error,
-	       crc->cnt_he_crc32_error, crc->cnt_crc32_error_all);
+	       crc->cnt_ampdu_crc_ok, crc->cnt_cck_crc32_error,
+	       crc->cnt_ofdm_crc32_error, crc->cnt_ht_crc32_error,
+	       crc->cnt_vht_crc32_error, crc->cnt_he_crc32_error,
+	       crc->cnt_crc32_error_all, crc->cnt_ampdu_crc_error);
 	BB_DBG(bb, DBG_CMN,
 	       "[CCA]{CCK, OFDM, All}: %d, %d, %d\n",
 	       cca->cnt_cck_cca, cca->cnt_ofdm_cca, cca->cnt_cca_all);
@@ -948,10 +1112,18 @@ void halbb_basic_dbg_message(struct bb_info *bb)
 	struct bb_ch_info	*ch = &bb->bb_ch_i;
 	struct bb_dbg_info	*dbg = &bb->bb_dbg_i;
 	struct bb_physts_info	*physts = &bb->bb_physts_i;
+	struct bb_dig_cr_info *cr = &bb->bb_dig_i.bb_dig_cr_i;
 	enum channel_width bw = bb->hal_com->band[0].cur_chandef.bw;
 	u8 fc = bb->hal_com->band[0].cur_chandef.center_ch;
 	u8 sta_cnt = 0;
 	u8 i;
+	u8 lna = 0, tia = 0, rxbb = 0;
+	u8 pd_low_bd = 0, pd_low_bd_en = 0;
+	u8 rx_num_path = bb->hal_com->rfpath_rx_num;
+	u32 pd_low_bd_a = cr->seg0r_pd_lower_bound_a;
+	u32 pd_low_bd_a_m = cr->seg0r_pd_lower_bound_a_m;
+	u32 pd_sr_en_a = cr->seg0r_pd_spatial_reuse_en_a;
+	u32 pd_sr_en_a_m = cr->seg0r_pd_spatial_reuse_en_a_m;
 
 #ifdef HALBB_DBG_TRACE_SUPPORT
 	if (!(bb->dbg_component & DBG_CMN))
@@ -1017,6 +1189,21 @@ void halbb_basic_dbg_message(struct bb_info *bb)
 		BB_DBG(bb, DBG_CMN, "====[8. [MU] AVG RSSI/RxRate]\n");
 		halbb_basic_dbg_msg_physts_mu(bb);
 	}
+	BB_DBG(bb, DBG_CMN, "\n");
+	BB_DBG(bb, DBG_CMN, "====[9. DIG]\n");
+	for (i = 0; i < rx_num_path; i++) {
+		lna = halbb_get_lna_idx(bb, i);
+		tia = halbb_get_tia_idx(bb, i);
+		rxbb = halbb_get_rxb_idx(bb, i);
+		BB_DBG(bb, DBG_CMN, "[DIG][Path-%d] Get(lna,tia,rxb)=(%d,%d,%d)\n",
+		       i, lna, tia, rxbb);
+	}
+
+	pd_low_bd = (u8)halbb_get_reg(bb, pd_low_bd_a, pd_low_bd_a_m);
+	pd_low_bd_en = (u8)halbb_get_reg(bb, pd_sr_en_a, pd_sr_en_a_m);
+	BB_DBG(bb, DBG_CMN, "PD_low_bd_en : %d, PD_low_bd = %d\n", pd_low_bd_en,
+	       pd_low_bd);
+
 	BB_DBG(bb, DBG_CMN, "============================================\n");
 	BB_DBG(bb, DBG_CMN, "\n");
 }
@@ -1241,6 +1428,21 @@ void halbb_basic_profile_dbg(struct bb_info *bb, u32 *_used, char *output, u32 *
 
 #if HALBB_DBG_DVLP_FLAG /*Dump register - relative*/
 
+void halbb_cr_table_dump(struct bb_info *bb, u32 *cr_table, u32 cr_len)
+{
+	u32 i = 0;
+	u32 cr_tmp, val;
+
+	for (i = 0; i < cr_len; i++) {
+		cr_tmp = cr_table[i];
+		if (cr_tmp == 0)
+			continue;
+
+		val = halbb_get_reg(bb, cr_tmp, MASKDWORD);
+		BB_TRACE("[%03d]Reg[0x%04x] = 0x%08x\n", i, cr_tmp, val);
+	}
+}
+
 void halbb_dump_bb_reg(struct bb_info *bb, u32 *_used, char *output,
 			       u32 *_out_len, bool dump_2_buff)
 {
@@ -1288,7 +1490,8 @@ void halbb_dump_reg_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *
 	u32 val[10] = {0};
 	u32 addr = 0;
 
-	HALBB_SCAN(input[1], DCMD_DECIMAL, &val[0]);
+	if (input[1])
+		HALBB_SCAN(input[1], DCMD_DECIMAL, &val[0]);
 
 	if (_os_strcmp(input[1], help) == 0) {
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
@@ -1434,6 +1637,199 @@ void halbb_cmn_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	}
 }
 
+void halbb_mac_phy_intf_dbg(struct bb_info *bb, char input[][16], u32 *_used,
+			  char *output, u32 *_out_len)
+{
+	struct bb_dbg_info *dbg = &bb->bb_dbg_i;
+	struct bb_mac_phy_intf *txinfo = &dbg->mac_phy_intf_i;
+	s32 pw = 0;
+	//u8 i = 0, usr_ofst = 0;
+	char ppdu[][10] = {{"L-CCK"}, {"S-CCK"}, {"Legacy"}, {"HT"},
+			   {"HT GF"}, {"VHT SU"}, {"VHT MU"}, {"HE SU"},
+			   {"HE ER SU"}, {"HE MU"}, {"HE TB"}, {"RSVD-11"},
+			   {"RSVD-12"}, {"RSVD-13"}, {"RSVD-14"}, {"RSVD-15"}};
+	char gi_type[][4] = {{"0.4"}, {"0.8"}, {"1.6"}, {"3.2"}};
+	char fec_type[][5] = {{"BCC"}, {"LDPC"}};
+	char *txcmd = NULL;
+	bool no_txcmd_hit = false;
+
+	if (bb->bb_watchdog_mode != BB_WATCHDOG_NORMAL)
+		return;
+
+	if ((bb->ic_type == BB_RTL8852C) && (bb->hal_com->cv == CAV))
+		return;
+
+	/*Store the whole mac_phy_interface register to avoid timing issue*/
+	halbb_get_mac_phy_intf(bb);
+
+	if ((txinfo->tx_path_en == 0) && (txinfo->tx_pw == 0) && (txinfo->l_sig == 0)) {
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "[MAC/PHY Intf]Txinfo is empty!BB reset has been probably toggled.\n");
+		return;
+	}
+
+	pw = halbb_cnvrt_2_sign((u32)txinfo->tx_pw, 9);
+	halbb_print_sign_frac_digit(bb, (u32)pw, 9, 2, bb->dbg_buf, HALBB_SNPRINT_SIZE);
+
+	/*Move txcmd to array declaration would cause warning due to larger frame size*/
+	switch (txinfo->txcmd_num) {
+	case 0:
+		txcmd = "data";
+		break;
+	case 1:
+		txcmd = "beacon";
+		break;
+	case 2:
+		txcmd = "HT-NDPA";
+		break;
+	case 3:
+		txcmd = "VHT-NDPA";
+		break;
+	case 4:
+		txcmd = "HE-NDPA";
+		break;
+	case 8:
+		txcmd = "RTS";
+		break;
+	case 9:
+		txcmd = "CTS2self";
+		break;
+	case 10:
+		txcmd = "CF_end";
+		break;
+	case 11:
+		txcmd = "compressed-BAR";
+		break;
+	case 12:
+		txcmd = "BFRP";
+		break;
+	case 13:
+		txcmd = "NDP";
+		break;
+	case 14:
+		txcmd = "QoS_Null";
+		break;
+	case 16:
+		txcmd = "ACK";
+		break;
+	case 17:
+		txcmd = "CTS";
+		break;
+	case 18:
+		txcmd = "compressed-BA";
+		break;
+	case 19:
+		txcmd = "Multi-STA-BA";
+		break;
+	case 20:
+		txcmd = "HT-CSI";
+		break;
+	case 21:
+		txcmd = "VHT-CSI";
+		break;
+	case 22:
+		txcmd = "HE-CSI";
+		break;
+	case 31:
+		txcmd = "TB_PPDU";
+		break;
+	case 32:
+		txcmd = "TRIG-BASIC";
+		break;
+	case 33:
+		txcmd = "TRIG-BFRP";
+		break;
+	case 34:
+		txcmd = "TRIG-MUBAR";
+		break;
+	case 35:
+		txcmd = "TRIG-MU-RTS";
+		break;
+	case 36:
+		txcmd = "TRIG-BSRP";
+		break;
+	case 37:
+		txcmd = "TRIG-BQRP";
+		break;
+	case 38:
+		txcmd = "TRIG-NFRP";
+		break;
+	case 48:
+		txcmd = "TRIG-BASIC-DATA";
+		break;
+	default:
+		no_txcmd_hit = true;
+		break;
+	}
+	if (no_txcmd_hit)
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+		       "[MAC/PHY Intf][%s][RSVD-%d] BW=%dM, TxSC=%d, TxPw=%s dBm, TxPathEn=%d\n",
+		       ppdu[txinfo->type], txinfo->txcmd_num, 20 << txinfo->bw,
+		       txinfo->txsc, bb->dbg_buf, txinfo->tx_path_en);
+	else
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+		       "[MAC/PHY Intf][%s][%s] BW=%dM, TxSC=%d, TxPw=%s dBm, TxPathEn=%d\n",
+		       ppdu[txinfo->type], txcmd, 20 << txinfo->bw, txinfo->txsc,
+		       bb->dbg_buf, txinfo->tx_path_en);
+
+	if (txinfo->type > 6) { // === HE === //
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "User_num=%d, STBC=%d, FEC=%s, GILTF=%dx%s, NDP_en=%d, N_sts=%d, MCS=%d\n",
+			   txinfo->n_usr, txinfo->stbc, fec_type[txinfo->fec],
+			   1 << txinfo->ltf, gi_type[txinfo->gi], txinfo->ndp_en,
+			   txinfo->n_sts, txinfo->mcs);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "DCM=%d, pre_fec=%d, pkt_ext=%d us\n",
+			   txinfo->dcm, txinfo->pre_fec, txinfo->pkt_ext << 2);
+		/*SIG*/
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "L-SIG/HE-SIG-A1/HE-SIG-A2={0x%08x, 0x%08x, 0x%08x}\n",
+			   txinfo->l_sig, txinfo->sig_a1, txinfo->sig_a2);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "n_sym=%d, t_data=%d us, PSDU_length=%d Bytes\n",
+			   txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else if (txinfo->type > 4) { // === VHT === //
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "User_num=%d, STBC=%d, FEC=%s, GI=%s, NDP_en=%d, N_sts=%d, MCS=%d\n",
+			   txinfo->n_usr, txinfo->stbc, fec_type[txinfo->fec],
+			   gi_type[txinfo->gi], txinfo->ndp_en, txinfo->n_sts,
+			   txinfo->mcs);
+		/*SIG*/
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "L-SIG/VHT-SIG-A1/VHT-SIG-A2={0x%08x, 0x%08x, 0x%08x}\n",
+			   txinfo->l_sig, txinfo->sig_a1, txinfo->sig_a2);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "n_sym=%d, t_data=%d us, VHT_length=%d Bytes\n",
+			   txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else if (txinfo->type > 2) { // === HT === //
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "User_num=%d, STBC=%d, FEC=%s, GI=%s, NDP_en=%d, N_sts=%d, MCS=%d\n",
+			   txinfo->n_usr, txinfo->stbc, fec_type[txinfo->fec],
+			   gi_type[txinfo->gi], txinfo->ndp_en, txinfo->n_sts,
+			   txinfo->mcs);
+		/*SIG*/
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "L-SIG/HT-SIG1/HT-SIG2={0x%08x, 0x%08x, 0x%08x}\n",
+			   txinfo->l_sig, txinfo->sig_a1, txinfo->sig_a2);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "n_sym=%d, t_data=%d us, HT_length=%d Bytes\n",
+			   txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else if (txinfo->type > 1) { // === OFDM === //
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "User_num=%d, rate=%dM\n", txinfo->n_usr,
+			   bb_phy_rate_table[4 + txinfo->mcs]);
+		/*SIG*/
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "L-SIG={0x%08x}\n", txinfo->l_sig);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "n_sym=%d, t_data=%d us, L_length=%d Bytes\n",
+			   txinfo->n_sym, txinfo->t_data, txinfo->psdu_length);
+	} else { // === CCK === //
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			   "User_num=%d\n", txinfo->n_usr);
+		/*txinfo->mcs of b mode cannot be used*/
+	}
+}
 
 void halbb_dbg_setting_init(struct bb_info *bb)
 {
@@ -1485,25 +1881,18 @@ void halbb_cr_cfg_dbg_init(struct bb_info *bb)
 		cr->bb_monitor1_m = MASKDWORD;
 		/*mac_phy_intf*/
 		cr->mac_phy_ppdu_type = 0x1800;
-		cr->mac_phy_txpath_en = 0x1800;
-		cr->mac_phy_txcmd = 0x1800;
 		cr->mac_phy_txsc = 0x1804;
-		cr->mac_phy_bw = 0x1804;
-		cr->mac_phy_tx_pw = 0x1804;
 		cr->mac_phy_n_usr = 0x1808;
 		cr->mac_phy_stbc = 0x1810;
-		cr->mac_phy_gi = 0x1810;
-		cr->mac_phy_ltf = 0x1810;
 		cr->mac_phy_ndp_en = 0x1814;
 		cr->mac_phy_n_sts = 0x1818;
-		cr->mac_phy_fec = 0x1818;
-		cr->mac_phy_mcs_3_0 = 0x1818;
 		cr->mac_phy_mcs_5_4 = 0x181c;
+		cr->mac_phy_n_sym = 0x1838;
 		cr->mac_phy_lsig = 0x1840;
 		cr->mac_phy_siga_0 = 0x1848;
 		cr->mac_phy_siga_1 = 0x184c;
+		cr->mac_phy_vht_sigb_0 = 0x1850;
 		break;
-
 	#endif
 	#ifdef HALBB_COMPILE_CLIENT_SERIES
 	case BB_CLIENT:
@@ -1523,24 +1912,17 @@ void halbb_cr_cfg_dbg_init(struct bb_info *bb)
 		cr->bb_monitor1_m = MASKDWORD;
 		/*mac_phy_intf*/
 		cr->mac_phy_ppdu_type = 0x1800;
-		cr->mac_phy_txpath_en = 0x1800;
-		cr->mac_phy_txcmd = 0x1800;
 		cr->mac_phy_txsc = 0x1804;
-		cr->mac_phy_bw = 0x1804;
-		cr->mac_phy_tx_pw = 0x1804;
 		cr->mac_phy_n_usr = 0x1808;
 		cr->mac_phy_stbc = 0x1810;
-		cr->mac_phy_gi = 0x1810;
-		cr->mac_phy_ltf = 0x1810;
 		cr->mac_phy_ndp_en = 0x1814;
 		cr->mac_phy_n_sts = 0x1818;
-		cr->mac_phy_fec = 0x1818;
-		cr->mac_phy_mcs_3_0 = 0x1818;
 		cr->mac_phy_mcs_5_4 = 0x181c;
+		cr->mac_phy_n_sym = 0x1838;
 		cr->mac_phy_lsig = 0x1840;
 		cr->mac_phy_siga_0 = 0x1848;
 		cr->mac_phy_siga_1 = 0x184c;
-
+		cr->mac_phy_vht_sigb_0 = 0x1850;
 		break;
 	#endif
 

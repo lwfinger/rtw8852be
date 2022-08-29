@@ -22,9 +22,11 @@ typedef struct rtw_phl_com_t HAL_DATA_TYPE; /*, *PHAL_DATA_TYPE;*/
 #define GET_HAL_SPEC(_dvobj)	(&(GET_PHL_COM(_dvobj)->hal_spec))
 
 
-/* refer to (registrypriv-> tx_nss,rx_nss / hal_spec->tx_nss_num,rx_nss_num)*/
-#define GET_HAL_TX_NSS(_dvobj) ((GET_PHL_COM(_dvobj))->tx_nss)
-#define GET_HAL_RX_NSS(_dvobj) ((GET_PHL_COM(_dvobj))->rx_nss)
+#define GET_PHY_CAP(_dvobj, _band)     (&(GET_PHL_COM(_dvobj))->phy_cap[_band])
+/* Using the macro when band info not ready. */
+#define GET_PHY_TX_NSS_BY_BAND(_adapter, _band) ((GET_PHY_CAP(_adapter->dvobj, _band))->txss)
+#define GET_PHY_RX_NSS_BY_BAND(_adapter, _band) ((GET_PHY_CAP(_adapter->dvobj, _band))->rxss)
+
 #define GET_HAL_RFPATH_NUM(_dvobj) ((GET_PHL_COM(_dvobj))->rf_path_num)
 /* refer to (hal_data->version_id.RFType / registrypriv->rf_path / 8814a from efuse or registrypriv)*/
 #define GET_HAL_RFPATH(_dvobj) ((GET_PHL_COM(_dvobj))->rf_type)
@@ -57,7 +59,7 @@ u8 rtw_hw_get_wireless_mode(struct dvobj_priv *dvobj);
 u8 rtw_hw_get_band_type(struct dvobj_priv *dvobj);
 u8 rtw_hw_get_mac_addr(struct dvobj_priv *dvobj, u8 *hw_mac_addr);
 
-bool rtw_hw_is_mimo_support(struct dvobj_priv *dvobj);
+bool rtw_hw_is_mimo_support(_adapter *adapter);
 u8 rtw_hw_largest_bw(struct dvobj_priv *dvobj, u8 in_bw);
 u8 rtw_hw_init(struct dvobj_priv *dvobj);
 void rtw_hw_deinit(struct dvobj_priv *dvobj);
@@ -68,6 +70,7 @@ void rtw_hw_stop(struct dvobj_priv *dvobj);
 bool rtw_hw_get_init_completed(struct dvobj_priv *dvobj);
 bool rtw_hw_is_init_completed(struct dvobj_priv *dvobj);
 void rtw_hw_cap_init(struct dvobj_priv *dvobj);
+void rtw_dump_rfe_type(struct dvobj_priv *d);
 
 u8 rtw_hw_iface_init(_adapter *adapter);
 u8 rtw_hw_iface_type_change(_adapter *adapter, u8 iface_type);
@@ -104,6 +107,11 @@ int rtw_hw_disconnect(struct _ADAPTER *a, struct sta_info *sta);
 
 void rtw_hw_update_chan_def(_adapter *adapter);
 
+#ifdef RTW_DETECT_HANG
+void rtw_is_hang_check(struct _ADAPTER *a);
+#endif
+int rtw_get_sta_tx_stat(_adapter *adapter, struct sta_info *sta);
+
 #ifdef CONFIG_RTW_ACS
 u16 rtw_acs_get_channel_by_idx(struct _ADAPTER *a, u8 idx);
 u8 rtw_acs_get_clm_ratio_by_idx(struct _ADAPTER *a, u8 idx);
@@ -125,5 +133,8 @@ void rtw_update_phl_edcca_mode(struct _ADAPTER *a);
 void rtw_dump_phl_tx_power_ext_info(void *sel, _adapter *adapter);
 
 void rtw_update_phl_txpwr_level(_adapter *adapter);
+
+u8 get_phy_tx_nss(_adapter *adapter);
+u8 get_phy_rx_nss(_adapter *adapter);
 
 #endif /* _RTW_HW_H_ */

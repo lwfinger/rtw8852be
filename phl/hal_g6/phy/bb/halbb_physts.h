@@ -104,6 +104,7 @@ static const char bb_physts_bitmap_type_t[][9] = {
 
 struct bb_physts_rslt_hdr_info {
 	u8 rssi[4];
+	u8 rssi_td[4];
 	u8 rssi_avg;
 	enum bb_physts_bitmap_t ie_map_type;
 };
@@ -131,7 +132,7 @@ struct bb_physts_rslt_1_info {
 	u8 pop_idx;
 	u8 rxsc;
 	u8 ch_idx;
-	u8 rpl_fd;
+	u8 rpl_fd; /*u(8,1)*/
 	enum channel_width bw_idx;
 	bool is_su; /*if (not MU && not OFDMA), is_su = 1*/
 	bool is_ldpc;
@@ -692,6 +693,9 @@ struct bb_physts_info {
 	s32 l_ltf_cfo_i;
 	s32 l_ltf_cfo_q;
 	u16 ie_len_curr[IE_PHYSTS_LEN_ALL];
+	bool rssi_cvrt_2_rpl_en;
+	u8 rpl_path[4]; /*u(8,1)*/
+	u8 rpl_avg; /*u(8,1)*/
 	struct bb_rate_info		bb_rate_i;
 	struct bb_rate_info		bb_rate_mu_i;
 	struct bb_physts_cr_info	bb_physts_cr_i;

@@ -205,6 +205,8 @@ u8 rtw_set_802_11_bssid(_adapter *padapter, u8 *bssid)
 	u8 status = _SUCCESS;
 
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 
 
 	RTW_PRINT("set bssid:%pM\n", bssid);
@@ -239,6 +241,10 @@ u8 rtw_set_802_11_bssid(_adapter *padapter, u8 *bssid)
 				#endif /* CONFIG_STA_CMD_DISPR */
 					rtw_free_assoc_resources_cmd(padapter, _TRUE, 0);
 				rtw_indicate_disconnect(padapter, 0, _FALSE);
+				pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+				pmlmeinfo->disconnect_code = DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND;
+				pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
+
 			}
 
 			if ((check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE)) {
@@ -279,6 +285,8 @@ u8 rtw_set_802_11_ssid(_adapter *padapter, NDIS_802_11_SSID *ssid)
 
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct wlan_network *pnetwork = &pmlmepriv->cur_network;
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 
 
 	RTW_PRINT("set ssid [%s] fw_state=0x%08x\n",
@@ -310,6 +318,9 @@ u8 rtw_set_802_11_ssid(_adapter *padapter, NDIS_802_11_SSID *ssid)
 					if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE) {
 						rtw_free_assoc_resources_cmd(padapter, _TRUE, 0);
 						rtw_indicate_disconnect(padapter, 0, _FALSE);
+						pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+						pmlmeinfo->disconnect_code = DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND;
+						pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 					}
 					if (check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) {
 						_clr_fwstate_(pmlmepriv, WIFI_ADHOC_MASTER_STATE);
@@ -333,6 +344,9 @@ u8 rtw_set_802_11_ssid(_adapter *padapter, NDIS_802_11_SSID *ssid)
 				#endif /* CONFIG_STA_CMD_DISPR */
 					rtw_free_assoc_resources_cmd(padapter, _TRUE, 0);
 				rtw_indicate_disconnect(padapter, 0, _FALSE);
+				pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+				pmlmeinfo->disconnect_code = DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND;
+				pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 			}
 			if (check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE) {
 				_clr_fwstate_(pmlmepriv, WIFI_ADHOC_MASTER_STATE);
@@ -439,6 +453,8 @@ u8 rtw_set_802_11_infrastructure_mode(_adapter *padapter,
 {
 	struct	mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	struct	wlan_network	*cur_network = &pmlmepriv->cur_network;
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 	NDIS_802_11_NETWORK_INFRASTRUCTURE *pold_state = &(cur_network->network.InfrastructureMode);
 	u8 ap2sta_mode = _FALSE;
 	u8 ret = _TRUE;
@@ -481,6 +497,9 @@ u8 rtw_set_802_11_infrastructure_mode(_adapter *padapter,
 		if ((*pold_state == Ndis802_11Infrastructure) || (*pold_state == Ndis802_11IBSS)) {
 			if (is_linked == _TRUE) {
 				rtw_indicate_disconnect(padapter, 0, _FALSE); /*will clr Linked_state; before this function, we must have checked whether issue dis-assoc_cmd or not*/
+				pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+				pmlmeinfo->disconnect_code = DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND;
+				pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 			}
 		}
 
@@ -542,7 +561,8 @@ u8 rtw_set_802_11_infrastructure_mode(_adapter *padapter,
 u8 rtw_set_802_11_disassociate(_adapter *padapter)
 {
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
-
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 
 	_rtw_spinlock_bh(&pmlmepriv->lock);
 
@@ -556,6 +576,9 @@ u8 rtw_set_802_11_disassociate(_adapter *padapter)
 		   )
 			rtw_free_assoc_resources_cmd(padapter, _TRUE, 0);
 		rtw_indicate_disconnect(padapter, 0, _FALSE);
+		pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+		pmlmeinfo->disconnect_code = DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND;
+		pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 		if (_FAIL == rtw_pwr_wakeup(padapter))
 			RTW_INFO("%s(): rtw_pwr_wakeup fail !!!\n", __FUNCTION__);
 	}

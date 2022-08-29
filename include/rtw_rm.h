@@ -25,6 +25,10 @@ u8 rm_post_event_hdl(_adapter *padapter, u8 *pbuf);
 #define RM_CAP_ARG(x) ((u8 *)(x))[4], ((u8 *)(x))[3], ((u8 *)(x))[2], ((u8 *)(x))[1], ((u8 *)(x))[0]
 #define RM_CAP_FMT "%02x %02x%02x %02x%02x"
 
+#ifndef MIN
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#endif
+
 /* remember to modify rm_event_name() when adding new event */
 enum RM_EV_ID {
 	RM_EV_state_in,
@@ -84,7 +88,6 @@ int rtw_free_rm_priv(_adapter *padapter);
 
 unsigned int rm_on_action(_adapter *padapter, union recv_frame *precv_frame);
 void RM_IE_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE);
-void update_rm_cap(u8 *frame_head, _adapter *pa, u32 pktlen, int offset);
 void rtw_ap_parse_sta_rm_en_cap(_adapter *padapter,
 	struct sta_info *psta, struct rtw_ieee802_11_elems *elems);
 
@@ -103,7 +106,9 @@ void indicate_beacon_report(u8 *sta_addr,
 	u8 n_measure_rpt, u32 elem_len, u8 *elem);
 #else
 #define RM_IE_handler(a, b) do{} while (0)
-#define update_rm_cap(a, b, c, d) do{} while(0)
 
 #endif /*CONFIG_RTW_80211K */
+
+void rm_update_cap(u8 *frame_head, _adapter *pa, u32 pktlen, int offset);
+
 #endif /* __RTW_RM_H_ */

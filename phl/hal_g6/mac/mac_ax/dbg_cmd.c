@@ -130,6 +130,7 @@ static struct fw_status_proc_class fw_status_proc_sys[] = {
 	{FW_STATUS_PSINFO, fw_status_psinfo_handler},
 	{FW_STATUS_H2C_C2HINFO, fw_status_h2c_c2hinfo_handler},
 	{FW_STATUS_ISRINFO, fw_status_isrinfo_handler},
+	{FW_STATUS_CHSW_TIMING, fw_status_chsw_handler},
 	{FW_STATUS_MAX, NULL},
 };
 
@@ -580,6 +581,7 @@ s32 mac_halmac_cmd(struct mac_ax_adapter *adapter, char *input, char *output, u3
 {
 	char *token;
 	u32 argc = 0;
+	u32 token_len = 0;
 	char argv[MAC_MAX_ARGC][MAC_MAX_ARGV];
 
 	if (output) {
@@ -593,8 +595,16 @@ s32 mac_halmac_cmd(struct mac_ax_adapter *adapter, char *input, char *output, u3
 	do {
 		token = PLTFM_STRSEP(&input, ", ");
 		if (token) {
-			if (PLTFM_STRLEN(token) <= MAC_MAX_ARGV)
+			token_len = PLTFM_STRLEN(token);
+			if (token_len <= MAC_MAX_ARGV) {
+				if (token_len > 0) {
+					if (token[token_len - 1] == '\n') {
+						--token_len;
+						token[token_len] = 0;
+					}
+				}
 				PLTFM_STRCPY(argv[argc], token);
+			}
 
 			argc++;
 		} else {
@@ -615,7 +625,15 @@ void mac_halmac_cmd_parser(struct mac_ax_adapter *adapter,
 	u32 i = 0;
 	u32 *used;
 
-	adapter->fw_dbgcmd.used = 0;
+	if (output) {
+		adapter->fw_dbgcmd.buf = output;
+		adapter->fw_dbgcmd.out_len = out_len;
+		adapter->fw_dbgcmd.used = 0;
+	} else {
+		PLTFM_MSG_TRACE("%s invalid argument\n", __func__);
+		return;
+	}
+
 	used = &adapter->fw_dbgcmd.used;
 	//struct mac_ax_fwstatus_payload data;
 
@@ -663,7 +681,7 @@ u32 c2h_fw_status(struct mac_ax_adapter *adapter, u8 *buf, u32 len,
 	struct fw_status_pkt pkt_info;
 	struct fw_status_proc_class *proc = fw_status_proc_sys;
 
-	//PLTFM_MSG_TRACE("[--------------------]%s\n", __func__);
+	PLTFM_MSG_TRACE("[--------------------]%s\n", __func__);
 	hdr0 = ((struct fwcmd_hdr *)buf)->hdr0;
 	hdr0 = le32_to_cpu(hdr0);
 
@@ -895,6 +913,24 @@ u32 fw_status_isrinfo_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 len)
 				    isr_info->ISRExecTimeMax_lo[i]);
 		}
 	}
+	return MACSUCCESS;
+}
+
+u32 fw_status_chsw_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 len)
+{
+	struct chswofld_timing_info *timing;
+	char *output = adapter->fw_dbgcmd.buf;
+	u32 *used = &adapter->fw_dbgcmd.used;
+	u32 out_len = adapter->fw_dbgcmd.out_len;
+	u32 remain_len = out_len - *used;
+
+	if (len > remain_len)
+		return MACFWSTATUSFAIL;
+
+	timing = (struct chswofld_timing_info *)buf;
+	MAC_DBG_MSG(out_len, *used, output + *used, out_len - *used,
+		    "total: %d (mac: %d, bb: %d, rf: %d, rf reld: %d)\n",
+		    timing->total, timing->mac, timing->bb, timing->rf, timing->rf_reld);
 	return MACSUCCESS;
 }
 

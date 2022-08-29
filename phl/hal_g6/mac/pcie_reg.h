@@ -21,15 +21,34 @@
 #define RAC_CTRL_PPR			0x00
 #define RAC_ANA10			0x10
 #define RAC_ANA19			0x19
+
 #define RAC_REG_REV2			0x1B
+#define BAC_CMU_EN_DLY_SH		12
+#define BAC_CMU_EN_DLY_MSK		0xF
+
 #define RAC_REG_FLD_0			0x1D
+#define BAC_AUTOK_N_SH			2
+#define BAC_AUTOK_N_MSK			0x3
+
 #define RAC_ANA1F			0x1F
 #define RAC_SET_PPR			0x20
 #define RAC_TRG_PPR			0x21
 #define RAC_ANA24			0x24
 #define RAC_ANA26			0x26
+
 #define RAC_CTRL_PPR_V1			0x30
+#define BAC_AUTOK_DIV_SH		14
+#define BAC_AUTOK_DIV_MSK		0x3
+#define BAC_AUTOK_EN			BIT(13)
+#define BAC_AUTOK_ONCE_EN		BIT(12)
+#define BAC_AUTOK_HW_TAR_SH		0
+#define BAC_AUTOK_HW_TAR_MSK		0xFFF
+
 #define RAC_SET_PPR_V1			0x31
+#define BAC_AUTOK_MGN_SH		12
+#define BAC_AUTOK_MGN_MSK		0xF
+#define BAC_AUTOK_TAR_SH		0
+#define BAC_AUTOK_TAR_MSK		0xFFF
 
 /* PCIE CFG register */
 #define PCIE_L1_STS			0x80

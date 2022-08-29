@@ -30,6 +30,7 @@ u8 rtw_set_tim_ie(u8 dtim_cnt, u8 dtim_period
 /* void update_BCNTIM(_adapter *padapter); */
 void rtw_add_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index, u8 *data, u8 len);
 void rtw_remove_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index);
+void rtw_add_bcn_ie_ex(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 eid_ex, u8 *data, u8 len);
 void rtw_remove_bcn_ie_ex(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index, u8* pindex_ex, u8 index_ex_len);
 void _update_beacon(_adapter *padapter, u8 ie_id, u8 *oui, u8 tx, u8 flags, const char *tag);
 #define rtw_update_beacon(adapter, ie_id, oui, tx, flags) _update_beacon((adapter), (ie_id), (oui), (tx), (flags), __func__)

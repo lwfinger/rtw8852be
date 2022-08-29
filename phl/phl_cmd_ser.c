@@ -414,18 +414,21 @@ _ser_hdl_external_evt(void *dispr, void *priv, struct phl_msg *msg)
 {
 	struct cmd_ser *cser = (struct cmd_ser *)priv;
 
-	/*
-	1. SER inprogress: pending msg from others module
-	2. SER recovery fail: clr pending event from MDL_SER & msg return failed from others module
-	3. SER recovery done: clr pending event & msg return ignor from others module
-	4. SER NOT OCCUR: MDL_RET_IGNORE
-	*/
+	/**
+	 * 1. SER inprogress: pending msg from others module
+	 * 2. SER recovery fail: clr pending event from MDL_SER & msg return failed from others module
+	 * 3. SER recovery done: clr pending event & msg return ignor from others module
+	 * 4. SER NOT OCCUR: MDL_RET_IGNORE
+	 */
 	if (cser->bserl2) {
-		PHL_ERR("%s: [2] L2 Occured!! From others MDL =%d , EVT_ID=%d\n", __func__,
+		/* allow MSG_EVT_DBG_L2_DIAGNOSE when ser L2 occured */
+		if (MSG_EVT_ID_FIELD(msg->msg_id) == MSG_EVT_DBG_L2_DIAGNOSE)
+			return MDL_RET_IGNORE;
+		PHL_ERR("%s: L2 Occured!! From others MDL=%d, EVT_ID=%d\n", __func__,
 		MSG_MDL_ID_FIELD(msg->msg_id), MSG_EVT_ID_FIELD(msg->msg_id));
 		return MDL_RET_FAIL;
 	} else if (cser->state) { /* non-CMD_SER_NOT_OCCUR */
-		PHL_WARN("%s: [1] Within SER!! From others MDL =%d , EVT_ID=%d\n", __func__,
+		PHL_WARN("%s: Within SER!! From others MDL=%d, EVT_ID=%d\n", __func__,
 		MSG_MDL_ID_FIELD(msg->msg_id), MSG_EVT_ID_FIELD(msg->msg_id));
 		return MDL_RET_PENDING;
 	}

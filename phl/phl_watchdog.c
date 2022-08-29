@@ -72,41 +72,108 @@ static void _phl_watchdog_hw(struct phl_info_t *phl)
 }
 
 #ifdef CONFIG_CMD_DISP
-static void _phl_watchdog_done(void *drv_priv, u8 *cmd, u32 cmd_len, enum rtw_phl_status status)
+static void _phl_watchdog_post_action(struct phl_info_t *phl_info)
 {
-	struct phl_info_t *phl_info = (struct phl_info_t *)cmd;
+#ifdef CONFIG_POWER_SAVE
+	rtw_hal_ps_chk_hw_rf_state(phl_info->phl_com, phl_info->hal);
+#endif /* CONFIG_POWER_SAVE */
+}
+
+static void _phl_trigger_next_watchdog(struct phl_info_t *phl_info)
+{
 	struct phl_watchdog *wdog = &(phl_info->wdog);
 
-	_os_set_timer(drv_priv,
-	              &wdog->wdog_timer,
-	              wdog->period);
+	if (wdog->state == WD_STATE_STARTED)
+		_os_set_timer(phl_to_drvpriv(phl_info), &wdog->wdog_timer, wdog->period);
+}
+
+static void _phl_watchdog_hw_done(void *drv_priv, u8 *cmd, u32 cmd_len, enum rtw_phl_status status)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)cmd;
+
+	_phl_watchdog_post_action(phl_info);
+	_phl_trigger_next_watchdog(phl_info);
 }
 
 static enum rtw_phl_status
-_phl_watchdog_cmd(struct phl_info_t *phl_info,
+_phl_watchdog_hw_cmd(struct phl_info_t *phl_info,
                   enum phl_cmd_type cmd_type,
                   u32 cmd_timeout)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
 
 	if (cmd_type == PHL_CMD_DIRECTLY) {
-		phl_status = phl_watchdog_cmd_hdl(phl_info, RTW_PHL_STATUS_SUCCESS);
+		phl_status = phl_watchdog_hw_cmd_hdl(phl_info, RTW_PHL_STATUS_SUCCESS);
 		goto _exit;
 	}
 
 	/* watchdog dont care hw_band */
 	phl_status = phl_cmd_enqueue(phl_info,
 	                             HW_BAND_0,
-	                             MSG_EVT_WATCHDOG,
+	                             MSG_EVT_HW_WATCHDOG,
 	                             (u8 *)phl_info,
 	                             0,
-	                             _phl_watchdog_done,
+	                             _phl_watchdog_hw_done,
 	                             cmd_type,
 	                             cmd_timeout);
 
 	if (is_cmd_failure(phl_status)) {
 		/* Send cmd success, but wait cmd fail*/
+	} else if (phl_status != RTW_PHL_STATUS_SUCCESS) {
+		/* Send cmd fail */
 		phl_status = RTW_PHL_STATUS_FAILURE;
+	}
+
+
+_exit:
+	return phl_status;
+}
+
+static void _phl_watchdog_sw_done(void *drv_priv, u8 *cmd, u32 cmd_len, enum rtw_phl_status status)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)cmd;
+	enum rtw_phl_status psts = RTW_PHL_STATUS_FAILURE;
+	bool set_timer = true;
+
+	if (true == phl_disp_eng_is_fg_empty(phl_info, HW_BAND_MAX)) {
+
+		/* send watchdog cmd to request privilege of I/O */
+		psts = _phl_watchdog_hw_cmd(phl_info, PHL_CMD_NO_WAIT, 0);
+		if (psts != RTW_PHL_STATUS_FAILURE)
+			set_timer = false;
+	} else {
+		PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s: skip watchdog\n",
+		          __FUNCTION__);
+	}
+
+	if (set_timer)
+		_phl_trigger_next_watchdog(phl_info);
+}
+
+static enum rtw_phl_status
+_phl_watchdog_sw_cmd(struct phl_info_t *phl_info,
+                  enum phl_cmd_type cmd_type,
+                  u32 cmd_timeout)
+{
+	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
+
+	if (cmd_type == PHL_CMD_DIRECTLY) {
+		phl_status = phl_watchdog_sw_cmd_hdl(phl_info, RTW_PHL_STATUS_SUCCESS);
+		goto _exit;
+	}
+
+	/* watchdog dont care hw_band */
+	phl_status = phl_cmd_enqueue(phl_info,
+	                             HW_BAND_0,
+	                             MSG_EVT_SW_WATCHDOG,
+	                             (u8 *)phl_info,
+	                             0,
+	                             _phl_watchdog_sw_done,
+	                             cmd_type,
+	                             cmd_timeout);
+
+	if (is_cmd_failure(phl_status)) {
+		/* Send cmd success, but wait cmd fail*/
 	} else if (phl_status != RTW_PHL_STATUS_SUCCESS) {
 		/* Send cmd fail */
 		phl_status = RTW_PHL_STATUS_FAILURE;
@@ -120,42 +187,26 @@ _exit:
 
 static void _phl_watchdog_timer_expired(void *context)
 {
-	struct phl_info_t *phl_info = (struct phl_info_t *)context;
-	struct phl_watchdog *wdog = &(phl_info->wdog);
-	enum rtw_phl_status psts = RTW_PHL_STATUS_FAILURE;
-
 #ifdef CONFIG_CMD_DISP
+	struct phl_info_t *phl_info = (struct phl_info_t *)context;
+	enum rtw_phl_status psts = RTW_PHL_STATUS_FAILURE;
+	bool set_timer = true;
+
 	/* phl sw watchdog */
 	_phl_watchdog_sw(phl_info);
+	psts = _phl_watchdog_sw_cmd(phl_info, PHL_CMD_NO_WAIT, 0);
+	if (psts != RTW_PHL_STATUS_FAILURE)
+		set_timer = false;
 
-	/* core sw watchdog */
-	if (NULL != wdog->core_sw_wdog)
-		wdog->core_sw_wdog(phl_to_drvpriv(phl_info));
-
-	/* check if there is FG cmd on hw_band 0/1 */
-	if (true == phl_disp_eng_is_fg_empty(phl_info, HW_BAND_MAX)) {
-		PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s: trigger watchdog(period %d)\n",
-		          __FUNCTION__, wdog->period);
-
-		/* send watchdog cmd to request privilege of I/O */
-		psts = _phl_watchdog_cmd(phl_info, PHL_CMD_NO_WAIT, 0);
-	} else {
-		PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s: skip watchdog\n",
-		          __FUNCTION__);
-	}
-
-	if (psts == RTW_PHL_STATUS_FAILURE) {
-		_os_set_timer(phl_to_drvpriv(phl_info),
-		              &wdog->wdog_timer,
-		              wdog->period);
-	}
+	if (set_timer)
+		_phl_trigger_next_watchdog(phl_info);
 #else
 	PHL_TRACE(COMP_PHL_DBG, _PHL_ERR_, "%s: Not support watchdog\n", __FUNCTION__);
 #endif
 }
 
 enum rtw_phl_status
-phl_watchdog_cmd_hdl(struct phl_info_t *phl_info, enum rtw_phl_status psts)
+phl_watchdog_hw_cmd_hdl(struct phl_info_t *phl_info, enum rtw_phl_status psts)
 {
 	struct phl_watchdog *wdog = &(phl_info->wdog);
 
@@ -169,6 +220,19 @@ phl_watchdog_cmd_hdl(struct phl_info_t *phl_info, enum rtw_phl_status psts)
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
+enum rtw_phl_status
+phl_watchdog_sw_cmd_hdl(struct phl_info_t *phl_info, enum rtw_phl_status psts)
+{
+	struct phl_watchdog *wdog = &(phl_info->wdog);
+
+	if (false == is_cmd_failure(psts)) {
+		if (NULL != wdog->core_sw_wdog)
+			wdog->core_sw_wdog(phl_to_drvpriv(phl_info));
+	}
+
+	return RTW_PHL_STATUS_SUCCESS;
+}
+
 void rtw_phl_watchdog_init(void *phl,
                            u16 period,
                            void (*core_sw_wdog)(void *drv_priv),
@@ -177,6 +241,7 @@ void rtw_phl_watchdog_init(void *phl,
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct phl_watchdog *wdog = &(phl_info->wdog);
 
+	wdog->state = WD_STATE_INIT;
 	wdog->core_sw_wdog = core_sw_wdog;
 	wdog->core_hw_wdog = core_hw_wdog;
 
@@ -205,11 +270,8 @@ void rtw_phl_watchdog_start(void *phl)
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct phl_watchdog *wdog = &(phl_info->wdog);
 
-	PHL_INFO("%s\n", __func__);
-
-	_os_set_timer(phl_to_drvpriv(phl_info),
-	              &wdog->wdog_timer,
-	              wdog->period);
+	wdog->state = WD_STATE_STARTED;
+	_phl_trigger_next_watchdog(phl_info);
 }
 
 void rtw_phl_watchdog_stop(void *phl)
@@ -218,6 +280,8 @@ void rtw_phl_watchdog_stop(void *phl)
 	struct phl_watchdog *wdog = &(phl_info->wdog);
 
 	PHL_INFO("%s\n", __func__);
+
+	wdog->state = WD_STATE_STOP;
 
 	_os_cancel_timer(phl_to_drvpriv(phl_info), &wdog->wdog_timer);
 }

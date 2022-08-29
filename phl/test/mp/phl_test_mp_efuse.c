@@ -643,6 +643,46 @@ static enum rtw_phl_status phl_mp_efuse_renew(
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
+static enum rtw_phl_status phl_mp_efuse_wifi_get_mask_buf(
+	struct mp_context *mp, struct mp_efuse_arg *arg)
+{
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+
+	hal_status = rtw_hal_mp_efuse_wifi_get_mask_buf(mp, arg);
+
+	/* Record the result */
+	arg->cmd_ok = true;
+	arg->status = hal_status;
+
+	/* Transfer to report */
+	mp->rpt = arg;
+	mp->rpt_len = sizeof(struct mp_efuse_arg);
+	mp->buf = NULL;
+	mp->buf_len = 0;
+
+	return RTW_PHL_STATUS_SUCCESS;
+}
+
+static enum rtw_phl_status phl_mp_efuse_bt_get_mask_buf(
+	struct mp_context *mp, struct mp_efuse_arg *arg)
+{
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+
+	hal_status = rtw_hal_mp_efuse_bt_get_mask_buf(mp, arg);
+
+	/* Record the result */
+	arg->cmd_ok = true;
+	arg->status = hal_status;
+
+	/* Transfer to report */
+	mp->rpt = arg;
+	mp->rpt_len = sizeof(struct mp_efuse_arg);
+	mp->buf = NULL;
+	mp->buf_len = 0;
+
+	return RTW_PHL_STATUS_SUCCESS;
+}
+
 enum rtw_phl_status mp_efuse(struct mp_context *mp, struct mp_efuse_arg *arg)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
@@ -801,6 +841,16 @@ enum rtw_phl_status mp_efuse(struct mp_context *mp, struct mp_efuse_arg *arg)
 		PHL_INFO("%s: CMD = MP_EFUSE_CMD_WIFI_SET_RENEW\n",
 		 __FUNCTION__);
 		phl_status = phl_mp_efuse_renew(mp, arg, PHL_MP_EFUSE_WIFI);
+		break;
+	case MP_EFUSE_CMD_WIFI_GET_MASK_BUF:
+		PHL_INFO("%s: CMD = MP_EFUSE_CMD_WIFI_GET_MASK_BUF\n",
+			 __FUNCTION__);
+		phl_status = phl_mp_efuse_wifi_get_mask_buf(mp, arg);
+		break;
+	case MP_EFUSE_CMD_BT_GET_MASK_BUF:
+		PHL_INFO("%s: CMD = MP_EFUSE_CMD_WIFI_GET_MASK_BUF\n",
+			 __FUNCTION__);
+		phl_status = phl_mp_efuse_bt_get_mask_buf(mp, arg);
 		break;
 	default:
 		PHL_INFO("%s: UNKNOWN CMD = %d\n", __FUNCTION__, arg->cmd);

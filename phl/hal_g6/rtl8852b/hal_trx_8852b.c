@@ -513,8 +513,14 @@ hal_handle_rx_buffer_8852b(struct rtw_phl_com_t *phl_com,
 			   (mdata->ppdu_type == RX_8852B_DESC_PPDU_T_HE_TB)) {
 				is_su = 0;
 			}
-			rtw_hal_bb_parse_phy_sts(hal, (void *)&ppdu_sts,
-						 phl_rx, is_su);
+			if(rtw_hal_bb_parse_phy_sts(hal,
+						(void *)&ppdu_sts,
+						 phl_rx,
+						is_su) != RTW_HAL_STATUS_SUCCESS)
+				PHL_TRACE(COMP_PHL_PSTS, _PHL_DEBUG_,
+					  "rtw_hal_bb_parse_phy_sts fail\n");
+
+
 
 			hal_rx_ppdu_sts(phl_com, phl_rx, &ppdu_sts);
 #ifdef CONFIG_PHL_TEST_SUITE

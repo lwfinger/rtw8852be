@@ -173,6 +173,27 @@ void halbb_ic_hw_setting_init_8852b(struct bb_info *bb)
 	}
 }
 
+void halbb_ic_hw_setting_8852b(struct bb_info *bb)
+{
+	bool btg_en;
+	
+	BB_DBG(bb, DBG_PHY_CONFIG, "<====== %s ======>\n", __func__);
+	
+	btg_en = (bb->hal_com->band[0].cur_chandef.band == BAND_ON_24G) &&
+		((bb->rx_path == RF_PATH_B) || (bb->rx_path == RF_PATH_AB)) ? true : false;
+	
+	if (btg_en && bb->bb_link_i.is_linked && (bb->bb_ch_i.rssi_min < (75 << 1))) {// if rssi < -35 dbm
+		halbb_set_reg(bb, 0x4aa4, BIT(18), 0x0);
+		BB_DBG(bb, DBG_PHY_CONFIG, "[BT] BTG enable, Is linked\n");
+		BB_DBG(bb, DBG_PHY_CONFIG, "[BT][RSSI] rssi_min=0x%x\n", bb->bb_ch_i.rssi_min >> 1);
+	} else {
+		halbb_set_reg(bb, 0x4aa4, BIT(18), 0x1);
+		BB_DBG(bb, DBG_PHY_CONFIG, "[BT] btg_en=%d, is_linked=%d\n", btg_en, bb->bb_link_i.is_linked);
+		BB_DBG(bb, DBG_PHY_CONFIG, "[BT][RSSI] rssi_min=0x%x\n", bb->bb_ch_i.rssi_min >> 1);
+	}
+
+}
+
 bool halbb_set_pd_lower_bound_8852b(struct bb_info *bb, u8 bound,
 				      enum channel_width bw,
 				      enum phl_phy_idx phy_idx)

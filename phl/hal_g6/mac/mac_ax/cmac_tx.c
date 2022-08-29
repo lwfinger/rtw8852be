@@ -1573,7 +1573,7 @@ u32 mac_set_cctl_max_tx_time(struct mac_ax_adapter *adapter,
 {
 #define MAC_AX_DFLT_TX_TIME 5280
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	struct mac_ax_cctl_info info, msk = {0};
+	struct rtw_hal_mac_ax_cctl_info info, msk = {0};
 	u32 ret = MACSUCCESS;
 	struct mac_role_tbl *role;
 	u8 band;

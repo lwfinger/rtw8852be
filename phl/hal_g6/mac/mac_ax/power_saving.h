@@ -85,6 +85,22 @@ struct lps_parm {
 };
 
 /**
+ * @struct ps_rpwm_parm
+ * @brief ps_rpwm_parm
+ *
+ * @var ps_rpwm_parm::req_pwr_state
+ * Please Place Description here.
+ * @var ps_rpwm_parm::notify_wake
+ * Please Place Description here.
+ * @var ps_rpwm_parm::rsvd0
+ */
+struct ps_rpwm_parm {
+	enum mac_ax_rpwm_req_pwr_state req_pwr_state;
+	u32 notify_wake:1;
+	u32 rsvd0:31;
+};
+
+/**
  * @macid_grp_list
  *
  * @brief macid_grp_list
@@ -106,6 +122,23 @@ enum macid_grp_list {
 };
 
 /**
+ * @struct ips_cfg
+ * @brief ips_cfg
+ *
+ * @var ips_cfg::macid
+ * Please Place Description here.
+ * @var ips_cfg::enable
+ * Please Place Description here.
+ * @var ips_cfg::rsvd0
+ * Please Place Description here.
+ */
+struct ips_cfg {
+	u32 macid:8;
+	u32 enable:1;
+	u32 rsvd0:23;
+};
+
+/**
  * @addtogroup PowerSaving
  * @{
  * @addtogroup LPS
@@ -123,7 +156,7 @@ enum macid_grp_list {
  * @retval u32
  */
 u32 mac_cfg_lps(struct mac_ax_adapter *adapter, u8 macid,
-		enum mac_ax_ps_mode ps_mode, void *lps_info);
+		enum mac_ax_ps_mode ps_mode, struct mac_ax_lps_info *lps_info);
 /**
  * @}
  * @}
@@ -137,7 +170,7 @@ u32 mac_cfg_lps(struct mac_ax_adapter *adapter, u8 macid,
  */
 
 /**
- * @brief mac_lps_pwr_state
+ * @brief mac_ps_pwr_state
  *
  * @param *adapter
  * @param action
@@ -145,14 +178,9 @@ u32 mac_cfg_lps(struct mac_ax_adapter *adapter, u8 macid,
  * @return Please Place Description here.
  * @retval u32
  */
-
-u32 mac_lps_pwr_state(struct mac_ax_adapter *adapter,
-		      enum mac_ax_pwr_state_action action,
-		      enum mac_ax_rpwm_req_pwr_state req_pwr_state);
-/**
- * @}
- * @}
- */
+u32 mac_ps_pwr_state(struct mac_ax_adapter *adapter,
+		     enum mac_ax_pwr_state_action action,
+		     enum mac_ax_rpwm_req_pwr_state req_pwr_state);
 
 /**
  * @addtogroup PowerSaving
@@ -212,6 +240,111 @@ u8 _is_in_lps(struct mac_ax_adapter *adapter);
  * @retval void
  */
 void reset_lps_seq_num(struct mac_ax_adapter *adapter);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup PowerSaving
+ * @{
+ * @addtogroup IPS
+ * @{
+ */
+
+/**
+ * @brief mac_cfg_ips
+ *
+ * @param *adapter
+ * @param macid
+ * @param enable
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_cfg_ips(struct mac_ax_adapter *adapter, u8 macid, u8 enable);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup PowerSaving
+ * @{
+ * @addtogroup IPS
+ * @{
+ */
+
+/**
+ * @brief mac_chk_leave_ips
+ *
+ * @param *adapter
+ * @param macid
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_chk_leave_ips(struct mac_ax_adapter *adapter, u8 macid);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup PowerSaving
+ * @{
+ * @addtogroup IPS
+ * @{
+ */
+
+/**
+ * @brief _is_in_ips
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u8
+ */
+u8 _is_in_ips(struct mac_ax_adapter *adapter);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup PowerSaving
+ * @{
+ * @addtogroup LPS
+ * @{
+ */
+
+/**
+ * @brief mac_ps_notify_wake
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_ps_notify_wake(struct mac_ax_adapter *adapter);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup PowerSaving
+ * @{
+ * @addtogroup LPS
+ * @{
+ */
+
+/**
+ * @brief mac_cfg_ps_advance_parm
+ *
+ * @param *adapter
+ * @param parm
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_cfg_ps_advance_parm(struct mac_ax_adapter *adapter,
+			    struct mac_ax_ps_adv_parm *parm);
 /**
  * @}
  * @}

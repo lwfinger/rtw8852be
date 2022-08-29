@@ -20,6 +20,7 @@
 enum rtw_customer_feature_id {
 	CUS_ID_NONE = 0,
 	CUS_ID_FB = 1,
+	CUS_ID_XH = 2,
 	CUS_ID_MAX
 };
 
@@ -53,6 +54,8 @@ enum rtw_msg_custom_evt_id {
 	MSG_EVT_BCN_OPT_IES_CFG = PRIVATE_EVT_START + 21,
 	MSG_EVT_BCN_VDR_IE_CFG = PRIVATE_EVT_START + 22,
 	MSG_EVT_SET_AP_START_CHNL = PRIVATE_EVT_START + 23,
+	MSG_EVT_SET_CUS_CHNL_LIST = PRIVATE_EVT_START + 24,
+	MSG_EVT_GET_CUS_CHNL_LIST = PRIVATE_EVT_START + 25,
 };
 
 enum custom_type {

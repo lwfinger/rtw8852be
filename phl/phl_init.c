@@ -127,6 +127,9 @@ static void phl_msg_entry(void* priv, struct phl_msg *msg)
 		case PHL_MDL_PHY_MGNT:
 			phl_msg_hub_phy_mgnt_evt_hdlr(phl_info, evt_id);
 			break;
+		case PHL_MDL_TX:
+			phl_msg_hub_tx_evt_hdlr(phl_info, evt_id, msg->inbuf, msg->inlen);
+			break;
 		case PHL_MDL_RX:
 			phl_msg_hub_rx_evt_hdlr(phl_info, evt_id, msg->inbuf, msg->inlen);
 			break;
@@ -143,7 +146,7 @@ static enum rtw_phl_status phl_register_msg_entry(struct phl_info_t *phl_info)
 	struct phl_msg_receiver ctx;
 	void *d = phl_to_drvpriv(phl_info);
 	u8 imr[] = {PHL_MDL_PHY_MGNT, PHL_MDL_RX, PHL_MDL_MRC, PHL_MDL_POWER_MGNT
-			, PHL_MDL_BTC};
+			, PHL_MDL_BTC, PHL_MDL_TX};
 	_os_mem_set(d, &ctx, 0, sizeof(struct phl_msg_receiver));
 	ctx.incoming_evt_notify = phl_msg_entry;
 	ctx.priv = (void*)phl_info;
@@ -487,6 +490,11 @@ static enum rtw_phl_status _phl_hci_ops_check(struct phl_info_t *phl_info)
 		phl_ops_error_msg("recycle_busy_h2c");
 		status = RTW_PHL_STATUS_FAILURE;
 	}
+	if (!trx_ops->read_hw_rx) {
+		phl_ops_error_msg("read_hw_rx");
+		status = RTW_PHL_STATUS_FAILURE;
+	}
+
 #endif
 
 #ifdef CONFIG_USB_HCI
@@ -1623,15 +1631,30 @@ static void _phl_interrupt_stop(struct phl_info_t *phl_info)
 static enum rtw_phl_status _phl_cmd_send_msg_phy_on(struct phl_info_t *phl_info)
 {
 	enum rtw_phl_status sts = RTW_PHL_STATUS_FAILURE;
+#ifdef DBG_PHY_ON_TIME
+	u32 phyon_start = 0, phyon_t = 0;
+#endif /* DBG_PHY_ON_TIME */
+
+#ifdef DBG_PHY_ON_TIME
+	phyon_start = _os_get_cur_time_ms();
+#endif /* DBG_PHY_ON_TIME */
 
 	sts = phl_cmd_enqueue(phl_info, HW_BAND_0, MSG_EVT_PHY_ON, NULL, 0, NULL,
-			PHL_CMD_WAIT, 1000);
+			PHL_CMD_WAIT, 3000);
+
+#ifdef DBG_PHY_ON_TIME
+	phyon_t = phl_get_passing_time_ms(phyon_start);
+	if (phyon_t > 1000) {
+		PHL_TRACE(COMP_PHL_DBG, _PHL_WARNING_, "%s : phy on takes %u (ms).\n"
+			  	, __func__, phyon_t);
+	}
+#endif /* DBG_PHY_ON_TIME */
 
 	if (is_cmd_failure(sts)) {
-		/* Send cmd success, but wait cmd fail*/
+		/* send cmd success, but wait cmd fail */
 		sts = RTW_PHL_STATUS_FAILURE;
 	} else if (sts != RTW_PHL_STATUS_SUCCESS) {
-		/* Send cmd fail */
+		/* send cmd fail */
 		sts = RTW_PHL_STATUS_FAILURE;
 	}
 	return sts;
@@ -1680,7 +1703,7 @@ enum rtw_phl_status phl_wow_start(struct phl_info_t *phl_info, struct rtw_phl_st
 		phl_cmd_role_suspend(phl_info);
 		rtw_phl_stop(phl_info);
 		/* since control path stopped after rtw_phl_stop,
-		   below action don't have to migrate to general module*/
+		   below action don't have to migrate to general module */
 		hstatus = rtw_hal_set_wowlan(phl_info->phl_com, phl_info->hal, true);
 		if (RTW_HAL_STATUS_SUCCESS != hstatus)
 			PHL_WARN("[wow] rtw_hal_set_wowlan failed, status(%u)\n", hstatus);
@@ -1697,7 +1720,7 @@ enum rtw_phl_status phl_wow_start(struct phl_info_t *phl_info, struct rtw_phl_st
 			goto end;
 		}
 		/* since control path stopped after phl_module_stop,
-		   below action don't have to migrate to general module*/
+		   below action don't have to migrate to general module */
 #ifdef CONFIG_FSM
 		pstatus = phl_fsm_module_stop(phl_info);
 		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
@@ -1731,7 +1754,9 @@ enum rtw_phl_status phl_wow_start(struct phl_info_t *phl_info, struct rtw_phl_st
 			goto end;
 #ifdef CONFIG_POWER_SAVE
 		/* power saving */
-		phl_wow_ps_pctl_cfg(wow_info, true);
+		phl_wow_ps_proto_cfg(wow_info, true);
+
+		phl_wow_ps_pwr_ntfy(wow_info, true);
 #endif
 		pstatus = phl_wow_init_postcfg(wow_info);
 		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
@@ -1755,6 +1780,7 @@ end:
 		#else
 		rtw_hal_disable_interrupt(phl_info->phl_com, phl_info->hal);
 		#endif /* CONFIG_SYNC_INTERRUPT */
+		phl_role_suspend(phl_info);
 		rtw_hal_stop(phl_info->phl_com, phl_info->hal);
 		phl_datapath_stop(phl_info);
 		wow_info->op_mode = RTW_WOW_OP_PWR_DOWN;
@@ -1776,7 +1802,8 @@ static void _wow_stop_reinit(struct phl_info_t *phl_info)
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
 
 	PHL_WARN("%s : reset hw!\n", __func__);
-	rtw_hal_hal_deinit(phl_info->phl_com, phl_info->hal);
+	phl_role_suspend(phl_info);
+	rtw_hal_stop(phl_info->phl_com, phl_info->hal);
 	phl_datapath_stop(phl_info);
 	pstatus = rtw_phl_start(phl_info);
 	if (pstatus)
@@ -1793,7 +1820,6 @@ void phl_wow_stop(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta, u8
 	struct phl_wow_info *wow_info = phl_to_wow_info(phl_info);
 	u8 reset = 0;
 
-
 	if (rtw_hal_get_pwr_state(phl_info->hal, &wow_info->mac_pwr)
 		!= RTW_HAL_STATUS_SUCCESS)
 		return;
@@ -1807,7 +1833,7 @@ void phl_wow_stop(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta, u8
 		#endif
 		#ifdef CONFIG_POWER_SAVE
 		/* leave clock/power gating */
-		pstatus = phl_wow_leave_low_power(wow_info);
+		pstatus = phl_wow_ps_pwr_cfg(wow_info, false);
 		if (RTW_PHL_STATUS_SUCCESS != pstatus) {
 			PHL_ERR("[wow] HW leave power saving failed.\n");
 			_wow_stop_reinit(phl_info);
@@ -1844,10 +1870,11 @@ void phl_wow_stop(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta, u8
 
 		phl_wow_deinit_precfg(wow_info);
 
-		rtw_hal_fw_dbg_dump(phl_info->hal, false);
+		rtw_hal_fw_dbg_dump(phl_info->hal);
 #ifdef CONFIG_POWER_SAVE
+		phl_wow_ps_pwr_ntfy(wow_info, false);
 		/* leave power saving */
-		phl_wow_ps_pctl_cfg(wow_info, false);
+		phl_wow_ps_proto_cfg(wow_info, false);
 #endif
 		phl_wow_func_dis(wow_info);
 
@@ -2186,11 +2213,11 @@ enum rtw_phl_status rtw_phl_interrupt_handler(void *phl)
 #if defined(CONFIG_SDIO_HCI) && defined(CONFIG_PHL_SDIO_READ_RXFF_IN_INT)
 		phl_info->hci_trx_ops->recv_rxfifo(phl);
 #else
-		phl_status = rtw_phl_start_rx_process(phl);
-#endif
 
-#if defined(CONFIG_PCI_HCI) && !defined(CONFIG_DYNAMIC_RX_BUF)
-		/* phl_status = hci_trx_ops->recycle_busy_wd(phl); */
+#if defined(CONFIG_PCI_HCI)
+		phl_info->hci_trx_ops->read_hw_rx(phl, RX_CH);
+#endif
+		phl_status = rtw_phl_start_rx_process(phl);
 #endif
 	}
 
@@ -2214,11 +2241,18 @@ enum rtw_phl_status rtw_phl_interrupt_handler(void *phl)
 	if (int_hdler_msk & BIT6)
 		phl_status = phl_ser_send_msg(phl, RTW_PHL_SER_EVENT_CHK);
 
+	if (int_hdler_msk & BIT7) {
+#if defined(CONFIG_PCI_HCI)
+		phl_info->hci_trx_ops->read_hw_rx(phl, RP_CH);
+#endif
+		phl_status = rtw_phl_start_rx_process(phl);
+		phl_schedule_handler(phl_info->phl_com,
+		                     &phl_info->phl_tx_handler);
+	}
+
 	if (phl_status != RTW_PHL_STATUS_SUCCESS)
 		PHL_INFO("rtw_phl_interrupt_handler fail !!\n");
 
-	/* schedule tx process */
-	phl_status = phl_schedule_handler(phl_info->phl_com, &phl_info->phl_tx_handler);
 end:
 
 #ifdef CONFIG_SYNC_INTERRUPT

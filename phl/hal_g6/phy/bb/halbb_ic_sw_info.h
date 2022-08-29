@@ -26,7 +26,7 @@
 #define __HALBB_IC_SW_INFO_H__
 
 #define HLABB_CODE_BASE			"HALBB_025"
-#define HALBB_RELEASE_DATE		"20210817"
+#define HALBB_RELEASE_DATE		"20211119"
 
 /*HALBB API status*/
 #define	HALBB_SET_FAIL			0

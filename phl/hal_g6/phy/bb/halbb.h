@@ -331,6 +331,9 @@ struct bb_info {
 #ifdef HALBB_CFO_TRK_SUPPORT
 	struct bb_cfo_trk_info	bb_cfo_trk_i;
 #endif
+#ifdef HALBB_UL_TB_CTRL_SUPPORT
+	struct bb_ul_tb_info	bb_ul_tb_i;
+#endif
 #ifdef HALBB_PHYSTS_PARSING_SUPPORT
 	struct bb_physts_info	bb_physts_i;
 #endif

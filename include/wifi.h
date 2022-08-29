@@ -52,6 +52,8 @@
 #define WLAN_ETHHDR_LEN		14
 #define WLAN_WMM_LEN		24
 #define VENDOR_NAME_LEN		20
+#define WLAN_IE_ID_LEN 1
+#define WLAN_IE_LEN_LEN 1
 
 #ifdef CONFIG_APPEND_VENDOR_IE_ENABLE
 #define WLAN_MAX_VENDOR_IE_LEN 255
@@ -105,6 +107,7 @@ enum WIFI_FRAME_SUBTYPE {
 	WIFI_ACTION_NOACK = (BIT(7) | BIT(6) | BIT(5) | WIFI_MGT_TYPE),
 
 	/* below is for control frame */
+	WIFI_TRIGGER = (BIT(5) | WIFI_CTRL_TYPE),
 	WIFI_BF_REPORT_POLL = (BIT(6) | WIFI_CTRL_TYPE),
 	WIFI_NDPA         = (BIT(6) | BIT(4) | WIFI_CTRL_TYPE),
 	WIFI_BAR            = (BIT(7) | WIFI_CTRL_TYPE),
@@ -614,6 +617,7 @@ static inline int IsFrameTypeData(unsigned char *pframe)
 #define _HT_ADD_INFO_IE_			61 /* _HT_EXTRA_INFO_IE_ */
 #define _WAPI_IE_				68
 #define _EID_RRM_EN_CAP_IE_			70
+#define _EID_MULTIPLEBSSID_IE_			71
 
 
 /* #define EID_BSSCoexistence			72 */ /* 20/40 BSS Coexistence
@@ -1303,5 +1307,10 @@ struct rtw_regulatory {
 #define IW_ENCODE_ALG_SM4			0x20
 #endif
 #endif
+
+#define GET_MBSSID_MAX_BSSID_INDOCATOR(_pEleStart) \
+	LE_BITS_TO_1BYTE((_pEleStart) + 2, 0, 8)
+
+#define MBSSID_MAX_BSSID_INDICATOR_OFFSET 3
 
 #endif /* _WIFI_H_ */

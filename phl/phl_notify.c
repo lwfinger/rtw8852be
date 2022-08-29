@@ -98,12 +98,20 @@ error_param:
 
 void rtw_phl_notification(void *phl,
                           enum phl_msg_evt_id event,
-                          struct rtw_wifi_role_t *wrole)
+                          struct rtw_wifi_role_t *wrole,
+                          bool direct)
 {
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 
 #ifdef CONFIG_CMD_DISP
-	rtw_phl_cmd_notify(phl_info->phl_com, event, NULL, wrole->hw_band);
+	/**
+	 * caller must make sure the current power state is I/O allowable or the
+	 * notification have nothing to do with I/O when "direct" is set to true.
+	 */
+	if (direct)
+		rtw_hal_notification(phl_info->hal, event, wrole->hw_band);
+	else
+		rtw_phl_cmd_notify(phl_info->phl_com, event, NULL, wrole->hw_band);
 #else
 	PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "%s: not support cmd notify\n",
 	          __func__);

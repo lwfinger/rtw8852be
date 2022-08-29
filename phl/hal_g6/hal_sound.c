@@ -801,9 +801,9 @@ void rtw_hal_snd_ax_fwcmd_tb_add_sta(void *hal, u8 *buf, u32 *ndpa_sta,
 	u8 mu = 0, ng = 4;
 	u32 rpt_size = 0;
 
-	if (ndpa_idx > HAL_MAX_HE_SND_STA_NUM)
+	if (ndpa_idx >= HAL_MAX_HE_SND_STA_NUM)
 		return;
-	if (bfrp_idx > HAL_MAX_HE_BFRP_NUM)
+	if (bfrp_idx >= HAL_MAX_HE_BFRP_NUM)
 		return;
 	cmd->macid[ndpa_idx] = sta->macid;
 	/* NDPA sta_info*/

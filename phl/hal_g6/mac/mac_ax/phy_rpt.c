@@ -24,6 +24,7 @@
 #define B_AX_CH_INFO_BUF_128 0
 #define B_AX_GET_CH_INFO_TO_DIS 0
 #define B_AX_GET_CH_INFO_TO_8 2
+#define B_AX_GET_CH_INFO_TO_28 7
 #define B_AX_CH_INFO_INTVL_DIS 0
 #define B_AX_CH_INFO_INTVL_1 1
 #define B_AX_CH_INFO_INTVL_2 2
@@ -57,6 +58,41 @@ static u32 is_cfg_avl(struct mac_ax_adapter *adapter,
 				return MACFUNCINPUT;
 		}
 	}
+
+	return MACSUCCESS;
+}
+
+static u32 get_ppdu_status_cfg(struct mac_ax_adapter *adapter,
+			       struct mac_ax_phy_rpt_cfg *cfg)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	struct mac_ax_ppdu_stat *ppdu = &cfg->u.ppdu;
+	u32 reg = (ppdu->band) ? R_AX_PPDU_STAT_C1 : R_AX_PPDU_STAT;
+	u32 val, tmp;
+	u32 ret = 0;
+
+	ret = check_mac_en(adapter, ppdu->band, MAC_AX_CMAC_SEL);
+	if (ret) {
+		PLTFM_MSG_ERR("MAC%d is not ready\n", ppdu->band);
+		return ret;
+	}
+
+	val = MAC_REG_R32(R_AX_HW_RPT_FWD);
+	tmp = GET_FIELD(val, B_AX_FWD_PPDU_STAT);
+	cfg->dest = (tmp == MAC_AX_FWD_TO_HOST) ? MAC_AX_PRPT_DEST_HOST :
+			MAC_AX_PRPT_DEST_WLCPU;
+
+	val = MAC_REG_R32(R_AX_RX_PPDU_STATUS_FW_MODE);
+	ppdu->dup2fw_en = !!(val & B_AX_HDR_PPDU_ENQ_WLCPU_EN);
+	ppdu->dup2fw_len = GET_FIELD(val, B_AX_CDR_PPDU_2_WLCPU_LEN);
+
+	val = MAC_REG_R32(reg);
+	ppdu->bmp_append_info = val & (MAC_AX_PPDU_MAC_INFO |
+				       MAC_AX_PPDU_PLCP |
+				       MAC_AX_PPDU_RX_CNT);
+	ppdu->bmp_filter = val & (MAC_AX_PPDU_HAS_A1M |
+				  MAC_AX_PPDU_HAS_CRC_OK);
+	cfg->en = !!(val & B_AX_PPDU_STAT_RPT_EN);
 
 	return MACSUCCESS;
 }
@@ -180,6 +216,10 @@ static u32 stop_ch_info(struct mac_ax_adapter *adapter, u32 ch_info_reg)
 #endif
 
 	val = MAC_REG_R8(R_AX_CH_INFO);
+
+	if (!(val & B_AX_CH_INFO_EN))
+		return MACSUCCESS;
+
 	MAC_REG_W8(R_AX_CH_INFO, val | B_AX_CH_INFO_STOP_REQ);
 	while (!(MAC_REG_R8(R_AX_CH_INFO) & B_AX_CH_INFO_STOP)) {
 		count--;
@@ -204,6 +244,51 @@ static u32 stop_ch_info(struct mac_ax_adapter *adapter, u32 ch_info_reg)
 
 	val = MAC_REG_R8(ch_info_reg);
 	MAC_REG_W8(ch_info_reg, val & ~B_AX_GET_CH_INFO_EN);
+
+	return MACSUCCESS;
+}
+
+static u32 get_ch_info_cfg(struct mac_ax_adapter *adapter,
+			   struct mac_ax_phy_rpt_cfg *cfg)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 reg;
+	u32 val;
+	u32 ret = 0;
+	struct mac_ax_ch_info *chif = &cfg->u.chif;
+	u8 band;
+
+	PLTFM_MEMSET(cfg, 0, sizeof(*cfg));
+
+	val = MAC_REG_R32(R_AX_CH_INFO);
+
+	cfg->en = !!(val & B_AX_CH_INFO_EN);
+	if (!cfg->en)
+		return MACSUCCESS;
+
+	band = !!(val & B_AX_CH_INFO_PHY);
+
+	chif->seg_size = GET_FIELD(val, B_AX_CH_INFO_SEG);
+	chif->dis_to = GET_FIELD(val, B_AX_GET_CH_INFO_TO) ? 0 : 1;
+	cfg->dest = (GET_FIELD(val, B_AX_DFS_QID) == MAC_AX_DISP_QID_WLCPU) ?
+		MAC_AX_PRPT_DEST_WLCPU : MAC_AX_PRPT_DEST_HOST;
+
+	ret = check_mac_en(adapter, band, MAC_AX_CMAC_SEL);
+	if (ret) {
+		PLTFM_MSG_ERR("MAC%d is not ready\n", band);
+		return ret;
+	}
+
+	reg = (band == MAC_AX_BAND_0) ?
+		R_AX_CH_INFO_QRY : R_AX_CH_INFO_QRY_C1;
+
+	val = MAC_REG_R32(reg);
+	chif->trigger = GET_FIELD(val, B_AX_CH_INFO_MODE);
+	chif->macid = GET_FIELD(val, B_AX_CH_INFO_MACID);
+	chif->bmp_filter = (val & (B_AX_CH_INFO_CRC_FAIL |
+				   B_AX_CH_INFO_DATA_FRM |
+				   B_AX_CH_INFO_CTRL_FRM |
+				   B_AX_CH_INFO_MGNT_FRM)) >> 16;
 
 	return MACSUCCESS;
 }
@@ -273,7 +358,8 @@ static u32 cfg_ch_info(struct mac_ax_adapter *adapter,
 		    SET_WORD(chif->seg_size, B_AX_CH_INFO_SEG) |
 		    SET_WORD(intvl, B_AX_CH_INFO_INTVL) |
 		    (chif->dis_to ?
-		     0 : SET_WORD(B_AX_GET_CH_INFO_TO_8, B_AX_GET_CH_INFO_TO)) |
+		     0 : SET_WORD(B_AX_GET_CH_INFO_TO_28,
+				  B_AX_GET_CH_INFO_TO)) |
 		    (band ? B_AX_CH_INFO_PHY : 0) |
 		    SET_WORD(B_AX_CH_INFO_BUF_128, B_AX_CH_INFO_BUF) |
 		    B_AX_CH_INFO_EN);
@@ -346,6 +432,23 @@ static u32 stop_dfs(struct mac_ax_adapter *adapter)
 	return MACSUCCESS;
 }
 
+static u32 get_dfs_cfg(struct mac_ax_adapter *adapter,
+		       struct mac_ax_phy_rpt_cfg *cfg)
+{
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	struct mac_ax_dfs *dfs = &cfg->u.dfs;
+	u32 val;
+
+	val = MAC_REG_R32(R_AX_DFS_CFG0);
+	cfg->en = !!(val & B_AX_DFS_RPT_EN);
+	dfs->num_th = GET_FIELD(val, B_AX_DFS_NUM_TH);
+	dfs->en_timeout = GET_FIELD(val, B_AX_DFS_TIME_TH);
+	cfg->dest = (GET_FIELD(val, B_AX_DFS_QID) == MAC_AX_DISP_QID_WLCPU) ?
+		MAC_AX_PRPT_DEST_WLCPU : MAC_AX_PRPT_DEST_HOST;
+
+	return MACSUCCESS;
+}
+
 static u32 cfg_dfs(struct mac_ax_adapter *adapter,
 		   struct mac_ax_phy_rpt_cfg *cfg)
 {
@@ -399,6 +502,30 @@ u32 mac_cfg_phy_rpt(struct mac_ax_adapter *adapter,
 		break;
 	case MAC_AX_DFS:
 		handle = cfg_dfs;
+		break;
+	default:
+		PLTFM_MSG_ERR("Wrong PHY report type\n");
+		return MACFUNCINPUT;
+	}
+
+	return handle(adapter, rpt);
+}
+
+u32 mac_get_phy_rpt_cfg(struct mac_ax_adapter *adapter,
+			struct mac_ax_phy_rpt_cfg *rpt)
+{
+	u32 (*handle)(struct mac_ax_adapter *adapter,
+		      struct mac_ax_phy_rpt_cfg *rpt);
+
+	switch (rpt->type) {
+	case MAC_AX_PPDU_STATUS:
+		handle = get_ppdu_status_cfg;
+		break;
+	case MAC_AX_CH_INFO:
+		handle = get_ch_info_cfg;
+		break;
+	case MAC_AX_DFS:
+		handle = get_dfs_cfg;
 		break;
 	default:
 		PLTFM_MSG_ERR("Wrong PHY report type\n");

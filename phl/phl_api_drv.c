@@ -81,6 +81,13 @@ void rtw_phl_get_fw_ver(void *phl, char *ver_str, u16 len)
 	rtw_hal_get_fw_ver(phl_info->hal, ver_str, len);
 }
 
+enum rtw_fw_status rtw_phl_get_fw_status(void *phl)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+
+	return rtw_hal_get_fw_status(phl_info->hal);
+}
+
 enum rtw_phl_status rtw_phl_msg_hub_hal_send(struct rtw_phl_com_t *phl_com,
 							struct phl_msg_attribute* attr, struct phl_msg* msg)
 {
@@ -149,4 +156,12 @@ void rtw_phl_dbg_dump_rx(void *phl, struct rtw_wifi_role_t *wrole)
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 
 	phl_rx_dbg_dump(phl_info, wrole->hw_band);
+}
+
+u32 rtw_phl_get_phy_stat_info(void *phl, enum phl_band_idx hw_band,
+			      enum phl_stat_info_query phy_stat)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+
+	return rtw_hal_get_phy_stat_info(phl_info->hal, hw_band, phy_stat);
 }

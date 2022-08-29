@@ -1191,6 +1191,12 @@ bool halbb_ctrl_bw_ch(struct bb_info *bb, u8 pri_ch, u8 central_ch_seg0,
 		      enum channel_width bw, enum phl_phy_idx phy_idx)
 {
 	bool rpt = true;
+	struct bb_api_info *bb_api = &bb->bb_api_i;
+
+	bb_api->central_ch = central_ch_seg0;
+	bb_api->band = band;
+	bb_api->bw = bw;
+	bb_api->pri_ch_idx = pri_ch;
 
 	switch (bb->ic_type) {
 
@@ -1222,8 +1228,22 @@ bool halbb_ctrl_bw_ch(struct bb_info *bb, u8 pri_ch, u8 central_ch_seg0,
 
 	#ifdef BB_8852B_SUPPORT
 	case BB_RTL8852B:
+		#ifdef HALBB_FW_OFLD_SUPPORT
+		if (halbb_check_fw_ofld(bb)) {
+			BB_WARNING("Do FW offload at Channel switch start\n");
+			rpt = halbb_fwofld_ctrl_bw_ch_8852b(bb, pri_ch, central_ch_seg0, bw,
+										band, phy_idx);
+			BB_WARNING("Do FW offload at Channel switch stop\n");
+		} else {
+			BB_WARNING("Not FW offload at Channel switch start\n");
+			rpt = halbb_ctrl_bw_ch_8852b(bb, pri_ch, central_ch_seg0, bw,
+					     band, phy_idx);
+			BB_WARNING("Not FW offload at Channel switch stop\n");
+		}
+		#else
 		rpt = halbb_ctrl_bw_ch_8852b(bb, pri_ch, central_ch_seg0, bw,
 					     band, phy_idx);
+		#endif
 		break;
 	#endif
 
@@ -1941,7 +1961,7 @@ void halbb_ic_hw_setting(struct bb_info *bb)
 	#endif
 	#ifdef BB_8852B_SUPPORT
 	case BB_RTL8852B:
-		//halbb_ic_hw_setting_8852b(bb);
+		halbb_ic_hw_setting_8852b(bb);
 		#ifdef HALBB_DYN_CSI_RSP_SUPPORT
 		halbb_dyn_csi_rsp_main(bb);
 		#endif

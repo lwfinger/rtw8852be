@@ -163,7 +163,7 @@ _phl_get_role_by_band_port(struct phl_info_t* phl_info,
 	for (ridx = 0; ridx < MAX_WIFI_ROLE_NUMBER; ridx++) {
 		if (!(band_ctrl->role_map & BIT(ridx)))
 			continue;
-		wrole = phl_get_wrole_by_ridx(phl_info, ridx);
+		wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, ridx);
 		if (wrole == NULL)
 			continue;
 		if (wrole->hw_band == hw_band && wrole->hw_port == hw_port) {
@@ -603,7 +603,7 @@ phl_p2pps_noa_all_role_resume(struct phl_info_t *phl_info, u8 band_idx)
 	for (ridx = 0; ridx < MAX_WIFI_ROLE_NUMBER; ridx++) {
 		if (!(band_ctrl->role_map & BIT(ridx)))
 			continue;
-		wrole = phl_get_wrole_by_ridx(phl_info, ridx);
+		wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, ridx);
 		if (wrole == NULL)
 			continue;
 		PHL_TRACE(COMP_PHL_P2PPS, _PHL_INFO_, "[NOA]p2pps_noa_all_role_resume():role_id(%d)\n",
@@ -649,7 +649,7 @@ void phl_p2pps_noa_all_role_pause(struct phl_info_t *phl_info, u8 band_idx)
 	for (ridx = 0; ridx < MAX_WIFI_ROLE_NUMBER; ridx++) {
 		if (!(band_ctrl->role_map & BIT(ridx)))
 			continue;
-		wrole = phl_get_wrole_by_ridx(phl_info, ridx);
+		wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, ridx);
 		if (wrole == NULL)
 			continue;
 		PHL_TRACE(COMP_PHL_P2PPS, _PHL_INFO_, "[NOA]phl_p2pps_noa_all_role_pause():role_id(%d)\n",

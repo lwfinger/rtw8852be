@@ -2008,7 +2008,7 @@ void rtw_bf_update_traffic(_adapter *adapter)
 	struct sta_info *sta;
 	u8 bfee_cnt, sounding_idx, i;
 	u16 tp[MAX_BEAMFORMEE_ENTRY_NUM] = {0};
-	u8 tx_rate[MAX_BEAMFORMEE_ENTRY_NUM] = {0};
+	u16 tx_rate[MAX_BEAMFORMEE_ENTRY_NUM] = {0};
 	u64 tx_bytes, last_bytes;
 	u32 time;
 	systime last_timestamp;
@@ -2046,7 +2046,7 @@ void rtw_bf_update_traffic(_adapter *adapter)
 			time = rtw_get_time_interval_ms(last_timestamp, bfee->tx_timestamp);
 			time = (time > 1000) ? time/1000 : 1;
 			tp[i] = toMbps(tx_bytes, time);
-			tx_rate[i] = rtw_hal_get_current_tx_rate(adapter, sta);
+			tx_rate[i] = rtw_get_current_tx_rate(adapter, sta);
 			RTW_INFO("%s: BFee idx(%d), MadId(%d), TxTP=%lld bytes (%d Mbps), txrate=%d\n",
 				 __FUNCTION__, i, bfee->mac_id, tx_bytes, tp[i], tx_rate[i]);
 		}

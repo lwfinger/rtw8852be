@@ -669,7 +669,7 @@ static void hal_phy_store_tx_power_limit		(void *drv_priv,
 	array_tc_8852a_txpwr_lmt->reg = (u8)regulation;
 	array_tc_8852a_txpwr_lmt->tx_shap_idx = pshape_idx;
 
-	PHL_INFO("Store of power limit table [regulation %d][band %d][bw %d]"\
+	PHL_DBG("Store of power limit table [regulation %d][band %d][bw %d]"\
 		"[rate section %d][ntx %d][BF %d][chnl %d][val %d] [sphape_idx %d]\n",
 		array_tc_8852a_txpwr_lmt->reg, array_tc_8852a_txpwr_lmt->band,
 		array_tc_8852a_txpwr_lmt->bw , array_tc_8852a_txpwr_lmt->rs,
@@ -1205,14 +1205,14 @@ _hal_parse_txpwrlmt_ru(void *drv_priv, void *para_info_t, u8 *psrc_buf, u32 bufl
 	u8	loadingstage = LD_STAGE_EXC_MAPPING;
 	u32 struct_idx = 0;
 	u32	i = 0, for_cnt = 0;
-	pHal_Txpwr_lmt_Ru_t array_tc_8852a_txpwr_lmt_ru;
+	pHal_Txpwr_lmt_Ru_t array_tc_txpwr_lmt_ru;
 
 	if (pdest_buf == NULL || psrc_buf == NULL) {
 		PHL_INFO("%s, fail !!! NULL buf !!!\n", __func__);
 		return 0;
 	}
 
-	array_tc_8852a_txpwr_lmt_ru = (pHal_Txpwr_lmt_Ru_t)pdest_buf;
+	array_tc_txpwr_lmt_ru = (pHal_Txpwr_lmt_Ru_t)pdest_buf;
 
 	ptmp = (char *)psrc_buf;
 	for (sz_line = hal_getLinefrombuffer(ptmp); sz_line != NULL; sz_line = hal_getLinefrombuffer(ptmp)) {
@@ -1541,9 +1541,9 @@ line_start:
 									(u8 *)bandwidth, (u8 *)ratesection,
 									(u8 *)ntx, (u8 *)channel, (u8 *)powerlimit,
 									(u8 *)pshape[for_cnt],
-									(void*)&array_tc_8852a_txpwr_lmt_ru[struct_idx],
+									(void*)&array_tc_txpwr_lmt_ru[struct_idx],
 									para_info);
-					PHL_INFO("array_tc_8852a_txpwr_lmt_ru[%d] \n", struct_idx);
+					PHL_DBG("array_tc_txpwr_lmt_ru[%d] \n", struct_idx);
 					struct_idx++;
 					}
 				}
@@ -1729,8 +1729,11 @@ _hal_dl_para_file(struct rtw_phl_com_t *phl_com,
 #ifdef CONFIG_LOAD_PHY_PARA_FROM_FILE
 
 	void *drv = phl_com->drv_priv;
-	char *hal_phy_folder = HAL_FILE_CONFIG_PATH;
-	u32 para_size = 0;
+	char hal_phy_folder[MAX_PATH_LEN] = {0};
+	char para_file_name[MAX_PATH_LEN] = {0};
+	char *sp, *ext = NULL;
+	u8 i, dot_pos;
+	u32 para_size = 0, postfix_size = 0;
 	u8 *para_buf = NULL;
 	struct rtw_para_info_t *para_info = (struct rtw_para_info_t *)para_info_t;
 
@@ -1758,9 +1761,69 @@ _hal_dl_para_file(struct rtw_phl_com_t *phl_com,
 	}
 
 
-	if (para_info->para_src == RTW_PARA_SRC_EXTNAL) {
+	if (para_info->para_src == RTW_PARA_SRC_EXTNAL_BUF) {
+		if (para_info->ext_para_file_buf != 0) {
+			/* Parsing file content */
+			para_info->para_data_len =
+				parser_fun(drv, para_info,
+					   para_info->ext_para_file_buf,
+					   para_info->ext_para_file_buf_len);
+
+			if (para_info->para_data_len) {
+				PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_,
+					"%s:: Download file ok.\n", __FUNCTION__);
+			} else {
+				PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_,
+					"%s:: Failed to parser %s \n",
+					__FUNCTION__, file_name);
+				para_info->para_src = RTW_PARA_SRC_INTNAL;
+			}
+			PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "%s:: Download file ok.\n", file_name);
+		} else {
+			PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "%s:: Error reading file.\n", file_name);
+
+			para_info->para_src = RTW_PARA_SRC_INTNAL;
+			para_info->para_data_len = 0;
+		}
+	} else if (para_info->para_src == RTW_PARA_SRC_EXTNAL) {
 		_os_snprintf(para_info->para_path, MAX_PATH_LEN, "%s%s%s%s",
 			     hal_phy_folder ,ic_name, _os_path_sep, file_name);
+
+		/* Determine parameter folder path */
+		if (para_info->hal_phy_folder != NULL) {
+			_os_snprintf(hal_phy_folder, MAX_PATH_LEN, "%s",
+						 para_info->hal_phy_folder);
+		} else {
+			_os_snprintf(hal_phy_folder, MAX_PATH_LEN, "%s%s%s",
+					     HAL_FILE_CONFIG_PATH , ic_name, _os_path_sep);
+		}
+
+		/* Determine parameter file name */
+		_os_strncpy(para_file_name, file_name, _os_strlen((u8 *)file_name)+1);
+
+		/* Add postfix into original file name if it is specified by user */
+		postfix_size = _os_strlen((u8 *)para_info->postfix);
+
+		if (postfix_size != 0) {
+			/* find the position of latest dot char in file name */
+			sp = para_file_name;
+			for (i = 0, dot_pos = 0; i < _os_strlen((u8 *)file_name); i++) {
+				if (sp[i] == '.')
+					dot_pos = i;
+			}
+
+			/* Get file extension name from original file name string */
+			ext = (char *)file_name + dot_pos;
+
+			/* Attach postfix, extension name and null terminator */
+			_os_strncpy(sp + dot_pos, para_info->postfix, postfix_size);
+			_os_strncpy(sp + dot_pos + postfix_size, ext, _os_strlen((u8 *)ext));
+			*(sp + dot_pos + postfix_size + _os_strlen((u8 *)ext)) = '\0';
+		}
+
+		/* Generate final parameter file full path */
+		_os_snprintf(para_info->para_path, MAX_PATH_LEN, "%s%s",
+				 hal_phy_folder, para_file_name);
 
 		PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "%s:: %s\n",__FUNCTION__,
 			  para_info->para_path);
@@ -1780,16 +1843,14 @@ _hal_dl_para_file(struct rtw_phl_com_t *phl_com,
 						      para_size);
 
 		if (para_info->para_data_len) {
-			PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_,
+			PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_,
 				  "%s:: Download file ok.\n", __FUNCTION__);
 		} else {
-			PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_,
-				  "%s:: Failed to parser %s\n",
-				  __FUNCTION__, file_name);
+			PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_,
+			"%s::Failed to parser %s \n",
+			__FUNCTION__, file_name);
 			para_info->para_src = RTW_PARA_SRC_INTNAL;
 		}
-		PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "%s:: Download file ok.\n",
-			  file_name);
 	} else {
 		PHL_TRACE(COMP_PHL_DBG, _PHL_ERR_, "%s:: Error reading file.\n",
 			  file_name);

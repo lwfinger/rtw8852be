@@ -15,6 +15,8 @@
 #ifndef _HAL_GENERAL_DEF_H_
 #define _HAL_GENERAL_DEF_H_
 
+#define RTW_MAC_TBTT_AGG_DEF 1
+
 enum rtw_chip_id {
 	CHIP_WIFI6_8852A,
 	CHIP_WIFI6_8834A,
@@ -279,6 +281,116 @@ enum wl_func {
 enum hw_stype{
 	EFUSE_HW_STYPE_NONE = 0x0,
 	EFUSE_HW_STYPE_GENERAL = 0xf
+};
+
+struct rtw_hal_mac_ax_cctl_info {
+	/* dword 0 */
+	u32 datarate:9;
+	u32 force_txop:1;
+	u32 data_bw:2;
+	u32 data_gi_ltf:3;
+	u32 darf_tc_index:1;
+	u32 arfr_ctrl:4;
+	u32 acq_rpt_en:1;
+	u32 mgq_rpt_en:1;
+	u32 ulq_rpt_en:1;
+	u32 twtq_rpt_en:1;
+	u32 rsvd0:1;
+	u32 disrtsfb:1;
+	u32 disdatafb:1;
+	u32 tryrate:1;
+	u32 ampdu_density:4;
+	/* dword 1 */
+	u32 data_rty_lowest_rate:9;
+	u32 ampdu_time_sel:1;
+	u32 ampdu_len_sel:1;
+	u32 rts_txcnt_lmt_sel:1;
+	u32 rts_txcnt_lmt:4;
+	u32 rtsrate:9;
+	u32 rsvd1:2;
+	u32 vcs_stbc:1;
+	u32 rts_rty_lowest_rate:4;
+	/* dword 2 */
+	u32 data_tx_cnt_lmt:6;
+	u32 data_txcnt_lmt_sel:1;
+	u32 max_agg_num_sel:1;
+	u32 rts_en:1;
+	u32 cts2self_en:1;
+	u32 cca_rts:2;
+	u32 hw_rts_en:1;
+	u32 rts_drop_data_mode:2;
+	u32 rsvd2:1;
+	u32 ampdu_max_len:11;
+	u32 ul_mu_dis:1;
+	u32 ampdu_max_time:4;
+	/* dword 3 */
+	u32 max_agg_num:8;
+	u32 ba_bmap:2;
+	u32 rsvd3:6;
+	u32 vo_lftime_sel:3;
+	u32 vi_lftime_sel:3;
+	u32 be_lftime_sel:3;
+	u32 bk_lftime_sel:3;
+	u32 sectype:4;
+	/* dword 4 */
+	u32 multi_port_id:3;
+	u32 bmc:1;
+	u32 mbssid:4;
+	u32 navusehdr:1;
+	u32 txpwr_mode:3;
+	u32 data_dcm:1;
+	u32 data_er:1;
+	u32 data_ldpc:1;
+	u32 data_stbc:1;
+	u32 a_ctrl_bqr:1;
+	u32 a_ctrl_uph:1;
+	u32 a_ctrl_bsr:1;
+	u32 a_ctrl_cas:1;
+	u32 data_bw_er:1;
+	u32 lsig_txop_en:1;
+	u32 rsvd4:5;
+	u32 ctrl_cnt_vld:1;
+	u32 ctrl_cnt:4;
+	/* dword 5 */
+	u32 resp_ref_rate:9;
+	u32 rsvd5:3;
+	u32 all_ack_support:1;
+	u32 bsr_queue_size_format:1;
+	u32 rsvd6:1;
+	u32 rsvd7:1;
+	u32 ntx_path_en:4;
+	u32 path_map_a:2;
+	u32 path_map_b:2;
+	u32 path_map_c:2;
+	u32 path_map_d:2;
+	u32 antsel_a:1;
+	u32 antsel_b:1;
+	u32 antsel_c:1;
+	u32 antsel_d:1;
+	/* dword 6 */
+	u32 addr_cam_index:8;
+	u32 paid:9;
+	u32 uldl:1;
+	u32 doppler_ctrl:2;
+	u32 nominal_pkt_padding:2;
+	u32 nominal_pkt_padding40:2;
+	u32 txpwr_tolerence:4;
+	u32 rsvd9:2;
+	u32 nominal_pkt_padding80:2;
+	/* dword 7 */
+	u32 nc:3;
+	u32 nr:3;
+	u32 ng:2;
+	u32 cb:2;
+	u32 cs:2;
+	u32 csi_txbf_en:1;
+	u32 csi_stbc_en:1;
+	u32 csi_ldpc_en:1;
+	u32 csi_para_en:1;
+	u32 csi_fix_rate:9;
+	u32 csi_gi_ltf:3;
+	u32 nominal_pkt_padding160:2;
+	u32 csi_bw:2;
 };
 
 #endif /* _HAL_GENERAL_DEF_H_*/

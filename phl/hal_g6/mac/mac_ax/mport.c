@@ -1274,6 +1274,13 @@ static u32 fast_bcn_drop(struct mac_ax_adapter *adapter, u8 band, u8 port)
 		}
 	}
 
+	cfg_para.val = 1;
+	ret = mac_port_cfg(adapter, MAC_AX_PCFG_TX_SW, &cfg_para);
+	if (ret != MACSUCCESS) {
+		PLTFM_MSG_ERR("[ERR] port cfg tx sw fail %d\n", ret);
+		return ret;
+	}
+
 	ret = chk_bcnq_empty(adapter, band, port, bcn_spc, &is_empty);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR] chk bcnq empty fail %d\n", ret);
@@ -1400,10 +1407,31 @@ end:
 	return ret;
 }
 
+u32 _patch_tbtt_shift_setval(struct mac_ax_adapter *adapter, u32 bcnspc,
+			     u32 *shift_val)
+{
+	if (!(is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
+	      is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
+	      is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
+	      is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB)))
+		return MACSUCCESS;
+
+	if (!*shift_val)
+		return MACSUCCESS;
+
+	if (*shift_val >= bcnspc)
+		return MACCMP;
+
+	*shift_val = (bcnspc - *shift_val) | TBTT_SHIFT_OFST_MSB;
+
+	return MACSUCCESS;
+}
+
 u32 mac_port_cfg(struct mac_ax_adapter *adapter,
 		 enum mac_ax_port_cfg_type type,
 		 struct mac_ax_port_cfg_para *para)
 {
+	struct mac_ax_port_cfg_para cfg_para;
 	struct mac_ax_port_info *pinfo;
 	u8 band = para->band;
 	u8 port = para->port;
@@ -1646,6 +1674,27 @@ fail:
 		if (set_val > B_AX_TBTT_SHIFT_OFST_P0_MSK) {
 			PLTFM_MSG_ERR("[ERR] illegal tbtt shift %d\n", set_val);
 			return MACFUNCINPUT;
+		}
+
+		cfg_para.band = band;
+		cfg_para.port = port;
+		cfg_para.mbssid_idx = 0;
+		cfg_para.val = 0;
+		ret = _get_port_cfg(adapter, MAC_AX_PCFG_BCN_INTV, &cfg_para);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("[ERR]get port cfg bcn intv fail %d\n", ret);
+			return ret;
+		}
+		if (set_val >= cfg_para.val) {
+			PLTFM_MSG_ERR("tbtt shift %d over bcn spc %d\n",
+				      set_val, cfg_para.val);
+			return MACCMP;
+		}
+
+		ret = _patch_tbtt_shift_setval(adapter, cfg_para.val, &set_val);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("patch tbtt shift fail %d\n", ret);
+			return ret;
 		}
 
 		val32 = MAC_REG_R32(tbttsht_regl[band][port]);

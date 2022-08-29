@@ -166,7 +166,7 @@ u8 rtw_set_acs_sitesurvey(_adapter *adapter)
 			center_chs_num = center_chs_2g_num;
 			center_chs = center_chs_2g;
 		} else
-		#ifdef CONFIG_IEEE80211_BAND_5GHZ
+		#if CONFIG_IEEE80211_BAND_5GHZ
 		if (band == BAND_ON_5G) {
 			center_chs_num = center_chs_5g_num;
 			center_chs = center_chs_5g;
@@ -183,7 +183,7 @@ u8 rtw_set_acs_sitesurvey(_adapter *adapter)
 		if (rfctl->ch_sel_within_same_band) {
 			if (rtw_is_2g_ch(uch) && band != BAND_ON_24G)
 				continue;
-			#ifdef CONFIG_IEEE80211_BAND_5GHZ
+			#if CONFIG_IEEE80211_BAND_5GHZ
 			if (rtw_is_5g_ch(uch) && band != BAND_ON_5G)
 				continue;
 			#endif
@@ -457,10 +457,13 @@ static bool update_scanned_network(_adapter *adapter, WLAN_BSSID_EX *target)
 #endif
 
 			_rtw_memcpy(&(pnetwork->network), target,  get_WLAN_BSSID_EX_sz(target));
-			/* pnetwork->last_scanned = rtw_get_current_time(); */
+			pnetwork->bcn_keys_valid = 0;
+			if (target->Reserved[0] == BSS_TYPE_BCN || target->Reserved[0] == BSS_TYPE_PROB_RSP)
+				rtw_update_bcn_keys_of_network(pnetwork);
 			/* variable initialize */
 			pnetwork->fixed = _FALSE;
 			pnetwork->last_scanned = rtw_get_current_time();
+			pnetwork->last_non_hidden_ssid_ap = pnetwork->last_scanned;
 			#if defined(CONFIG_RTW_MESH) && CONFIG_RTW_MESH_ACNODE_PREVENT
 			pnetwork->acnode_stime = 0;
 			pnetwork->acnode_notify_etime = 0;
@@ -484,8 +487,9 @@ static bool update_scanned_network(_adapter *adapter, WLAN_BSSID_EX *target)
 			target->Length = bssid_ex_sz;
 
 			_rtw_memcpy(&(pnetwork->network), target, bssid_ex_sz);
-
-			pnetwork->last_scanned = rtw_get_current_time();
+			pnetwork->bcn_keys_valid = 0;
+			if (target->Reserved[0] == BSS_TYPE_BCN || target->Reserved[0] == BSS_TYPE_PROB_RSP)
+				rtw_update_bcn_keys_of_network(pnetwork);
 
 			/* bss info not receving from the right channel */
 			if (pnetwork->network.PhyInfo.SignalQuality == 101)
@@ -502,21 +506,36 @@ static bool update_scanned_network(_adapter *adapter, WLAN_BSSID_EX *target)
 		#if defined(CONFIG_RTW_MESH) && CONFIG_RTW_MESH_ACNODE_PREVENT
 		systime last_scanned = pnetwork->last_scanned;
 		#endif
+		struct beacon_keys bcn_keys;
+		bool bcn_keys_valid = 0;
+		bool is_hidden_ssid_ap = 0;
 
 		pnetwork->last_scanned = rtw_get_current_time();
 
-		/* target.Reserved[0]==BSS_TYPE_BCN, means that scanned network is a bcn frame. */
-		if ((pnetwork->network.IELength > target->IELength) && (target->Reserved[0] == BSS_TYPE_BCN))
-			update_ie = _FALSE;
+		if (target->Reserved[0] == BSS_TYPE_BCN || target->Reserved[0] == BSS_TYPE_PROB_RSP) {
+			if (target->InfrastructureMode == Ndis802_11Infrastructure) {
+				is_hidden_ssid_ap = hidden_ssid_ap(target);
+				if (!is_hidden_ssid_ap) /* update last time it's non hidden ssid AP */
+					pnetwork->last_non_hidden_ssid_ap = rtw_get_current_time();
+			}
+			bcn_keys_valid = rtw_get_bcn_keys_from_bss(target, &bcn_keys);
+		}
 
-		if (MLME_IS_MESH(adapter)
-			/* probe resp(3) > beacon(1) > probe req(2) */
-			|| (target->Reserved[0] != BSS_TYPE_PROB_REQ
-				&& target->Reserved[0] >= pnetwork->network.Reserved[0])
-		)
+		if (target->InfrastructureMode == Ndis802_11_mesh
+			|| target->Reserved[0] >= pnetwork->network.Reserved[0])
 			update_ie = _TRUE;
-		else
-			update_ie = _FALSE;
+		else if (target->InfrastructureMode == Ndis802_11Infrastructure && !pnetwork->fixed
+			&& rtw_get_passing_time_ms(pnetwork->last_non_hidden_ssid_ap) > SCANQUEUE_LIFETIME)
+			update_ie = _TRUE;
+		else if (bcn_keys_valid) {
+			if (is_hidden_ssid(bcn_keys.ssid, bcn_keys.ssid_len)) {
+				/* hidden ssid, replace with current beacon ssid directly */
+				_rtw_memcpy(bcn_keys.ssid, pnetwork->bcn_keys.ssid, pnetwork->bcn_keys.ssid_len);
+				bcn_keys.ssid_len = pnetwork->bcn_keys.ssid_len;
+			}
+			if (rtw_bcn_key_compare(&pnetwork->bcn_keys, &bcn_keys) == _FALSE)
+				update_ie = _TRUE;
+		}
 
 		#if defined(CONFIG_RTW_MESH) && CONFIG_RTW_MESH_ACNODE_PREVENT
 		if (!MLME_IS_MESH(adapter) || !MLME_IS_ASOC(adapter)
@@ -528,6 +547,13 @@ static bool update_scanned_network(_adapter *adapter, WLAN_BSSID_EX *target)
 			pnetwork->acnode_notify_etime = 0;
 		}
 		#endif
+
+		if (bcn_keys_valid) {
+			_rtw_memcpy(&pnetwork->bcn_keys, &bcn_keys, sizeof(bcn_keys));
+			pnetwork->bcn_keys_valid = 1;
+		} else if (update_ie)
+			pnetwork->bcn_keys_valid = 0;
+
 		rtw_update_network(&(pnetwork->network), target, adapter, update_ie);
 	}
 
@@ -586,6 +612,145 @@ static void add_network(_adapter *adapter, WLAN_BSSID_EX *pnetwork)
 
 }
 
+#ifdef CONFIG_STA_MULTIPLE_BSSID
+static inline void rtw_gen_new_bssid(const u8 *bssid, u8 max_bssid_ind,
+					  u8 mbssid_index, u8 *new_bssid)
+{
+	u8 i = 0;
+	u8 max_num = 1;
+	u8 B;
+	u8 new_a5;
+
+	for (i = 0; i < max_bssid_ind; i++)
+		max_num = max_num * 2;
+	/*RTW_INFO("%s, max_num=%d\n", __func__, max_num);*/
+	/*RTW_INFO("%s, %02x,%02x,%02x,%02x,%02x,%02x \n", __func__, bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);*/
+
+	B = bssid[5] % max_num;
+
+	new_a5 = bssid[5] - B + ((B + mbssid_index) % max_num);
+
+	new_bssid[0] = bssid[0];
+	new_bssid[1] = bssid[1];
+	new_bssid[2] = bssid[2];
+	new_bssid[3] = bssid[3];
+	new_bssid[4] = bssid[4];
+	new_bssid[5] = new_a5;
+
+	/*RTW_INFO("%s, %02x,%02x,%02x,%02x,%02x,%02x \n", __func__, new_bssid[0], new_bssid[1], new_bssid[2], new_bssid[3], new_bssid[4], new_bssid[5]);*/
+}
+
+void add_mbssid_network(_adapter *padapter, WLAN_BSSID_EX *ref_bss)
+{
+	WLAN_BSSID_EX *pbss;
+	u32 sub_ies_len;
+	u8 *mbssid_ie_ptr = NULL;
+	PNDIS_802_11_VARIABLE_IEs pIE, sub_pie;
+	u8 max_bssid_indicator;
+	int i,j;
+	u8* mbssid_ie;
+	sint mbssid_len;
+	u8 mbssid_index;
+	u8 copy_ie_offset;
+	u32 copy_ie_len = 0;
+
+	mbssid_ie = rtw_get_ie(ref_bss->IEs + _BEACON_IE_OFFSET_
+		                              , WLAN_EID_MULTIPLE_BSSID
+		                              , &mbssid_len
+		                              , (ref_bss->IELength- _BEACON_IE_OFFSET_));
+	if (!mbssid_ie)
+		return;
+#if 0
+	else
+		RTW_PRINT_DUMP("mbssid_ie: ", (const u8 *)mbssid_ie, mbssid_len);
+#endif
+
+	mbssid_ie_ptr = mbssid_ie;
+	max_bssid_indicator = GET_MBSSID_MAX_BSSID_INDOCATOR(mbssid_ie_ptr);
+	/*RTW_INFO("%s, max_bssid_indicator=%d\n", __func__, max_bssid_indicator);*/
+	mbssid_ie_ptr = mbssid_ie_ptr + MBSSID_MAX_BSSID_INDICATOR_OFFSET;
+
+	for (i = 0; i + 1 < mbssid_len;) {
+		pIE = (PNDIS_802_11_VARIABLE_IEs)(mbssid_ie_ptr + i);
+
+		switch (pIE->ElementID) {
+		case MBSSID_NONTRANSMITTED_BSSID_PROFILE_ID:
+			sub_ies_len = pIE->Length;
+			pbss = (WLAN_BSSID_EX *)rtw_zmalloc(sizeof(WLAN_BSSID_EX));
+			if (pbss) {
+				_rtw_memcpy(pbss, ref_bss, sizeof(WLAN_BSSID_EX));
+				_rtw_memset(pbss->IEs, 0, MAX_IE_SZ);
+				copy_ie_len =  _TIMESTAMP_ + _BEACON_ITERVAL_;
+				_rtw_memcpy(pbss->IEs, ref_bss->IEs, copy_ie_len);
+			} else {
+				return;
+			}
+
+			for (j = 0; j + 1 < sub_ies_len;) {
+				sub_pie = (PNDIS_802_11_VARIABLE_IEs)(pIE->data + j);
+				switch (sub_pie->ElementID) {
+				case WLAN_EID_NON_TX_BSSID_CAP:
+					/*RTW_INFO("%s, sub_pie->Length=%d\n", __func__, sub_pie->Length);*/
+					/*RTW_PRINT_DUMP("WLAN_EID_NON_TX_BSSID_CAP: ", (const u8 *)sub_pie->data, sub_pie->Length);*/
+					copy_ie_offset =  _TIMESTAMP_ + _BEACON_ITERVAL_;
+					_rtw_memcpy(pbss->IEs + copy_ie_offset, sub_pie->data, sub_pie->Length);
+					break;
+				case WLAN_EID_SSID:
+					/*RTW_PRINT_DUMP("WLAN_EID_SSID: ", (const u8 *)sub_pie->data, sub_pie->Length);*/
+					/*RTW_INFO("%s, ref_bss->IELength=%d\n", __func__, ref_bss->IELength);*/
+					/*RTW_PRINT_DUMP("A ref_bss->IEs: ", (const u8 *)ref_bss->IEs, ref_bss->IELength);*/
+					copy_ie_offset =  _TIMESTAMP_ + _BEACON_ITERVAL_ + _CAPABILITY_;
+					copy_ie_len =  WLAN_IE_ID_LEN + WLAN_IE_LEN_LEN;
+					_rtw_memcpy(pbss->IEs + copy_ie_offset, sub_pie, copy_ie_len);
+
+					copy_ie_offset = copy_ie_offset + WLAN_IE_ID_LEN + WLAN_IE_LEN_LEN;
+					_rtw_memcpy(pbss->IEs + copy_ie_offset, sub_pie->data, sub_pie->Length);
+					_rtw_memcpy(pbss->IEs + copy_ie_offset + sub_pie->Length
+						                , ref_bss->IEs + copy_ie_offset + ref_bss->Ssid.SsidLength
+						                , ref_bss->IELength - (copy_ie_offset + ref_bss->Ssid.SsidLength));
+
+					pbss->IELength = ref_bss->IELength + (sub_pie->Length - ref_bss->Ssid.SsidLength);
+					/*RTW_INFO("%s, ref_bss->Ssid.SsidLength=%d\n", __func__, ref_bss->Ssid.SsidLength);*/
+					/*RTW_INFO("%s, sub_pie->Length=%d\n", __func__, sub_pie->Length);*/
+					/*RTW_INFO("%s, pbss->IELength=%d\n", __func__, pbss->IELength);*/
+					/*RTW_PRINT_DUMP("B pbss->IEs: ", (const u8 *)pbss->IEs, pbss->IELength);*/
+
+					_rtw_memset(pbss->Ssid.Ssid, 0, pbss->Ssid.SsidLength);
+					_rtw_memcpy(pbss->Ssid.Ssid, sub_pie->data, sub_pie->Length);
+					pbss->Ssid.SsidLength = sub_pie->Length;
+					break;
+				case WLAN_EID_MULTI_BSSID_IDX:
+					/*RTW_INFO("%s, sub_pie->Length=%d\n", __func__, sub_pie->Length);*/
+					/*RTW_PRINT_DUMP("WLAN_EID_MULTI_BSSID_IDX: ", (const u8 *)sub_pie->data, sub_pie->Length);*/
+					_rtw_memcpy(&mbssid_index, sub_pie->data, sub_pie->Length);
+					/*RTW_INFO("%s,mbssid_index=%d\n", __func__, mbssid_index);*/
+					rtw_gen_new_bssid(ref_bss->MacAddress, max_bssid_indicator
+						                          , mbssid_index, pbss->MacAddress);
+					pbss->mbssid_index = mbssid_index;
+					break;
+				default:
+					break;
+				}
+
+				j += (sub_pie->Length + WLAN_IE_ID_LEN + WLAN_IE_LEN_LEN);
+				/*RTW_INFO("%s, j=%d\n", __func__, j);*/
+			}
+			pbss->is_mbssid = _TRUE;
+			add_network(padapter, pbss);
+			rtw_mfree((u8 *)pbss, sizeof(WLAN_BSSID_EX));
+			break;
+		case MBSSID_VENDOR_SPECIFIC_ID:
+			break;
+		default:
+			break;
+		}
+
+		i += (pIE->Length + WLAN_IE_ID_LEN + WLAN_IE_LEN_LEN);
+		/*RTW_INFO("%s, i=%d\n", __func__, i);*/
+	}
+}
+#endif
+
 void rtw_survey_event_callback(_adapter	*adapter, u8 *pbuf)
 {
 	u32 len;
@@ -641,6 +806,9 @@ void rtw_survey_event_callback(_adapter	*adapter, u8 *pbuf)
 		if (pnetwork->Ssid.Ssid[0] == 0)
 			pnetwork->Ssid.SsidLength = 0;
 		add_network(adapter, pnetwork);
+#ifdef CONFIG_STA_MULTIPLE_BSSID
+		add_mbssid_network(adapter, pnetwork);
+#endif
 	}
 
 exit:
@@ -655,6 +823,7 @@ void rtw_surveydone_event_callback(_adapter *adapter, u8 *pbuf)
 	struct surveydone_event *parm = (struct surveydone_event *)pbuf;
 	struct	mlme_priv	*pmlmepriv = &adapter->mlmepriv;
 	struct mlme_ext_priv	*pmlmeext = &adapter->mlmeextpriv;
+	struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
 
 	_rtw_spinlock_bh(&pmlmepriv->lock);
 	if (pmlmepriv->wps_probe_req_ie) {
@@ -762,6 +931,9 @@ void rtw_surveydone_event_callback(_adapter *adapter, u8 *pbuf)
 #else
 					receive_disconnect(adapter, pmlmepriv->cur_network.network.MacAddress
 						, WLAN_REASON_ACTIVE_ROAM, _FALSE);
+					pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+					pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_ROAMING;
+					pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 #endif
 				}
 			}
@@ -2397,14 +2569,34 @@ static struct rtw_phl_scan_ops scan_ops_rrm_cb = {
 };
 #endif /* CONFIG_RTW_80211K */
 
-#define SCANNING_TIMEOUT_EX	2000
+#ifndef SCAN_PER_CH_EX_TIME
+#define SCAN_PER_CH_EX_TIME	40 /*8852bs sw ch ov*/
+#endif /*SCAN_PER_CH_EX_TIME*/
 static u32 rtw_scan_timeout_decision(_adapter *padapter)
 {
-	u32 back_op_times= 0;
 	u8 max_chan_num;
+	u8 issue_null_time;
 	u16 scan_ms;
+	u16 p_ch_ex_time;
+	u32 non_op_buf;
+	u32 back_op_times = 0;
+
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct ss_res *ss = &pmlmeext->sitesurvey_res;
+	#ifdef CONFIG_SCAN_BACKOP
+	u8 backop_cout = 0;
+	#endif /*CONFIG_SCAN_BACKOP*/
+
+	if (padapter->registrypriv.scan_pch_ex_time != 0)
+		p_ch_ex_time = padapter->registrypriv.scan_pch_ex_time;
+	else
+		p_ch_ex_time = SCAN_PER_CH_EX_TIME;
+
+	/*issue null time,null(0)+null(1),undefine flag phl sleep 50ms*/
+	issue_null_time = 10;
+	#ifndef RTW_WKARD_TX_NULL_WD_RP
+	issue_null_time += 50;
+	#endif /*RTW_WKARD_TX_NULL_WD_RP*/
 
 	if (is_supported_5g(padapter->registrypriv.band_type)
 		&& is_supported_24g(padapter->registrypriv.band_type))
@@ -2413,9 +2605,10 @@ static u32 rtw_scan_timeout_decision(_adapter *padapter)
 		max_chan_num = MAX_CHANNEL_NUM_2G;/*single band*/
 
 	#ifdef CONFIG_SCAN_BACKOP
+	backop_cout = max_chan_num / ss->scan_cnt_max;
 	/* delay 50ms to protect nulldata(1) */
 	if (rtw_scan_backop_decision(padapter))
-		back_op_times = (max_chan_num / ss->scan_cnt_max) * (ss->backop_ms + 50);
+		back_op_times = backop_cout * (ss->backop_ms + p_ch_ex_time + issue_null_time);
 	#endif
 
 	if (ss->duration)
@@ -2428,8 +2621,15 @@ static u32 rtw_scan_timeout_decision(_adapter *padapter)
 	#endif /*CONFIG_RTW_ACS*/
 		scan_ms = ss->scan_ch_ms;
 
-	ss->scan_timeout_ms = (scan_ms * max_chan_num) + back_op_times + SCANNING_TIMEOUT_EX;
+	/*non op channel buffer time + scan start/done issue null*/
+	non_op_buf = max_chan_num * p_ch_ex_time + issue_null_time;
+
+	ss->scan_timeout_ms = (scan_ms * max_chan_num) + back_op_times + non_op_buf;
 	#ifdef DBG_SITESURVEY
+	RTW_INFO("%s, max_chan_num(%d), p_ch_ex_time(%d), \
+		 ss->scan_cnt_max=%d issue_null_time=%d\n" \
+		 , __func__, max_chan_num, p_ch_ex_time,
+		 ss->scan_cnt_max, issue_null_time);
 	RTW_INFO("%s , scan_timeout_ms = %d (ms), scan_ms=%d (ms), \
 		back_op_times=%d (ms), ss->duration=%d (ms)\n" \
 		, __func__, ss->scan_timeout_ms, scan_ms, back_op_times, ss->duration);

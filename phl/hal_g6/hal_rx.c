@@ -249,14 +249,14 @@ enum rtw_hal_status rtw_hal_notify_rxdone(void* hal,
 }
 
 u16 rtw_hal_handle_wp_rpt(void *hal, u8 *rp, u16 len, u8 *sw_retry, u8 *dma_ch,
-			  u16 *wp_seq, u8 *txsts)
+			  u16 *wp_seq, u8 *macid, u8 *ac_queue, u8 *txsts)
 {
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 	struct hal_trx_ops *trx_ops = hal_info->trx_ops;
 	u16 rsize = 0;
 
 	rsize = trx_ops->handle_wp_rpt(hal_info, rp, len, sw_retry, dma_ch,
-				       wp_seq, txsts);
+				       wp_seq, macid, ac_queue, txsts);
 	return rsize;
 }
 

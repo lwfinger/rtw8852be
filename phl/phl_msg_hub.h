@@ -34,4 +34,6 @@ phl_msg_hub_deregister_recver(void *phl, enum phl_msg_recver_layer layer);
 void phl_msg_hub_phy_mgnt_evt_hdlr(struct phl_info_t *phl, u16 evt_id);
 void phl_msg_hub_rx_evt_hdlr(struct phl_info_t *phl, u16 evt_id, u8 *buf,
 			     u32 len);
+void phl_msg_hub_tx_evt_hdlr(struct phl_info_t *phl, u16 evt_id, u8 *buf,
+			     u32 len);
 #endif

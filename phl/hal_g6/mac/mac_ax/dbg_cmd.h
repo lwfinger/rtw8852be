@@ -129,6 +129,9 @@ enum mac_ax_fw_status {
 	FW_STATUS_PSINFO,
 	FW_STATUS_H2C_C2HINFO,
 	FW_STATUS_ISRINFO,
+	FW_STATUS_DBGINFO_REG,
+	FW_STATUS_SERINFO,
+	FW_STATUS_CHSW_TIMING,
 	FW_STATUS_MAX
 };
 
@@ -340,6 +343,30 @@ struct isr_info {
 };
 
 /**
+ * @struct chswofld_timing_info
+ * @brief chswofld_timing_info
+ *
+ * @var chswofld_timing_info::mac
+ * Please Place Description here.
+ * @var chswofld_timing_info::bb
+ * Please Place Description here.
+ * @var chswofld_timing_info::rf
+ * Please Place Description here.
+ * @var chswofld_timing_info::rfReload
+ * Please Place Description here.
+ * @var chswofld_timing_info::total
+ * Please Place Description here.
+
+ */
+struct chswofld_timing_info {
+	u32 mac;
+	u32 bb;
+	u32 rf;
+	u32 rf_reld;
+	u32 total;
+};
+
+/**
  * @struct fw_status_proc_class
  * @brief fw_status_proc_class
  *
@@ -494,6 +521,17 @@ u32 fw_status_h2c_c2hinfo_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 l
  * @retval void
  */
 u32 fw_status_isrinfo_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 len);
+
+/**
+ * @brief fw_status_chsw_handler
+ *
+ * @param *adapter
+ * @param *buf
+ * @param *len
+ * @return Please Place Description here.
+ * @retval void
+ */
+u32 fw_status_chsw_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 len);
 
 /**
  * @brief cmd_mac_help

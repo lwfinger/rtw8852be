@@ -361,6 +361,9 @@ _phl_stainfo_init(struct phl_info_t *phl_info,
 		return RTW_PHL_STATUS_FAILURE;
 	}
 	phl_sta->active = false;
+#ifdef RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
+	phl_sta->allocated = false;
+#endif
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
@@ -854,6 +857,13 @@ __phl_free_stainfo_sw(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta
 		goto _exit;
 	}
 
+#ifdef RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
+	if (!sta->allocated) {
+		PHL_INFO("%s sta has not been allocated\n", __func__);
+		goto _exit;
+	}
+#endif
+
 	wrole = sta->wrole;
 
 	if (!is_broadcast_mac_addr(sta->mac_addr)) {
@@ -867,6 +877,10 @@ __phl_free_stainfo_sw(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta
 	if (pstatus != RTW_PHL_STATUS_SUCCESS) {
 		PHL_ERR("phl_stainfo_queue_del failed\n");
 	}
+
+#ifdef RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
+	sta->allocated = false;
+#endif
 
 	pstatus = phl_free_stainfo_sw(phl_info, sta);
 	if (pstatus != RTW_PHL_STATUS_SUCCESS) {
@@ -907,6 +921,8 @@ phl_free_stainfo_hw(struct phl_info_t *phl_info,
 		PHL_ERR("%s sta == NULL\n", __func__);
 		goto _exit;
 	}
+
+	phl_pkt_ofld_del_entry(phl_info, sta->macid);
 
 	sta->active = false;
 	if (rtw_hal_del_sta_entry(phl_info->hal, sta) == RTW_HAL_STATUS_SUCCESS)
@@ -1039,6 +1055,9 @@ phl_alloc_stainfo_sw(struct phl_info_t *phl_info,
 	_phl_sta_set_default_value(phl_info, phl_sta);
 
 	phl_stainfo_enqueue(phl_info, &wrole->assoc_sta_queue, phl_sta);
+#ifdef RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
+	phl_sta->allocated = true;
+#endif
 
 	#ifdef RTW_WKARD_AP_CLIENT_ADD_DEL_NTY
 	if (_phl_self_stainfo_chk(phl_info, wrole, phl_sta) == false) {
@@ -1083,10 +1102,15 @@ phl_alloc_stainfo_hw(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *sta)
 
 	if (rtw_hal_add_sta_entry(phl_info->hal, sta) != RTW_HAL_STATUS_SUCCESS) {
 		PHL_ERR("%s rtw_hal_add_sta_entry failure!\n", __func__);
-	} else {
-		sta->active = true;
-		pstatus = RTW_PHL_STATUS_SUCCESS;
+		goto _exit;
 	}
+
+	sta->active = true;
+
+	pstatus = phl_pkt_ofld_add_entry(phl_info, sta->macid);
+	if (RTW_PHL_STATUS_SUCCESS != pstatus)
+		PHL_ERR("%s phl_pkt_ofld_add_entry failure!\n", __func__);
+
 _exit:
 	return pstatus;
 }
@@ -1305,6 +1329,9 @@ phl_wifi_role_free_stainfo_sw(struct phl_info_t *phl_info,
 		phl_sta = phl_stainfo_dequeue(phl_info, &role->assoc_sta_queue);
 
 		if (phl_sta) {
+#ifdef RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
+			phl_sta->allocated = false;
+#endif
 			phl_free_stainfo_sw(phl_info, phl_sta);
 			phl_stainfo_enqueue(phl_info,
 						&sta_ctrl->free_sta_queue, phl_sta);
@@ -1326,6 +1353,9 @@ phl_wifi_role_free_stainfo(struct phl_info_t *phl_info,
 		phl_sta = phl_stainfo_dequeue(phl_info, &role->assoc_sta_queue);
 
 		if (phl_sta) {
+#ifdef RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
+			phl_sta->allocated = false;
+#endif
 			phl_free_stainfo_hw(phl_info, phl_sta);
 			phl_free_stainfo_sw(phl_info, phl_sta);
 			phl_stainfo_enqueue(phl_info,
@@ -1335,17 +1365,6 @@ phl_wifi_role_free_stainfo(struct phl_info_t *phl_info,
 	} while(phl_sta != NULL);
 
 	return RTW_PHL_STATUS_SUCCESS;
-}
-
-static void
-_phl_media_sta_notify(struct phl_info_t *phl_info,
-		struct rtw_phl_stainfo_t *sta, bool is_connect)
-{
-	if (is_connect)
-		phl_pkt_ofld_add_entry(phl_info, sta->macid);
-	else
-		phl_pkt_ofld_del_entry(phl_info, sta->macid);
-
 }
 
 /**
@@ -1476,8 +1495,6 @@ phl_update_media_status(struct phl_info_t *phl_info, struct rtw_phl_stainfo_t *s
 			goto _exit;
 		}
 	}
-
-	_phl_media_sta_notify(phl_info, sta, is_connect);
 
 	pstatus = RTW_PHL_STATUS_SUCCESS;
 
@@ -1622,6 +1639,7 @@ _change_stainfo(struct phl_info_t *phl_info,
 		break;
 	case STA_CHG_RA_GILTF:
 		sta->hal_sta->ra_info.cal_giltf = *((u8*)chg_info);
+		sta->hal_sta->ra_info.fix_giltf_en = true;
 		PHL_INFO("%s: Config RA GI LTF = %d\n", __FUNCTION__, *((u8*)chg_info));
 		break;
 	case STA_CHG_MAX:
@@ -1826,13 +1844,13 @@ rtw_phl_get_stainfo_by_macid(void *phl, u16 macid)
 
 	if (phl_sta == NULL) {
 		PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_,"%s sta info (macid:%d) is NULL\n", __func__, macid);
-		#ifdef CONFIG_PHL_USB_RELEASE_RPT_ENABLE
+		#ifdef CONFIG_PHL_RELEASE_RPT_ENABLE
 		/* comment temporarily since release report may report unused macid */
 		/* and trigger call tracing */
 		/* _os_warn_on(1); */
 		#else
 		_os_warn_on(1);
-		#endif /* CONFIG_PHL_USB_RELEASE_RPT_ENABLE */
+		#endif /* CONFIG_PHL_RELEASE_RPT_ENABLE */
 	}
 	_os_spinunlock(phl_to_drvpriv(phl_info), &macid_ctl->lock, _bh, NULL);
 
@@ -2006,6 +2024,24 @@ rtw_phl_query_rainfo(void *phl, struct rtw_phl_stainfo_t *phl_sta,
 	return phl_sts;
 }
 
+enum rtw_phl_status
+rtw_phl_get_rx_stat(void *phl, struct rtw_phl_stainfo_t *phl_sta,
+		     u16 *rx_rate, u8 *bw, u8 *gi_ltf)
+{
+	enum rtw_phl_status phl_sts = RTW_PHL_STATUS_FAILURE;
+	struct rtw_hal_stainfo_t *hal_sta;
+
+	if(phl_sta) {
+		hal_sta = phl_sta->hal_sta;
+		*rx_rate = hal_sta->trx_stat.rx_rate;
+		*gi_ltf = hal_sta->trx_stat.rx_gi_ltf;
+		*bw = hal_sta->trx_stat.rx_bw;
+		phl_sts = RTW_PHL_STATUS_SUCCESS;
+	}
+
+	return phl_sts;
+}
+
 /**
  * rtw_phl_txsts_rpt_config() - issue h2c for txok and tx retry info
  * @phl:		struct phl_info_t *
@@ -2025,7 +2061,7 @@ rtw_phl_txsts_rpt_config(void *phl, struct rtw_phl_stainfo_t *phl_sta)
 	return phl_sts;
 }
 
-#ifdef CONFIG_USB_HCI
+#if defined(CONFIG_USB_HCI) || defined(CONFIG_PCI_HCI)
 /**
  * rtw_phl_get_tx_ok_rpt() - get txok info.
  * @phl:		struct phl_info_t *
@@ -2201,7 +2237,7 @@ rtw_phl_get_tx_retry_rpt(void *phl, struct rtw_phl_stainfo_t *phl_sta, u32 *tx_r
 	}
 	return phl_sts;
 }
-#endif /* CONFIG_USB_HCI */
+#endif /* defined(CONFIG_USB_HCI) || defined(CONFIG_PCI_HCI) */
 
 /*
  * Get next idx
@@ -2351,8 +2387,8 @@ void phl_bcn_watchdog(struct phl_info_t *phl)
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
 
 	for (ridx = 0; ridx < MAX_WIFI_ROLE_NUMBER; ridx++) {
-		wrole = phl_get_wrole_by_ridx(phl, ridx);
-		if (wrole == NULL)
+		wrole = rtw_phl_get_wrole_by_ridx(phl->phl_com, ridx);
+		if (wrole->active == false)
 			continue;
 
 		if (rtw_phl_role_is_client_category(wrole) && wrole->mstate == MLME_LINKED) {
@@ -2486,3 +2522,9 @@ exit:
 
 }
 
+bool phl_self_stainfo_chk(struct phl_info_t *phl_info,
+                          struct rtw_wifi_role_t *wrole,
+                          struct rtw_phl_stainfo_t *sta)
+{
+	return _phl_self_stainfo_chk(phl_info, wrole, sta);
+}

@@ -222,8 +222,8 @@ typedef struct _WLAN_BCN_INFO {
 
 enum bss_type {
 	BSS_TYPE_UNDEF,
-	BSS_TYPE_BCN = 1,
-	BSS_TYPE_PROB_REQ = 2,
+	BSS_TYPE_PROB_REQ = 1,
+	BSS_TYPE_BCN = 2,
 	BSS_TYPE_PROB_RSP = 3,
 };
 
@@ -241,6 +241,10 @@ typedef struct _WLAN_BSSID_EX {
 	NDIS_802_11_NETWORK_INFRASTRUCTURE  InfrastructureMode;
 	NDIS_802_11_RATES_EX  SupportedRates;
 	WLAN_PHY_INFO	PhyInfo;
+#ifdef CONFIG_STA_MULTIPLE_BSSID
+	u8 is_mbssid;
+	u8 mbssid_index;
+#endif
 	u32  IELength;
 	u8  IEs[MAX_IE_SZ];	/* (timestamp, beacon interval, and capability information) */
 }
@@ -257,11 +261,27 @@ __inline  static uint get_WLAN_BSSID_EX_sz(WLAN_BSSID_EX *bss)
 	return sizeof(WLAN_BSSID_EX) - MAX_IE_SZ + bss->IELength;
 }
 
+struct beacon_keys {
+	u8 ssid[IW_ESSID_MAX_SIZE];
+	u32 ssid_len;
+	u8 ch;
+	u8 bw;
+	u8 offset;
+	u8 proto_cap; /* PROTO_CAP_XXX */
+	u8 rate_set[12];
+	u8 rate_num;
+	int encryp_protocol;
+	int pairwise_cipher;
+	int group_cipher;
+	u32 akm;
+};
+
 struct	wlan_network {
 	_list	list;
 	int	network_type;	/* refer to ieee80211.h for WIRELESS_11A/B/G */
 	int	fixed;			/* set to fixed when not to be removed as site-surveying */
 	systime last_scanned; /* timestamp for the network */
+	systime last_non_hidden_ssid_ap;
 #ifdef CONFIG_RTW_MESH
 #if CONFIG_RTW_MESH_ACNODE_PREVENT
 	systime acnode_stime;
@@ -270,6 +290,8 @@ struct	wlan_network {
 #endif
 	int	aid;			/* will only be valid when a BSS is joinned. */
 	int	join_res;
+	struct beacon_keys bcn_keys;
+	bool bcn_keys_valid;
 	WLAN_BSSID_EX	network; /* must be the last item */
 };
 

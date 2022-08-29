@@ -1094,7 +1094,7 @@ void halrf_pwr_by_rate_info_8852b(struct rf_info *rf,
 	u32 out_len = *_out_len;
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d\n",
-		 "RF Para Ver", RF_RELEASE_VERSION_8852B);
+		 "RF Para Ver", halrf_get_radio_reg_ver(rf));
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d\n",
 		 "RFE type", rf->phl_com->dev_cap.rfe_type);
@@ -1258,7 +1258,7 @@ void halrf_pwr_limit_info_8852b(struct rf_info *rf,
 	u32 out_len = *_out_len;
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d\n",
-		 "RF Para Ver", RF_RELEASE_VERSION_8852B);
+		 "RF Para Ver", halrf_get_radio_reg_ver(rf));
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d\n",
 		 "RFE type", rf->phl_com->dev_cap.rfe_type);
@@ -1270,9 +1270,9 @@ void halrf_pwr_limit_info_8852b(struct rf_info *rf,
 	
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s / %s / %s\n",
 		 "Regulation 2G / 5G / 6G",
-		 halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_24G),
-		 halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_5G),
-		 halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_6G));
+		 halrf_get_pw_lmt_regu_type_str_extra(rf, BAND_ON_24G),
+		 halrf_get_pw_lmt_regu_type_str_extra(rf, BAND_ON_5G),
+		 halrf_get_pw_lmt_regu_type_str_extra(rf, BAND_ON_6G));
 
 	cck_ref = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd200, 0x0007fc00);
 	ofdm_ref = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd200, 0x0ff80000);
@@ -1386,7 +1386,7 @@ void halrf_pwr_limit_ru_info_8852b(struct rf_info *rf,
 	u32 out_len = *_out_len;
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d\n",
-		 "RF Para Ver", RF_RELEASE_VERSION_8852B);
+		 "RF Para Ver", halrf_get_radio_reg_ver(rf));
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d\n",
 		 "RFE type", rf->phl_com->dev_cap.rfe_type);
@@ -1398,9 +1398,9 @@ void halrf_pwr_limit_ru_info_8852b(struct rf_info *rf,
 	
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s / %s / %s\n",
 		 "Regulation 2G / 5G / 6G",
-		 halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_24G),
-		 halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_5G),
-		 halrf_get_pw_lmt_regu_type_str(rf, BAND_ON_6G));
+		 halrf_get_pw_lmt_regu_type_str_extra(rf, BAND_ON_24G),
+		 halrf_get_pw_lmt_regu_type_str_extra(rf, BAND_ON_5G),
+		 halrf_get_pw_lmt_regu_type_str_extra(rf, BAND_ON_6G));
 
 	cck_ref = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd200, 0x0007fc00);
 	ofdm_ref = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd200, 0x0ff80000);
@@ -1437,6 +1437,8 @@ void halrf_pwr_limit_ru_info_8852b(struct rf_info *rf,
 		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM],
 		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM]);
 
+	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "1SS\n");
+
 	reg_tmp = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd33c, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		 "RU26", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
@@ -1446,6 +1448,20 @@ void halrf_pwr_limit_ru_info_8852b(struct rf_info *rf,
 		 "RU52", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 
 	reg_tmp = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd34c, 0xffffffff);
+	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
+		 "RU106", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
+
+	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "2SS\n");
+
+	reg_tmp = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd354, 0xffffffff);
+	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
+		 "RU26", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
+
+	reg_tmp = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd35c, 0xffffffff);
+	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
+		 "RU52", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
+
+	reg_tmp = halrf_mac_get_pwr_reg_8852b(rf, 0, 0xd364, 0xffffffff);
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %d.%d\n",
 		 "RU106", (reg_tmp & 0x7f) / 2, (reg_tmp & 0x7f) * 10 / 2 % 10);
 

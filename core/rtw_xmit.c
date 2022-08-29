@@ -67,6 +67,7 @@ void rtw_free_xmit_block(_adapter *padapter)
 u8 alloc_txring(_adapter *padapter)
 {
 	struct xmit_txreq_buf *ptxreq_buf = NULL;
+	struct rtw_xmit_req *txreq = NULL;
 	u32 idx, alloc_sz = 0, alloc_sz_txreq = 0;
 	u8 res = _SUCCESS;
 
@@ -99,6 +100,9 @@ u8 alloc_txring(_adapter *padapter)
 		ptxreq_buf->head = padapter->tx_pool_ring[idx] + offset_head;
 		ptxreq_buf->tail = padapter->tx_pool_ring[idx] + offset_tail;
 		ptxreq_buf->pkt_list = padapter->tx_pool_ring[idx] + offset_list;
+
+		txreq = (struct rtw_xmit_req *)ptxreq_buf->txreq;
+		txreq->cache = VIRTUAL_ADDR;
 
 		#ifdef USE_PREV_WLHDR_BUF /* CONFIG_CORE_TXSC */
 		ptxreq_buf->macid = 0xff;
@@ -355,6 +359,7 @@ s32 _rtw_init_xmit_priv(struct xmit_priv *pxmitpriv, _adapter *padapter)
 		/* MGT_TXREQ_QMGT */
 		pxframe->phl_txreq = (struct rtw_xmit_req *)txreq;
 		pxframe->phl_txreq->pkt_list = pkt_list;
+		pxframe->phl_txreq->cache = VIRTUAL_ADDR;
 
 		rtw_list_insert_tail(&(pxframe->list), &(pxmitpriv->free_xframe_ext_queue.queue));
 
@@ -2350,6 +2355,8 @@ static u8 rtw_chk_htc_en(_adapter *padapter, struct sta_info *psta, struct pkt_a
 	if (psta->hepriv.he_option == _TRUE) {
 		/*By test, some HE AP eapol & arp & dhcp pkt can not append ht control*/
 		if ((0x888e == pattrib->ether_type) || (0x0806 == pattrib->ether_type) || (pattrib->dhcp_pkt == 1))
+			return 0;
+		else if (rtw_get_current_tx_rate(padapter, psta) < RTW_DATA_RATE_HE_NSS1_MCS0)
 			return 0;
 		else
 			return rtw_he_htc_en(padapter, psta);
@@ -6471,17 +6478,18 @@ void core_recycle_txreq_phyaddr(_adapter *padapter, struct rtw_xmit_req *txreq)
 	PPCI_DATA pci_data = dvobj_to_pci(padapter->dvobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
 	struct rtw_pkt_buf_list *pkt_list = (struct rtw_pkt_buf_list *)txreq->pkt_list;
+	dma_addr_t phy_addr = 0;
 	u32 idx = 0;
 
 	for (idx = 0; idx < txreq->pkt_cnt; idx++) {
-		dma_addr_t phy_addr = (pkt_list->phy_addr_l);
-
+		phy_addr = pkt_list->phy_addr_l;
 #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
 		{
 			u64 phy_addr_h = pkt_list->phy_addr_h;
 			phy_addr |= (phy_addr_h << 32);
 		}
 #endif
+		if (txreq->cache == VIRTUAL_ADDR) {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 			pci_unmap_bus_addr(pdev, &phy_addr,
 				pkt_list->length, PCI_DMA_TODEVICE);
@@ -6489,6 +6497,12 @@ void core_recycle_txreq_phyaddr(_adapter *padapter, struct rtw_xmit_req *txreq)
 			pci_unmap_bus_addr(pdev, &phy_addr,
 				pkt_list->length, DMA_TO_DEVICE);
 #endif
+		} else {
+			pci_free_noncache_mem(pdev, pkt_list->vir_addr,
+				&phy_addr, pkt_list->length);
+			txreq->cache = VIRTUAL_ADDR;
+		}
+		pkt_list++;
 	}
 }
 
@@ -6503,6 +6517,9 @@ void fill_txreq_phyaddr(_adapter *padapter, struct xmit_frame *pxframe)
 
 	for (idx = 0; idx < pxframe->txreq_cnt; idx++) {
 		struct rtw_pkt_buf_list *pkt_list = (struct rtw_pkt_buf_list *)txreq->pkt_list;
+
+		if (txreq->cache != VIRTUAL_ADDR)
+			goto next;
 
 		for (idx1 = 0; idx1 < txreq->pkt_cnt; idx1++) {
 			dma_addr_t phy_addr = 0;
@@ -6519,6 +6536,7 @@ void fill_txreq_phyaddr(_adapter *padapter, struct xmit_frame *pxframe)
 			pkt_list->phy_addr_l = phy_addr & 0xFFFFFFFF;
 			pkt_list++;
 		}
+next:
 		txreq++;
 	}
 }
@@ -7547,6 +7565,73 @@ u8 core_wlan_fill_txreq_pre(_adapter *padapter, struct xmit_frame *pxframe)
 	return _SUCCESS;
 }
 
+u8 core_migrate_to_coherent_buf(_adapter *padapter, struct xmit_frame *pxframe)
+{
+#if defined(CONFIG_PCI_HCI) && defined(CONFIG_DMA_TX_USE_COHERENT_MEM)
+	PPCI_DATA pci_data = dvobj_to_pci(padapter->dvobj);
+	struct pci_dev *pdev = pci_data->ppcidev;
+	struct rtw_xmit_req *tx_req = NULL;
+	struct rtw_pkt_buf_list *pkt_frag = NULL;
+	char *tx_data, *ptr;
+	dma_addr_t phy_addr;
+	int i, j;
+
+
+	tx_req = pxframe->phl_txreq;
+
+	for (i = 0; i < pxframe->txreq_cnt; i++) {
+
+		tx_data = pci_alloc_noncache_mem(pdev, &phy_addr, tx_req->total_len);
+		if (!tx_data)
+			return _FAIL;
+
+		ptr = tx_data;
+		pkt_frag = (struct rtw_pkt_buf_list *)tx_req->pkt_list;
+
+		for (j = 0; j < tx_req->pkt_cnt; j++) {
+
+			if (!pkt_frag) {
+				pci_free_noncache_mem(pdev, tx_data,
+					(dma_addr_t *)&phy_addr, tx_req->total_len);
+				return _FAIL;
+			}
+
+			if (pkt_frag->vir_addr) {
+				_rtw_memcpy(ptr, pkt_frag->vir_addr, pkt_frag->length);
+				ptr += pkt_frag->length;
+			}
+
+			if (pxframe->buf_need_free & BIT(j)) {
+				pxframe->buf_need_free &= ~BIT(j);
+				rtw_mfree(pkt_frag->vir_addr, pkt_frag->length);
+			}
+			pkt_frag++;
+		}
+		pxframe->attrib.nr_frags = 1;
+
+		tx_req->pkt_cnt = 1;
+		pkt_frag = (struct rtw_pkt_buf_list *)tx_req->pkt_list;
+		pkt_frag->length = tx_req->total_len;
+		pkt_frag->vir_addr = tx_data;
+		pkt_frag->phy_addr_l = phy_addr & 0xFFFFFFFF;;
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+		pkt_frag->phy_addr_h = (u32)(phy_addr >> 32);
+#else
+		pkt_frag->phy_addr_h = 0x0;
+#endif
+		tx_req->cache = DMA_ADDR;
+		tx_req++;
+	}
+
+	if (pxframe->pkt) {
+		rtw_os_pkt_complete(padapter, pxframe->pkt);
+		pxframe->pkt = NULL;
+	}
+
+#endif /* CONFIG_PCI_HCI */
+	return _TRUE;
+}
+
 void core_wlan_fill_txreq_post(_adapter *padapter, struct xmit_frame *pxframe)
 {
 	fill_txreq_mdata(padapter, pxframe);
@@ -7930,6 +8015,9 @@ s32 core_tx_prepare_phl(_adapter *padapter, struct xmit_frame *pxframe)
 	}
 	core_wlan_fill_tail(padapter, pxframe);
 	core_wlan_sw_encrypt(padapter, pxframe);
+
+	if (core_migrate_to_coherent_buf(padapter, pxframe) == _FAIL)
+		return FAIL;
 
 	core_wlan_fill_txreq_post(padapter, pxframe);
 

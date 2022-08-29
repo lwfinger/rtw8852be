@@ -119,4 +119,9 @@
 
 #define HALBB_TDMA_CR_SUPPORT
 
+
+#ifndef DRV_BB_ULOFDMA_CTRL_DISABLE
+	#define HALBB_UL_TB_CTRL_SUPPORT
+#endif
+
 #endif
