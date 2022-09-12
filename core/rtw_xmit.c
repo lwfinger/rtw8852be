@@ -79,7 +79,7 @@ u8 alloc_txring(_adapter *padapter)
 	alloc_sz = (SZ_TX_RING * RTW_MAX_FRAG_NUM);
 	alloc_sz_txreq = MAX_TX_RING_NUM * (sizeof(struct xmit_txreq_buf));
 
-	RTW_INFO("eric-tx [%s] alloc_sz = %d, alloc_sz_txreq = %d\n", __FUNCTION__, alloc_sz, alloc_sz_txreq);
+//	RTW_INFO("eric-tx [%s] alloc_sz = %d, alloc_sz_txreq = %d\n", __FUNCTION__, alloc_sz, alloc_sz_txreq);
 
 	padapter->pxmit_txreq_buf = rtw_vmalloc(alloc_sz_txreq);
 	ptxreq_buf = (struct xmit_txreq_buf *)padapter->pxmit_txreq_buf;
@@ -129,7 +129,7 @@ void free_txring(_adapter *padapter)
 	alloc_sz = (SZ_TX_RING * RTW_MAX_FRAG_NUM);
 	alloc_sz_txreq = MAX_TX_RING_NUM * (sizeof(struct xmit_txreq_buf));
 
-	RTW_INFO("eric-tx [%s] alloc_sz = %d,  alloc_sz_txreq = %d\n", __func__, alloc_sz, alloc_sz_txreq);
+//	RTW_INFO("eric-tx [%s] alloc_sz = %d,  alloc_sz_txreq = %d\n", __func__, alloc_sz, alloc_sz_txreq);
 
 	for (idx = 0; idx < MAX_TX_RING_NUM; idx++) {
 		if (padapter->tx_pool_ring[idx]) {
@@ -495,7 +495,7 @@ s32 _rtw_init_xmit_priv(struct xmit_priv *pxmitpriv, _adapter *padapter)
 	rtw_intf_init_xmit_priv(padapter);
 
 #ifdef RTW_PHL_TX //alloc xmit resource
-	printk("eric-tx CALL alloc_txring !!!!\n");
+//	printk("eric-tx CALL alloc_txring !!!!\n");
 	if (alloc_txring(padapter) == _FAIL) {
 		RTW_ERR("[core] alloc_txring fail !!!\n");
 		res = _FAIL;
