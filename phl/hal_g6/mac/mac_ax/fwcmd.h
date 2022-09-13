@@ -845,5 +845,7 @@ u32 mac_get_c2h_event(struct mac_ax_adapter *adapter,
 
 u32 mac_notify_fw_dbcc(struct mac_ax_adapter *adapter, u8 en);
 
+void H2CRegIncreaseCounter(struct mac_ax_adapter *adapter);
+void C2HRegIncreaseCounter(struct mac_ax_adapter *adapter);
 #endif
 

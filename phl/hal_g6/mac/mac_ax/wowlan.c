@@ -21,6 +21,7 @@ static u32 frm_tgt_ind_orig;
 static u32 wol_pattern_orig;
 static u32 wol_uc_orig;
 static u32 wol_magic_orig;
+static u8 nlo_enable_record;
 
 static u32 send_h2c_keep_alive(struct mac_ax_adapter *adapter,
 			       struct keep_alive *parm)
@@ -500,10 +501,12 @@ static u32 send_h2c_nlo(struct mac_ax_adapter *adapter,
 	#else
 	struct h2c_buf *h2cb;
 	#endif
-	struct fwcmd_nlo *fwcmd_nl;
 	u32 ret = 0;
+	u32 *h2cb_u32;
+	u32 *nlo_parm_u32;
+	u8 sh;
 
-	h2cb = h2cb_alloc(adapter, H2CB_CLASS_DATA);
+	h2cb = h2cb_alloc(adapter, H2CB_CLASS_LONG_DATA);
 	if (!h2cb)
 		return MACNPTR;
 
@@ -514,15 +517,20 @@ static u32 send_h2c_nlo(struct mac_ax_adapter *adapter,
 		goto fail;
 	}
 
-	fwcmd_nl = (struct fwcmd_nlo *)buf;
-	fwcmd_nl->dword0 =
-	cpu_to_le32((parm->nlo_en ? FWCMD_H2C_NLO_NLO_EN : 0) |
-	(parm->nlo_32k_en ? FWCMD_H2C_NLO_NLO_32K_EN : 0) |
-	(parm->ignore_cipher_type ? FWCMD_H2C_NLO_IGNORE_CIPHER_TYPE : 0) |
-	SET_WORD(parm->mac_id, FWCMD_H2C_NLO_MAC_ID));
+	nlo_parm_u32 = &parm->nlo_networklistinfo_content;
+	h2cb_u32 = (u32 *)buf;
+	*h2cb_u32 = cpu_to_le32((parm->nlo_en ? FWCMD_H2C_NLO_NLO_EN : 0) |
+				(parm->nlo_32k_en ? FWCMD_H2C_NLO_NLO_32K_EN : 0) |
+				(parm->ignore_cipher_type ? FWCMD_H2C_NLO_IGNORE_CIPHER_TYPE : 0) |
+				SET_WORD(parm->mac_id, FWCMD_H2C_NLO_MAC_ID));
+	h2cb_u32++;
 
-	fwcmd_nl->dword1 =
-		cpu_to_le32(parm->nlo_networklistinfo_content);
+	*h2cb_u32 = cpu_to_le32(*nlo_parm_u32);
+	h2cb_u32++;
+	nlo_parm_u32 = parm->nlo_networklistinfo_more;
+
+	for (sh = 0; sh < (sizeof(struct mac_ax_nlo_networklist_parm_) / 4 - 1); sh++)
+		*(h2cb_u32 + sh) = cpu_to_le32(*(nlo_parm_u32 + sh));
 
 	ret = h2c_pkt_set_hdr(adapter, h2cb,
 			      FWCMD_TYPE_H2C,
@@ -1238,7 +1246,8 @@ u32 mac_cfg_nlo(struct mac_ax_adapter *adapter,
 	ret = send_h2c_nlo(adapter, &parm);
 	if (ret)
 		return ret;
-
+	if (info->nlo_en)
+		nlo_enable_record = 1;
 	return MACSUCCESS;
 }
 
@@ -1352,7 +1361,13 @@ u32 mac_cfg_wow_sleep(struct mac_ax_adapter *adapter,
 			ret = MAC_REG_W_OFLD(R_AX_RX_FUNCTION_STOP, B_AX_HDR_RX_STOP, 1, 0);
 			if (ret)
 				return ret;
-			ret = MAC_REG_W_OFLD(R_AX_RX_FLTR_OPT, B_AX_SNIFFER_MODE, 0, 0);
+			if (nlo_enable_record == 0) {
+				ret = MAC_REG_W_OFLD(R_AX_RX_FLTR_OPT, B_AX_SNIFFER_MODE, 0, 0);
+			} else {
+				ret = MAC_REG_W_OFLD(R_AX_RX_FLTR_OPT, B_AX_SNIFFER_MODE, 1, 0);
+				PLTFM_MSG_TRACE("Enable sniffer mode since nlo enable");
+				nlo_enable_record = 0;
+			}
 			if (ret)
 				return ret;
 			ret = MAC_REG_W32_OFLD(R_AX_ACTION_FWD0, 0x00000000, 0);
@@ -1407,9 +1422,18 @@ u32 mac_cfg_wow_sleep(struct mac_ax_adapter *adapter,
 		val32 = MAC_REG_R32(R_AX_RX_FUNCTION_STOP);
 		val32 |= B_AX_HDR_RX_STOP;
 		MAC_REG_W32(R_AX_RX_FUNCTION_STOP, val32);
-		val32 = MAC_REG_R32(R_AX_RX_FLTR_OPT);
-		val32 &= ~B_AX_SNIFFER_MODE;
-		MAC_REG_W32(R_AX_RX_FLTR_OPT, val32);
+
+		if (nlo_enable_record == 0) {
+			val32 = MAC_REG_R32(R_AX_RX_FLTR_OPT);
+			val32 &= ~B_AX_SNIFFER_MODE;
+			MAC_REG_W32(R_AX_RX_FLTR_OPT, val32);
+		} else {
+			val32 = MAC_REG_R32(R_AX_RX_FLTR_OPT);
+			val32 |= B_AX_SNIFFER_MODE;
+			MAC_REG_W32(R_AX_RX_FLTR_OPT, val32);
+			PLTFM_MSG_TRACE("enable sniffer for nlo\n");
+			nlo_enable_record = 0;
+		}
 
 		cfg.type = MAC_AX_PPDU_STATUS;
 		cfg.en = 0;

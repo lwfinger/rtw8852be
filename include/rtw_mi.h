@@ -33,7 +33,7 @@ struct mi_state {
 #ifdef CONFIG_AP_MODE
 	u8 ap_num;			/* WIFI_AP_STATE && WIFI_ASOC_STATE */
 	u8 starting_ap_num;	/*WIFI_FW_AP_STATE*/
-	u8 ld_ap_num;		/* WIFI_AP_STATE && WIFI_ASOC_STATE && asoc_sta_count > 2 */
+	u8 ld_ap_num;		/* WIFI_AP_STATE && WIFI_ASOC_STATE && asoc_sta_count >= 2 */
 #endif
 	u8 adhoc_num;		/* (WIFI_ADHOC_STATE | WIFI_ADHOC_MASTER_STATE) && WIFI_ASOC_STATE */
 	u8 ld_adhoc_num;	/* (WIFI_ADHOC_STATE | WIFI_ADHOC_MASTER_STATE) && WIFI_ASOC_STATE && asoc_sta_count > 2 */
@@ -288,6 +288,6 @@ u8 rtw_mi_get_ap_mesh_ifbmp(_adapter *adapter);
 
 
 u8 rtw_mi_disconnect(_adapter *adapter);
-u8 rtw_mi_buddy_disconnect(_adapter *adapter);
+u8 rtw_mi_buddy_disconnect(_adapter *adapter, Disconnect_type disc_code);
 
 #endif /*__RTW_MI_H_*/

@@ -39,6 +39,7 @@ halbb-y += $(path_halbb_d1)/halbb.o \
 			$(path_halbb_d1)/halbb_plcp_tx.o \
 			$(path_halbb_d1)/halbb_pmac_setting.o \
 			$(path_halbb_d1)/halbb_psd.o \
+			$(path_halbb_d1)/halbb_ul_tb_ctrl.o \
 			$(path_halbb_d1)/halbb_physts.o \
 			$(path_halbb_d1)/halbb_pwr_ctrl.o \
 			$(path_halbb_d1)/halbb_ra.o \
@@ -77,6 +78,7 @@ path_halbb_8852b := $(path_halbb_d1)/halbb_$(ic)
 
 halbb-y += $(path_halbb_8852b)/halbb_8852b.o \
 			$(path_halbb_8852b)/halbb_8852b_api.o \
+			$(path_halbb_8852b)/halbb_8852b_fwofld_api.o \
 			$(path_halbb_8852b)/halbb_hwimg_8852b.o \
 			$(path_halbb_8852b)/halbb_reg_cfg_8852b.o
 endif

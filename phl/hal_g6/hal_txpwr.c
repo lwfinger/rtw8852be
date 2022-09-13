@@ -41,3 +41,16 @@ enum rtw_hal_status rtw_hal_set_tx_power(void *hal, u8 band_idx,
 	return rtw_hal_rf_set_power(hal_info, phy_idx, pwr_table);
 }
 
+enum rtw_hal_status rtw_hal_get_txinfo_power(void *hal,
+					s16 *txinfo_power_dbm)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
+	s16 power_dbm = 0;
+
+	hal_status = rtw_hal_bb_get_txinfo_power(hal_info, &power_dbm);
+	*txinfo_power_dbm = power_dbm;
+
+	return hal_status;
+}
+

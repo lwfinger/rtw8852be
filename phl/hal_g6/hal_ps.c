@@ -70,8 +70,9 @@ _hal_ps_lps_chk_leave(struct hal_info_t *hal_info, u16 macid)
 
 	} while (1);
 
-	rtw_hal_fw_dbg_dump(hal_info, false);
-
+#ifdef CONFIG_PHL_PS_FW_DBG
+	rtw_hal_fw_dbg_dump(hal_info);
+#endif
 	if (status != RTW_HAL_STATUS_SUCCESS)
 		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[HALPS], %s(): polling timeout!\n", __func__);
 
@@ -84,7 +85,7 @@ _hal_ps_lps_cfg(struct hal_info_t *hal_info,
 {
 	PHL_TRACE(COMP_PHL_PS, _PHL_INFO_,
 		"[HALPS], %s(): mode(%d), listen bcn mode(%d), awake interval(%d), smart_ps_mode(%d).\n",
-		__func__, lps_info->lps_en, lps_info->listen_bcn_mode,
+		__func__, lps_info->en, lps_info->listen_bcn_mode,
 		lps_info->awake_interval, lps_info->smart_ps_mode);
 
 	return rtw_hal_mac_lps_cfg(hal_info, lps_info);
@@ -123,7 +124,9 @@ _hal_ps_pwr_state_chk(struct hal_info_t *hal_info, u8 req_pwr_state)
 
 	} while (1);
 
-	rtw_hal_fw_dbg_dump(hal_info, true);
+#ifdef CONFIG_PHL_PS_FW_DBG
+	rtw_hal_fw_dbg_dump(hal_info);
+#endif
 
 	if (status != RTW_HAL_STATUS_SUCCESS)
 		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[HALPS], %s(): polling timeout!\n", __func__);
@@ -244,6 +247,45 @@ _hal_ps_pwr_lvl_cfg(struct rtw_phl_com_t *phl_com, struct hal_info_t *hal_info,
 	return status;
 }
 
+void _hal_ps_proc_hw_rf_state_done(void* priv, struct phl_msg* msg)
+{
+	struct rtw_phl_com_t *phl_com = (struct rtw_phl_com_t *)priv;
+
+	if (msg->inbuf && msg->inlen) {
+		_os_kmem_free(phlcom_to_drvpriv(phl_com), msg->inbuf, msg->inlen);
+	}
+}
+
+static void
+_hal_ps_ntfy_hw_rf_state(struct rtw_phl_com_t *phl_com,
+			enum rtw_rf_state rf_state)
+{
+	struct phl_msg msg = {0};
+	struct phl_msg_attribute attr = {0};
+	void *d = phlcom_to_drvpriv(phl_com);
+	enum rtw_rf_state *rf_ntfy = NULL;
+
+	rf_ntfy = (enum rtw_rf_state *)_os_kmem_alloc(d, sizeof(*rf_ntfy));
+	if (rf_ntfy == NULL) {
+		PHL_ERR("[HALPS], %s(): alloc for ntfy fail.\n", __func__);
+		return;
+	}
+
+	*rf_ntfy = rf_state;
+	msg.inbuf = (u8 *)rf_ntfy;
+	msg.inlen = sizeof(*rf_ntfy);
+
+	SET_MSG_MDL_ID_FIELD(msg.msg_id, PHL_MDL_POWER_MGNT);
+	SET_MSG_EVT_ID_FIELD(msg.msg_id, MSG_EVT_HW_RF_CHG);
+	attr.completion.completion = _hal_ps_proc_hw_rf_state_done;
+	attr.completion.priv = phl_com;
+	if (rtw_phl_msg_hub_hal_send(phl_com, &attr, &msg) !=
+		RTW_PHL_STATUS_SUCCESS) {
+		PHL_ERR("[HALPS], %s(): send msg failed\n", __func__);
+		_os_kmem_free(d, rf_ntfy, sizeof(*rf_ntfy));
+	}
+}
+
 /**
  * configured requested power level
  * return success if configure power level ok
@@ -281,7 +323,7 @@ rtw_hal_ps_lps_cfg(void *hal, struct rtw_hal_lps_info *lps_info)
 	status = _hal_ps_lps_cfg(hal_info, lps_info);
 
 	if (status == RTW_HAL_STATUS_SUCCESS) {
-		if (lps_info->lps_en == false)
+		if (lps_info->en == false)
 			status = _hal_ps_lps_chk_leave(hal_info, lps_info->macid);
 	}
 
@@ -300,4 +342,57 @@ enum rtw_hal_status rtw_hal_ps_pwr_req(struct rtw_phl_com_t *phl_com, u8 src, bo
 
 	return RTW_HAL_STATUS_SUCCESS;
 }
+
+enum rtw_hal_status rtw_hal_ps_ips_cfg(void *hal,
+	struct rtw_hal_ips_info *ips_info)
+{
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+
+	hstatus = rtw_hal_mac_ips_cfg(hal, ips_info->macid, ips_info->en);
+
+	if (hstatus == RTW_HAL_STATUS_SUCCESS && !ips_info->en)
+		hstatus = rtw_hal_mac_ips_chk_leave(hal_info, ips_info->macid);
+
+	return hstatus;
+}
+
+void
+rtw_hal_ps_chk_hw_rf_state(struct rtw_phl_com_t *phl_com, void *hal)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
+	enum rtw_rf_state rf_state = RTW_RF_ON;
+	u8 val = 0;
+
+	hstatus = rtw_hal_mac_get_wl_dis_val(hal_info, &val);
+	if (hstatus != RTW_HAL_STATUS_SUCCESS) {
+		PHL_TRACE(COMP_PHL_PS, _PHL_ERR_, "[HALPS], %s(): get wl dis val fail, status: %d\n",
+			  __func__, hstatus);
+		return;
+	}
+
+	/* get new rf state */
+	if (val == 1) {
+		rf_state = RTW_RF_ON;
+	} else if (val == 0) {
+		rf_state = RTW_RF_OFF;
+	} else {
+		PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[HALPS], %s(): wl_dis is invalid value: %d\n",
+			  __func__, val);
+		return;
+	}
+
+	PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[HALPS], %s(): rf state = %d\n",
+		  __func__, rf_state);
+	_hal_ps_ntfy_hw_rf_state(phl_com, rf_state);
+}
+
+void rtw_hal_ps_notify_wake(void *hal)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+
+	rtw_hal_mac_ps_notify_wake(hal_info);
+}
+
 #endif /* CONFIG_POWER_SAVE */

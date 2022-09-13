@@ -179,10 +179,7 @@ void rtw_os_indicate_disconnect(_adapter *adapter,  u16 reason, u8 locally_gener
 #ifdef RTK_DMP_PLATFORM
 	_set_workitem(&adapter->mlmepriv.Linkdown_workitem);
 #endif
-	/* modify for CONFIG_IEEE80211W, none 11w also can use the same command */
-	rtw_reset_securitypriv_cmd(adapter);
-
-
+	rtw_reset_securitypriv(adapter);
 }
 
 void rtw_report_sec_ie(_adapter *adapter, u8 authmode, u8 *sec_ie)
@@ -407,11 +404,13 @@ int hostapd_mode_init(_adapter *padapter)
 	mac[4] = 0x11;
 	mac[5] = 0x12;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
-	_rtw_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+        eth_hw_addr_set(pnetdev, mac);
 #else
-	dev_addr_mod(pnetdevi, 0, mac, ETH_ALEN);
+	_rtw_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
 #endif
+
+
 	rtw_netif_carrier_off(pnetdev);
 
 

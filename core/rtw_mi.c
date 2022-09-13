@@ -194,7 +194,7 @@ void rtw_mi_status_by_ifbmp(struct dvobj_priv *dvobj, u8 ifbmp, struct mi_state 
 		} else if (check_fwstate(&iface->mlmepriv, WIFI_AP_STATE) == _TRUE ) {
 			if (check_fwstate(&iface->mlmepriv, WIFI_ASOC_STATE) == _TRUE) {
 				MSTATE_AP_NUM(mstate)++;
-				if (iface->stapriv.asoc_sta_count > 2)
+				if (iface->stapriv.asoc_sta_count >= 2)
 					MSTATE_AP_LD_NUM(mstate)++;
 				#ifdef CONFIG_P2P
 				if (MLME_IS_GO(iface))
@@ -516,6 +516,11 @@ static u8 _rtw_mi_disconnect(_adapter *adapter, void *data)
 {
 	struct mlme_priv *mlme = &adapter->mlmepriv;
 	struct mlme_ext_priv *mlmeext = &adapter->mlmeextpriv;
+	struct mlme_ext_info *mlmeinfo = &(mlmeext->mlmext_info);
+	Disconnect_type disc_code = DISCONNECTION_NOT_YET_OCCUR;
+
+	if (data)
+		disc_code = *(int *)data;
 
 	if ((MLME_IS_AP(adapter) || MLME_IS_MESH(adapter))
 			&& check_fwstate(mlme, WIFI_ASOC_STATE)) {
@@ -542,6 +547,12 @@ static u8 _rtw_mi_disconnect(_adapter *adapter, void *data)
 		rtw_free_assoc_resources(adapter, _TRUE);
 #endif /* !CONFIG_STA_CMD_DISPR */
 		rtw_indicate_disconnect(adapter, 0, _FALSE);
+
+		if (disc_code == DISCONNECTION_BY_DRIVER_DUE_TO_EACH_IFACE_CHBW_NOT_SYNC) {
+			mlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+			mlmeinfo->disconnect_code = disc_code;
+			mlmeinfo->wifi_reason_code = WLAN_REASON_DEAUTH_LEAVING;
+		}
 	}
 	return _TRUE;
 }
@@ -550,9 +561,10 @@ u8 rtw_mi_disconnect(_adapter *adapter)
 {
 	return _rtw_mi_process(adapter, _FALSE, NULL, _rtw_mi_disconnect);
 }
-u8 rtw_mi_buddy_disconnect(_adapter *adapter)
+u8 rtw_mi_buddy_disconnect(_adapter *adapter, Disconnect_type disc_code)
 {
-	return _rtw_mi_process(adapter, _TRUE, NULL, _rtw_mi_disconnect);
+	return _rtw_mi_process(adapter, _TRUE, (void *)&disc_code,
+			       _rtw_mi_disconnect);
 }
 
 static u8 _rtw_mi_netif_caron_qstart(_adapter *padapter, void *data)

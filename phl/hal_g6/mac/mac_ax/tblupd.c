@@ -933,9 +933,9 @@ fail:
 }
 
 void _set_role_cctrl(struct mac_ax_adapter *adapter,
-		     struct mac_ax_cctl_info *info,
-		     struct mac_ax_cctl_info *mask,
-		     struct mac_ax_cctl_info *cctrl)
+		     struct rtw_hal_mac_ax_cctl_info *info,
+		     struct rtw_hal_mac_ax_cctl_info *mask,
+		     struct rtw_hal_mac_ax_cctl_info *cctrl)
 {
 	cctrl->datarate = (cctrl->datarate & ~mask->datarate) |
 			(mask->datarate & info->datarate);
@@ -1158,8 +1158,8 @@ void _set_role_cctrl(struct mac_ax_adapter *adapter,
 }
 
 void mac_upd_role_cctrl(struct mac_ax_adapter *adapter,
-			struct mac_ax_cctl_info *info,
-			struct mac_ax_cctl_info *mask, u8 macid)
+			struct rtw_hal_mac_ax_cctl_info *info,
+			struct rtw_hal_mac_ax_cctl_info *mask, u8 macid)
 {
 	struct mac_role_tbl *role;
 
@@ -1172,8 +1172,8 @@ void mac_upd_role_cctrl(struct mac_ax_adapter *adapter,
 }
 
 u32 mac_upd_cctl_info(struct mac_ax_adapter *adapter,
-		      struct mac_ax_cctl_info *info,
-		      struct mac_ax_cctl_info *mask, u8 macid, u8 operation)
+		      struct rtw_hal_mac_ax_cctl_info *info,
+		      struct rtw_hal_mac_ax_cctl_info *mask, u8 macid, u8 operation)
 {
 	u32 ret = 0;
 	u8 *buf;

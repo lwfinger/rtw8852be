@@ -2000,6 +2000,8 @@ void halrf_do_tssi_scan_8852b(struct rf_info *rf,
 	else
 		band = TSSI_ALIMK_2G;
 
+	halrf_write_fwofld_start(rf);
+
 	halrf_tssi_disable_8852b(rf, phy);
 
 	for (i = RF_PATH_A; i < TSSI_PATH_MAX_8852B; i++) {
@@ -2028,6 +2030,7 @@ void halrf_do_tssi_scan_8852b(struct rf_info *rf,
 	halrf_tssi_enable_8852b(rf, phy);
 	halrf_tssi_set_efuse_to_de_8852b(rf, phy);
 
+	halrf_write_fwofld_end(rf);
 }
 
 void halrf_tssi_get_efuse_8852b(struct rf_info *rf,
@@ -2653,7 +2656,7 @@ void halrf_get_tssi_info_8852b(struct rf_info *rf,
 	s8 txagc_offset[TSSI_PATH_MAX_8852B] = {0};
 	
 	RF_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used, " %-25s = %x\n",
-		 "RF Para Ver", halrf_rrf(rf, RF_PATH_A, 0x9f, 0xfff));
+		 "RF Para Ver", halrf_get_radio_ver_from_reg(rf));
 
 	RF_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used, " %-25s = 0x%x / 0x%x\n",
 		 "TSSI DCK A / B", halrf_rreg(rf, 0x1c04, 0x00FFF000),
@@ -2683,8 +2686,8 @@ void halrf_get_tssi_info_8852b(struct rf_info *rf,
 	else
 		delta_tssi = tmp;
 	RF_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used, " %-25s = %d / %d / %d\n",
-		 "TSSI C / Final / Delta B", halrf_rreg(rf, 0x1c00, 0x000001ff),
-		 halrf_rreg(rf, 0x1c00, 0x0003fe00), delta_tssi);
+		 "TSSI C / Final / Delta B", halrf_rreg(rf, 0x3c00, 0x000001ff),
+		 halrf_rreg(rf, 0x3c00, 0x0003fe00), delta_tssi);
 
 	pg_ther = halrf_rreg(rf, 0x5810, 0x0000fc00);
 	cur_ther = halrf_rreg(rf, 0x1c10, 0xff000000);

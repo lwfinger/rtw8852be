@@ -158,7 +158,8 @@ struct env_mntr_rpt {
 	u16			nhm_tx_cnt; /*sample cnt*/
 	u16			nhm_cca_cnt; /*sample cnt*/
 	u16			nhm_idle_cnt; /*sample cnt*/
-	u8			nhm_pwr; /*dBm+110*/
+	u8			nhm_pwr; /*110+x(dBm), unit = 1dB*/
+	u8			nhm_pwr_0p5; /*110+x/2(dBm), unit = 0.5dB*/
 	u8			ifs_clm_tx_ratio; /*percent*/
 	u8			ifs_clm_edcca_excl_cca_ratio; /*percent*/
 	u8			ifs_clm_cck_fa_ratio; /*percent*/
@@ -174,7 +175,8 @@ struct env_mntr_rpt {
 	u8			fahm_rpt[FAHM_RPT_NUM]; /*percent*/
 	u8			fahm_ratio; /*percent*/
 	u8			fahm_denom_ratio; /*percent*/
-	u8			fahm_pwr; /*dBm+110*/
+	u8			fahm_pwr; /*110+x(dBm), unit = 1dB*/
+	u8			fahm_pwr_0p5; /*110+x/2(dBm), unit = 0.5dB*/
 	u8			edcca_clm_ratio; /*percent*/
 };
 

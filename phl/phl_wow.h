@@ -64,8 +64,8 @@ struct phl_wow_info {
 	struct phl_wow_error err;
 	struct rtw_phl_stainfo_t *sta;
 	enum rtw_wow_op_mode op_mode;
-	enum rtw_mac_pwr_st mac_pwr;
 	u8 ps_pwr_lvl;
+	enum rtw_mac_pwr_st mac_pwr;
 
 	/* pkt ofld token */
 	u32 null_pkt_token;
@@ -76,6 +76,7 @@ struct phl_wow_info {
 	u32 kapkt_pkt_token;
 	u32 ack_pkt_token;
 	u32 wp_token;
+	u32 probe_req_pkt_token;
 
 	/* func */
 	struct rtw_keep_alive_info keep_alive_info;
@@ -113,19 +114,17 @@ enum rtw_phl_status phl_wow_deinit_postcfg(struct phl_wow_info *wow_info);
 
 void phl_reset_wow_info(struct phl_wow_info *wow_info);
 
-u8 phl_wow_nlo_exist(struct phl_wow_info *wow_info);
-
 enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info);
 
 void phl_wow_func_dis(struct phl_wow_info *wow_info);
 
 void phl_wow_decide_op_mode(struct phl_wow_info *wow_info, struct rtw_phl_stainfo_t *sta);
 #ifdef CONFIG_POWER_SAVE
-void phl_wow_ps_pctl_cfg(struct phl_wow_info *wow_info, u8 enter_wow);
+enum rtw_phl_status phl_wow_ps_proto_cfg(struct phl_wow_info *wow_info, bool enter_ps);
 
-void phl_wow_ps_pwr_cfg(struct phl_wow_info *wow_info, u8 enter_wow);
+void phl_wow_ps_pwr_ntfy(struct phl_wow_info *wow_info, bool enter_ps);
 
-enum rtw_phl_status phl_wow_leave_low_power(struct phl_wow_info *wow_info);
+enum rtw_phl_status phl_wow_ps_pwr_cfg(struct phl_wow_info *wow_info, bool enter_ps);
 #endif
 #endif /* CONFIG_WOWLAN */
 

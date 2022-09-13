@@ -276,7 +276,7 @@ enum rtw_phl_status _mcc_transfer_mode(struct phl_info_t *phl,
 	for (ridx = 0; ridx < MAX_WIFI_ROLE_NUMBER; ridx++) {
 		if (!(role_map & BIT(ridx)))
 			continue;
-		wrole = phl_get_wrole_by_ridx(phl, ridx);
+		wrole = rtw_phl_get_wrole_by_ridx(phl->phl_com, ridx);
 		if (wrole == NULL) {
 			PHL_TRACE(COMP_PHL_MCC, _PHL_INFO_, "_mcc_transfer_mode(): get wrole fail, role_idx(%d)\n",
 				ridx);
@@ -577,7 +577,7 @@ enum rtw_phl_status _mcc_fill_role_info(struct phl_info_t *phl,
 	for (ridx = 0; ridx < MAX_WIFI_ROLE_NUMBER; ridx++) {
 		if (!(role_map & BIT(ridx)))
 			continue;
-		wrole = phl_get_wrole_by_ridx(phl, ridx);
+		wrole = rtw_phl_get_wrole_by_ridx(phl->phl_com, ridx);
 		if (wrole == NULL) {
 			PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "_mcc_fill_role_info(): get wrole fail, role_idx(%d)\n",
 				ridx);
@@ -3162,8 +3162,8 @@ enum rtw_phl_status rtw_phl_mcc_ap_bt_coex_enable(struct phl_info_t *phl,
 		goto _cfg_info_fail;
 	}
 	_mcc_set_state(minfo, MCC_TRIGGER_FW_EN);
-	if (rtw_hal_mcc_enable(phl->hal, en_info, &minfo->bt_info) !=
-						RTW_HAL_STATUS_SUCCESS) {
+	if (rtw_hal_mcc_enable(phl->hal, en_info, &minfo->bt_info,
+				minfo->mcc_mode) != RTW_HAL_STATUS_SUCCESS) {
 		_mcc_set_state(minfo, MCC_FW_EN_FAIL);
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_phl_mcc_ap_bt_coex_enable(): Enable FW mcc Fail\n");
 		goto exit;
@@ -3208,8 +3208,8 @@ enum rtw_phl_status rtw_phl_mcc_go_bt_coex_disable(struct phl_info_t *phl,
 		goto exit;
 	}
 	_mcc_set_state(minfo, MCC_TRIGGER_FW_DIS);
-	if (rtw_hal_mcc_disable(phl->hal, m_role->group, m_role->macid)
-						!= RTW_HAL_STATUS_SUCCESS) {
+	if (rtw_hal_mcc_disable(phl->hal, m_role->group, m_role->macid,
+				minfo->mcc_mode) != RTW_HAL_STATUS_SUCCESS) {
 		status = RTW_PHL_STATUS_FAILURE;
 		_mcc_set_state(minfo, MCC_FW_DIS_FAIL);
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_,"rtw_phl_mcc_go_bt_coex_disable(): Disable FW mcc Fail\n");
@@ -3416,6 +3416,11 @@ void rtw_phl_mcc_sta_entry_change(struct phl_info_t *phl,
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_phl_mcc_sta_entry_change(): Update macid map fail\n");
 		goto exit;
 	}
+	if (RTW_HAL_STATUS_SUCCESS != rtw_hal_notify_mcc_macid(phl->hal,
+	                                                       mrole,
+	                                                       minfo->mcc_mode)) {
+		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_phl_mcc_sta_entry_change(): Notify macid map fail\n");
+	}
 	PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_phl_mcc_sta_entry_change(): Update macid map ok\n");
 	_mcc_dump_mcc_info(minfo);
 exit:
@@ -3456,6 +3461,11 @@ void phl_mcc_client_link_notify_for_ap(struct phl_info_t *phl,
 			__func__);
 		goto exit;
 	}
+	if (RTW_HAL_STATUS_SUCCESS != rtw_hal_notify_mcc_macid(phl->hal,
+	                                                       mrole,
+	                                                       minfo->mcc_mode)) {
+		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_phl_mcc_client_link_notify_for_ap(): Notify macid map fail\n");
+	}
 	PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "%s(): Update macid map ok\n",
 		__func__);
 	_mcc_dump_mcc_info(minfo);
@@ -3480,6 +3490,74 @@ bool rtw_phl_mcc_inprogress(struct phl_info_t *phl, u8 band_idx)
 	}
 exit:
 	return ret;
+}
+
+static bool _is_mcc_sts_err(struct phl_info_t *phl, u8 band_idx)
+{
+	bool ret = false;
+	struct phl_mcc_info *minfo = NULL;
+
+	if (!is_mcc_init(phl)) {
+		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_,
+			"%s(): mcc is not init, please check code\n",
+			__func__);
+		goto exit;
+	}
+	minfo = get_mcc_info(phl, band_idx);
+	if (MCC_FW_DIS_FAIL == minfo->state ||
+		MCC_FW_EN_FAIL == minfo->state) {
+		ret = true;
+	}
+exit:
+	return ret;
+}
+
+enum rtw_phl_status rtw_phl_mcc_reset(struct phl_info_t *phl,
+					u8 band_idx)
+{
+	enum rtw_phl_status status = RTW_PHL_STATUS_FAILURE;
+	struct rtw_phl_mcc_en_info *en_info = NULL;
+	struct phl_mcc_info *minfo = NULL;
+
+	FUNCIN();
+	if (!is_mcc_init(phl)) {
+		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_,
+			"%s(): mcc is not init, please check code\n",
+			__func__);
+		goto exit;
+	}
+	minfo = get_mcc_info(phl, band_idx);
+	en_info = &minfo->en_info;
+
+	/* Reset mcc */
+	rtw_hal_mcc_reset(phl->hal, en_info->group, minfo->mcc_mode);
+	PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_,
+		"%s(): reset mcc group(%d) complete\n",
+		__func__, en_info->group);
+	/* Reset state */
+	_mcc_set_state(minfo, MCC_NONE);
+
+	if (minfo->mcc_mode == RTW_PHL_TDMRA_AP_CLIENT_WMODE ||
+		minfo->mcc_mode == RTW_PHL_TDMRA_AP_WMODE)
+		_mcc_clean_noa(phl, en_info);
+	status = RTW_PHL_STATUS_SUCCESS;
+exit:
+	return status;
+}
+
+enum rtw_phl_status rtw_phl_mcc_recovery(struct phl_info_t *phl,
+					u8 band_idx)
+{
+	enum rtw_phl_status status = RTW_PHL_STATUS_SUCCESS;
+
+	if (_is_mcc_sts_err(phl, band_idx)) {
+		PHL_TRACE(COMP_PHL_MCC, _PHL_INFO_,
+			"%s: err status detected, try to reset mcc.\n",
+			__func__);
+		rtw_phl_mcc_reset(phl, band_idx);
+	}
+
+	return status;
 }
 
 /* Enable Fw MCC
@@ -3558,8 +3636,8 @@ enum rtw_phl_status rtw_phl_mcc_enable(struct phl_info_t *phl,
 		goto _cfg_info_fail;
 	}
 	_mcc_set_state(minfo, MCC_TRIGGER_FW_EN);
-	if (rtw_hal_mcc_enable(phl->hal, en_info, &minfo->bt_info) !=
-						RTW_HAL_STATUS_SUCCESS) {
+	if (rtw_hal_mcc_enable(phl->hal, en_info, &minfo->bt_info,
+				minfo->mcc_mode) != RTW_HAL_STATUS_SUCCESS) {
 		_mcc_set_state(minfo, MCC_FW_EN_FAIL);
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_phl_mcc_enable(): Enable FW mcc Fail\n");
 		goto exit;
@@ -3610,8 +3688,8 @@ enum rtw_phl_status rtw_phl_mcc_disable(struct phl_info_t *phl,
 		goto exit;
 	}
 	_mcc_set_state(minfo, MCC_TRIGGER_FW_DIS);
-	if (rtw_hal_mcc_disable(phl->hal, m_role->group, m_role->macid)
-						!= RTW_HAL_STATUS_SUCCESS) {
+	if (rtw_hal_mcc_disable(phl->hal, m_role->group, m_role->macid,
+				minfo->mcc_mode) != RTW_HAL_STATUS_SUCCESS) {
 		status = RTW_PHL_STATUS_FAILURE;
 		_mcc_set_state(minfo, MCC_FW_DIS_FAIL);
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_,"rtw_phl_mcc_disable(): Disable FW mcc Fail\n");
@@ -3729,8 +3807,8 @@ enum rtw_phl_status rtw_phl_tdmra_disable(struct phl_info_t *phl,
 		#endif /* RTW_WKARD_TDMRA_AUTO_GET_STAY_ROLE */
 	}
 	_mcc_set_state(minfo, MCC_TRIGGER_FW_DIS);
-	if (rtw_hal_mcc_disable(phl->hal, m_role->group, m_role->macid)
-						!= RTW_HAL_STATUS_SUCCESS) {
+	if (rtw_hal_mcc_disable(phl->hal, m_role->group, m_role->macid,
+				minfo->mcc_mode) != RTW_HAL_STATUS_SUCCESS) {
 		status = RTW_PHL_STATUS_FAILURE;
 		_mcc_set_state(minfo, MCC_FW_DIS_FAIL);
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_,"rtw_phl_tdmra_disable(): Disable FW mcc Fail\n");

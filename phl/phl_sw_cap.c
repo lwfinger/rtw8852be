@@ -21,6 +21,7 @@ _phl_sw_cap_para_init(
 	para_info->para_src = RTW_PARA_SRC_INTNAL;
 	para_info->para_data = NULL;
 	para_info->para_data_len = 0;
+	para_info->hal_phy_folder = NULL;
 }
 
 static void
@@ -46,6 +47,7 @@ _phl_pwrlmt_para_init(
 	para_info->para_data_len = 0;
 	para_info->ext_regd_arridx = 0;
 	para_info->ext_reg_map_num = 0;
+	para_info->hal_phy_folder = NULL;
 }
 
 static void
@@ -328,6 +330,22 @@ static void _phl_init_proto_bf_cap(struct phl_info_t *phl_info,
 
 }
 
+static void _phl_external_cap_limit(struct phl_info_t *phl_info,
+	struct protocol_cap_t *proto_role_cap)
+{
+#ifdef RTW_WKARD_BTC_STBC_CAP
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl_info->hal);
+
+	if ((proto_role_cap->cap_option & EXT_CAP_LIMIT_2G_RX_STBC) &&
+		hal_com->btc_ctrl.disable_rx_stbc) {
+		proto_role_cap->stbc_he_rx = 0;
+		proto_role_cap->stbc_vht_rx = 0;
+		proto_role_cap->stbc_ht_rx = 0;
+		PHL_INFO("%s Disable STBC RX cap for BTC request\n", __func__);
+	}
+#endif
+}
+
 static void _phl_init_proto_stbc_cap(struct phl_info_t *phl_info,
 		u8 hw_band, struct protocol_cap_t *proto_role_cap)
 {
@@ -417,6 +435,8 @@ static void _phl_init_proto_stbc_cap(struct phl_info_t *phl_info,
 		proto_role_cap->stbc_rx_greater_80mhz = proto_cap.stbc_rx_greater_80mhz;
 	}
 #endif
+
+	_phl_external_cap_limit(phl_info, proto_role_cap);
 }
 
 static enum rtw_phl_status
@@ -859,4 +879,14 @@ void rtw_phl_final_cap_decision(void * phl)
 	rtw_hal_final_cap_decision(phl_com, phl_info->hal);
 }
 
+void phl_init_proto_stbc_cap(struct rtw_wifi_role_t *role,
+		struct phl_info_t *phl_info,
+		struct protocol_cap_t *proto_role_cap)
+{
+	if (role->chandef.band == BAND_ON_24G)
+		proto_role_cap->cap_option |= EXT_CAP_LIMIT_2G_RX_STBC;
+	else
+		proto_role_cap->cap_option &= ~(EXT_CAP_LIMIT_2G_RX_STBC);
 
+	_phl_init_proto_stbc_cap(phl_info, role->hw_band, proto_role_cap);
+}

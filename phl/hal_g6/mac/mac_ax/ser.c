@@ -15,6 +15,22 @@
 
 #include "ser.h"
 
+#define DBG_SENARIO_SH 28
+
+#define L0_TO_L1_EVENT_SH 28
+#define L0_TO_L1_EVENT_MSK 0xF
+
+enum mac_ax_l0_to_l1_event {
+	MAC_AX_L0_TO_L1_CHIF_IDLE = 0,
+	MAC_AX_L0_TO_L1_CMAC_DMA_IDLE = 1,
+	MAC_AX_L0_TO_L1_RLS_PKID = 2,
+	MAC_AX_L0_TO_L1_PTCL_IDLE = 3,
+	MAC_AX_L0_TO_L1_RX_QTA_LOST = 4,
+	MAC_AX_L0_TO_L1_DLE_STAT_HANG = 5,
+	MAC_AX_L0_TO_L1_PCIE_STUCK = 6,
+	MAC_AX_L0_TO_L1_EVENT_MAX = 15,
+};
+
 static void dump_err_status_dispatcher(struct mac_ax_adapter *adapter);
 static void dump_err_status_dmac(struct mac_ax_adapter *adapter);
 static void dump_err_status_cmac(struct mac_ax_adapter *adapter, u8 band);
@@ -96,6 +112,144 @@ u32 mac_trigger_dmac_err(struct mac_ax_adapter *adapter)
 	return MACSUCCESS;
 }
 
+u32 mac_dump_qta_lost(struct mac_ax_adapter *adapter)
+{
+	struct dle_dfi_qempty_t qempty;
+	struct dle_dfi_quota_t quota;
+	struct dle_dfi_ctrl_t ctrl;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 ret, val, not_empty, i;
+
+	qempty.dle_type = DLE_CTRL_TYPE_PLE;
+	qempty.grpsel = 0;
+	ret = dle_dfi_qempty(adapter, &qempty);
+	if (ret == MACSUCCESS)
+		PLTFM_MSG_ALWAYS("DLE group0 empty: 0x%x\n", qempty.qempty);
+	else
+		PLTFM_MSG_ERR("%s: query DLE fail\n", __func__);
+
+	for (not_empty = ~qempty.qempty, i = 0;
+	     not_empty != 0; not_empty = not_empty >> 1, i++) {
+		if (!(not_empty & BIT(0)))
+			continue;
+		ctrl.type = DLE_CTRL_TYPE_PLE;
+		ctrl.target = DLE_DFI_TYPE_QLNKTBL;
+		ctrl.addr = (QLNKTBL_ADDR_INFO_SEL_0 ?
+			     QLNKTBL_ADDR_INFO_SEL : 0) |
+			SET_WORD(i, QLNKTBL_ADDR_TBL_IDX);
+		ret = dle_dfi_ctrl(adapter, &ctrl);
+		if (ret == MACSUCCESS)
+			PLTFM_MSG_ALWAYS("qidx%d pktcnt = %d\n", i,
+					 GET_FIELD(ctrl.out_data,
+						   QLNKTBL_DATA_SEL1_PKT_CNT));
+		else
+			PLTFM_MSG_ERR("%s: query DLE fail\n", __func__);
+	}
+
+	/* cmac0 */
+	quota.dle_type = DLE_CTRL_TYPE_PLE;
+	quota.qtaid = 6;
+	ret = dle_dfi_quota(adapter, &quota);
+	if (ret == MACSUCCESS)
+		PLTFM_MSG_ALWAYS("quota6 rsv/use: 0x%x/0x%x\n",
+				 quota.rsv_pgnum, quota.use_pgnum);
+	else
+		PLTFM_MSG_ERR("%s: query DLE fail\n", __func__);
+
+	val = MAC_REG_R32(R_AX_PLE_QTA6_CFG);
+	PLTFM_MSG_ALWAYS("[PLE][CMAC0_RX]min_pgnum=0x%x\n",
+			 GET_FIELD(val, B_AX_PLE_Q6_MIN_SIZE));
+	PLTFM_MSG_ALWAYS("[PLE][CMAC0_RX]max_pgnum=0x%x\n",
+			 GET_FIELD(val, B_AX_PLE_Q6_MAX_SIZE));
+
+	val = MAC_REG_R32(R_AX_RX_FLTR_OPT);
+	PLTFM_MSG_ALWAYS("[CMAC0_RX]B_AX_RX_MPDU_MAX_LEN=0x%x\n",
+			 GET_FIELD(val, B_AX_RX_MPDU_MAX_LEN));
+
+	val = MAC_REG_R32(R_AX_RSP_CHK_SIG);
+	PLTFM_MSG_ALWAYS("R_AX_RSP_CHK_SIG=0x%x\n",
+			 val);
+
+	val = MAC_REG_R32(R_AX_TRXPTCL_RESP_0);
+	PLTFM_MSG_ALWAYS("R_AX_TRXPTCL_RESP_0=0x%x\n",
+			 val);
+
+	val = MAC_REG_R32(R_AX_CCA_CONTROL);
+	PLTFM_MSG_ALWAYS("R_AX_CCA_CONTROL=0x%x\n",
+			 val);
+
+	/* cmac1 */
+	ret = check_mac_en(adapter, 1, MAC_AX_CMAC_SEL);
+
+	if (ret == MACSUCCESS) {
+		quota.dle_type = DLE_CTRL_TYPE_PLE;
+		quota.qtaid = 7;
+		ret = dle_dfi_quota(adapter, &quota);
+		if (ret == MACSUCCESS)
+			PLTFM_MSG_ALWAYS("quota7 rsv/use: 0x%x/0x%x\n",
+					 quota.rsv_pgnum, quota.use_pgnum);
+		else
+			PLTFM_MSG_ERR("%s: query DLE fail\n", __func__);
+
+		val = MAC_REG_R32(R_AX_PLE_QTA7_CFG);
+		PLTFM_MSG_ALWAYS("[PLE][CMAC1_RX]min_pgnum=0x%x\n",
+				 GET_FIELD(val, B_AX_PLE_Q7_MIN_SIZE));
+		PLTFM_MSG_ALWAYS("[PLE][CMAC1_RX]max_pgnum=0x%x\n",
+				 GET_FIELD(val, B_AX_PLE_Q7_MAX_SIZE));
+
+		val = MAC_REG_R32(R_AX_RX_FLTR_OPT_C1);
+		PLTFM_MSG_ALWAYS("[CMAC1_RX]B_AX_RX_MPDU_MAX_LEN=0x%x\n",
+				 GET_FIELD(val, B_AX_RX_MPDU_MAX_LEN));
+
+		val = MAC_REG_R32(R_AX_RSP_CHK_SIG_C1);
+		PLTFM_MSG_ALWAYS("R_AX_RSP_CHK_SIG_C1=0x%x\n",
+				 val);
+
+		val = MAC_REG_R32(R_AX_TRXPTCL_RESP_0_C1);
+		PLTFM_MSG_ALWAYS("R_AX_TRXPTCL_RESP_0_C1=0x%x\n",
+				 val);
+
+		val = MAC_REG_R32(R_AX_CCA_CONTROL_C1);
+		PLTFM_MSG_ALWAYS("R_AX_CCA_CONTROL_C1=0x%x\n",
+				 val);
+	}
+
+	val = MAC_REG_R32(R_AX_DLE_EMPTY0);
+	PLTFM_MSG_ALWAYS("R_AX_DLE_EMPTY0=0x%x\n",
+			 val);
+
+	val = MAC_REG_R32(R_AX_DLE_EMPTY1);
+	PLTFM_MSG_ALWAYS("R_AX_DLE_EMPTY1=0x%x\n",
+			 val);
+
+	dump_err_status_dispatcher(adapter);
+
+	return MACSUCCESS;
+}
+
+u32 mac_dump_l0_to_l1(struct mac_ax_adapter *adapter,
+		      enum mac_ax_err_info err)
+{
+	u32 dbg, event;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	PLTFM_MSG_ALWAYS("%s\n", __func__);
+
+	dbg = MAC_REG_R32(R_AX_SER_DBG_INFO);
+	event = GET_FIELD(dbg, L0_TO_L1_EVENT);
+
+	switch (event) {
+	case MAC_AX_L0_TO_L1_RX_QTA_LOST:
+		PLTFM_MSG_ALWAYS("quota lost!\n");
+		mac_dump_qta_lost(adapter);
+		break;
+	default:
+		break;
+	}
+
+	return MACSUCCESS;
+}
+
 u32 mac_dump_err_status(struct mac_ax_adapter *adapter,
 			enum mac_ax_err_info err)
 {
@@ -119,6 +273,8 @@ u32 mac_dump_err_status(struct mac_ax_adapter *adapter,
 			PLTFM_MSG_ERR("R_AX_LBC_WATCHDOG=0x%08x\n",
 				      MAC_REG_R32(R_AX_LBC_WATCHDOG));
 		}
+		if (err == MAC_AX_ERR_L0_PROMOTE_TO_L1)
+			mac_dump_l0_to_l1(adapter, err);
 	}
 	PLTFM_MSG_ERR("<---\n");
 

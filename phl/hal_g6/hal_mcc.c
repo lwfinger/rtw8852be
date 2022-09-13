@@ -231,6 +231,26 @@ exit:
 	return status;
 }
 
+enum rtw_hal_status rtw_hal_notify_mcc_macid(void *hal,
+                                             struct rtw_phl_mcc_role *mrole,
+                                             enum rtw_phl_tdmra_wmode wmode)
+{
+	enum rtw_hal_status sts = RTW_HAL_STATUS_FAILURE;
+
+	if (wmode == RTW_PHL_TDMRA_AP_CLIENT_WMODE ||
+	    wmode == RTW_PHL_TDMRA_2CLIENTS_WMODE) {
+		if (sts != rtw_hal_bb_upd_mcc_macid(hal, mrole)) {
+			PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "%s: Notify BB MCC MACID bitmap failed\n",
+			          __FUNCTION__);
+			goto exit;
+
+		}
+	}
+	sts = RTW_HAL_STATUS_SUCCESS;
+exit:
+	return sts;
+}
+
 enum rtw_hal_status rtw_hal_mcc_update_macid_bitmap(void *hal, u8 group,
 			u16 macid, struct rtw_phl_mcc_macid_bitmap *info)
 {
@@ -309,7 +329,32 @@ enum rtw_hal_status rtw_hal_mcc_change_pattern(void *hal,
 	return status;
 }
 
-enum rtw_hal_status rtw_hal_mcc_disable(void *hal, u8 group, u16 macid)
+enum rtw_hal_status rtw_hal_mcc_reset(void *hal, u8 group,
+					enum rtw_phl_tdmra_wmode wmode)
+{
+	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
+
+	status = rtw_hal_mac_reset_mcc_group(hal, group);
+	if (status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_,
+			"%s(): reset group(%d) failed\n",
+			__func__, group);
+		goto exit;
+	}
+	if (wmode == RTW_PHL_TDMRA_AP_CLIENT_WMODE ||
+		wmode == RTW_PHL_TDMRA_2CLIENTS_WMODE) {
+		rtw_hal_bb_mcc_stop(hal);
+	}
+
+	status = RTW_HAL_STATUS_SUCCESS;
+exit:
+	PHL_TRACE(COMP_PHL_MCC, _PHL_INFO_, "%s(): status(%d)\n",
+		__func__, status);
+	return status;
+}
+
+enum rtw_hal_status rtw_hal_mcc_disable(void *hal, u8 group, u16 macid,
+					enum rtw_phl_tdmra_wmode wmode)
 {
 	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
 
@@ -323,6 +368,11 @@ enum rtw_hal_status rtw_hal_mcc_disable(void *hal, u8 group, u16 macid)
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_hal_mcc_disable(): Delete group failed\n");
 		goto exit;
 	}
+	if (wmode == RTW_PHL_TDMRA_AP_CLIENT_WMODE ||
+		wmode == RTW_PHL_TDMRA_2CLIENTS_WMODE) {
+		rtw_hal_bb_mcc_stop(hal);
+	}
+
 #ifdef RTW_WKARD_HALRF_MCC
 	rtw_hal_rf_dpk_switch(hal, true);
 #endif /* RTW_WKARD_HALRF_MCC */
@@ -334,7 +384,8 @@ exit:
 }
 
 enum rtw_hal_status rtw_hal_mcc_enable(void *hal, struct rtw_phl_mcc_en_info *info,
-					struct rtw_phl_mcc_bt_info *bt_info)
+					struct rtw_phl_mcc_bt_info *bt_info,
+					enum rtw_phl_tdmra_wmode wmode)
 {
 	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
 	struct rtw_phl_mcc_role *ref_role = &info->mcc_role[info->ref_role_idx];
@@ -372,6 +423,16 @@ enum rtw_hal_status rtw_hal_mcc_enable(void *hal, struct rtw_phl_mcc_en_info *in
 		PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_hal_mcc_enable(): Start MCC failed\n");
 		goto exit;
 	}
+
+	if (wmode == RTW_PHL_TDMRA_AP_CLIENT_WMODE ||
+		wmode == RTW_PHL_TDMRA_2CLIENTS_WMODE) {
+		status = rtw_hal_bb_mcc_start(hal, &info->mcc_role[0],
+		                              &info->mcc_role[1]);
+		if (status != RTW_HAL_STATUS_SUCCESS) {
+			PHL_TRACE(COMP_PHL_MCC, _PHL_ERR_, "rtw_hal_mcc_enable(): Notify MCC start failed\n");
+		}
+	}
+
 	status = RTW_HAL_STATUS_SUCCESS;
 exit:
 	PHL_TRACE(COMP_PHL_MCC, _PHL_INFO_, "rtw_hal_mcc_enable(): Ststus(%d)\n",

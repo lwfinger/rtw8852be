@@ -59,7 +59,7 @@ static struct dle_size_t wde_size5 = {
 /* PCIE 64 */
 static struct dle_size_t wde_size6 = {
 	MAC_AX_WDE_PG_64, /* pge_size */
-	1024, /* lnk_pge_num */
+	512, /* lnk_pge_num */
 	0, /* unlnk_pge_num */
 };
 
@@ -175,11 +175,11 @@ static struct dle_size_t wde_size22 = {
 	104, /* unlnk_pge_num */
 };
 
-/* 8852B PCIE STF AB */
+/* PCIE SCC TURBO */
 static struct dle_size_t wde_size23 = {
 	MAC_AX_WDE_PG_64, /* pge_size */
-	216, /* lnk_pge_num */
-	40, /* unlnk_pge_num */
+	1024, /* lnk_pge_num */
+	0, /* unlnk_pge_num */
 };
 
 /* 8852B USB CABV*/
@@ -189,11 +189,11 @@ static struct dle_size_t wde_size24 = {
 	40, /* unlnk_pge_num */
 };
 
-/* 8852B USB2.0 */
+/* 8852B USB2.0/USB3.0 SCC*/
 static struct dle_size_t wde_size25 = {
 	MAC_AX_WDE_PG_64, /* pge_size */
-	242, /* lnk_pge_num */
-	14, /* unlnk_pge_num */
+	162, /* lnk_pge_num */
+	94, /* unlnk_pge_num */
 };
 
 /* 8852AU ccv*/
@@ -201,6 +201,20 @@ static struct dle_size_t wde_size26 = {
 	MAC_AX_WDE_PG_64, /* pge_size */
 	760, /* lnk_pge_num */
 	8, /* unlnk_pge_num */
+};
+
+/* 8852B USB2.0/USB3.0 SCC TURBO*/
+static struct dle_size_t wde_size27 = {
+	MAC_AX_WDE_PG_64, /* pge_size */
+	220, /* lnk_pge_num */
+	36, /* unlnk_pge_num */
+};
+
+/* 8852C USB*/
+static struct dle_size_t wde_size28 = {
+	MAC_AX_WDE_PG_64, /* pge_size */
+	384, /* lnk_pge_num */
+	0, /* unlnk_pge_num */
 };
 
 /* PCIE */
@@ -248,7 +262,7 @@ static struct dle_size_t ple_size5 = {
 /* PCIE 64 */
 static struct dle_size_t ple_size6 = {
 	MAC_AX_PLE_PG_128, /* pge_size */
-	1008, /* lnk_pge_num */
+	496, /* lnk_pge_num */
 	16, /* unlnk_pge_num */
 };
 
@@ -297,7 +311,7 @@ static struct dle_size_t ple_size12 = {
 /* SDIO SCC */
 static struct dle_size_t ple_size13 = {
 	MAC_AX_PLE_PG_128, /* pge_size */
-	1456, /* lnk_pge_num */
+	688, /* lnk_pge_num */
 	16, /* unlnk_pge_num */
 };
 
@@ -305,7 +319,7 @@ static struct dle_size_t ple_size13 = {
 static struct dle_size_t ple_size14 = {
 	MAC_AX_PLE_PG_128, /* pge_size */
 	432, /* lnk_pge_num */
-	528, /* unlnk_pge_num */
+	16, /* unlnk_pge_num */
 };
 
 /* LA-USB 8852A */
@@ -364,39 +378,53 @@ static struct dle_size_t ple_size22 = {
 	16, /* unlnk_pge_num */
 };
 
-/* 8852B PCIE AB */
+/* 8852B PCIE TURBO AB */
 static struct dle_size_t ple_size23 = {
 	MAC_AX_PLE_PG_128, /* pge_size */
 	496, /* lnk_pge_num */
 	16, /* unlnk_pge_num */
 };
 
-/* 8852B PCIE STF AB */
+/* PCIE SCC TURBO */
 static struct dle_size_t ple_size24 = {
 	MAC_AX_PLE_PG_128, /* pge_size */
-	880, /* lnk_pge_num */
+	1008, /* lnk_pge_num */
 	16, /* unlnk_pge_num */
 };
 
-/* 8852B DLFW AB */
-static struct dle_size_t ple_size25 = {
-	MAC_AX_PLE_PG_128, /* pge_size */
-	64, /* lnk_pge_num */
-	448, /* unlnk_pge_num */
-};
-
-/* 8852B USB CABV*/
-static struct dle_size_t ple_size26 = {
-	MAC_AX_PLE_PG_128, /* pge_size */
-	872, /* lnk_pge_num */
-	24, /* unlnk_pge_num */
-};
-
-/* 8852B USB2.0 */
+/* 8852B USB2.0 SCC*/
 static struct dle_size_t ple_size27 = {
 	MAC_AX_PLE_PG_128, /* pge_size */
-	1402, /* lnk_pge_num */
-	6, /* unlnk_pge_num */
+	620, /* lnk_pge_num */
+	20, /* unlnk_pge_num */
+};
+
+/* 8852B USB2.0 TURBO*/
+static struct dle_size_t ple_size28 = {
+	MAC_AX_PLE_PG_128, /* pge_size */
+	1396, /* lnk_pge_num */
+	12, /* unlnk_pge_num */
+};
+
+/* SDIO SCC TURBO */
+static struct dle_size_t ple_size29 = {
+	MAC_AX_PLE_PG_128, /* pge_size */
+	1456, /* lnk_pge_num */
+	16, /* unlnk_pge_num */
+};
+
+/*8852B  USB 3.0 */
+static struct dle_size_t ple_size30 = {
+	MAC_AX_PLE_PG_128, /* pge_size */
+	632, /* lnk_pge_num */
+	8, /* unlnk_pge_num */
+};
+
+/* 8852B USB3.0 TURBO */
+static struct dle_size_t ple_size31 = {
+	MAC_AX_PLE_PG_128, /* pge_size */
+	1386, /* lnk_pge_num */
+	22, /* unlnk_pge_num */
 };
 
 /* PCIE 64 */
@@ -449,7 +477,7 @@ static struct wde_quota_t wde_qt5 = {
 
 /* PCIE 64 */
 static struct wde_quota_t wde_qt6 = {
-	960, /* hif */
+	448, /* hif */
 	48, /* wcpu */
 	0, /* pkt_in */
 	16, /* cpu_io */
@@ -583,12 +611,12 @@ static struct wde_quota_t wde_qt22 = {
 	40, /* cpu_io */
 };
 
-/* 8852B PCIE STF AB */
+/* PCIE SCC TRUBO */
 static struct wde_quota_t wde_qt23 = {
-	164, /* hif */
-	44, /* wcpu */
+	960, /* hif */
+	48, /* wcpu */
 	0, /* pkt_in */
-	8, /* cpu_io */
+	16, /* cpu_io */
 };
 
 /* 8852B USB CABV */
@@ -599,10 +627,18 @@ static struct wde_quota_t wde_qt24 = {
 	8, /* cpu_io */
 };
 
-/* 8852B USB2.0 */
+/* 8852B USB2.0 SCC */
 static struct wde_quota_t wde_qt25 = {
-	190, /* hif */
-	44, /* wcpu */
+	152, /* hif */
+	2, /* wcpu */
+	0, /* pkt_in */
+	8, /* cpu_io */
+};
+
+/* 8852B USB2.0 SCC TURBO*/
+static struct wde_quota_t wde_qt26 = {
+	210, /* hif */
+	2, /* wcpu */
 	0, /* pkt_in */
 	8, /* cpu_io */
 };
@@ -624,7 +660,7 @@ static struct ple_quota_t ple_qt0 = {
 };
 
 /* 8852AU ccv */
-static struct wde_quota_t wde_qt26 = {
+static struct wde_quota_t wde_qt27 = {
 	504, /* hif */
 	196, /* wcpu */
 	0, /* pkt_in */
@@ -909,7 +945,7 @@ static struct ple_quota_t ple_qt18 = {
 	0, /* cmac1_tx */
 	16, /* c2h */
 	20, /* h2c */
-	13, /* wcpu */
+	4, /* wcpu */
 	13, /* mpdu_proc */
 	178, /* cmac0_dma */
 	0, /* cma1_dma */
@@ -1049,11 +1085,11 @@ static struct ple_quota_t ple_qt26 = {
 
 /* USB3.0 52B */
 static struct ple_quota_t ple_qt27 = {
-	962, /* cmac0_tx */
+	286, /* cmac0_tx */
 	0, /* cmac1_tx */
 	16, /* c2h */
 	48, /* h2c */
-	88, /* wcpu */
+	4, /* wcpu */
 	13, /* mpdu_proc */
 	178, /* cmac0_dma */
 	0, /* cma1_dma */
@@ -1065,11 +1101,11 @@ static struct ple_quota_t ple_qt27 = {
 
 /* USB3.0 52B */
 static struct ple_quota_t ple_qt28 = {
-	962, /* cmac0_tx */
+	286, /* cmac0_tx */
 	0, /* cmac1_tx */
 	32, /* c2h */
 	48, /* h2c */
-	121, /* wcpu */
+	37, /* wcpu */
 	13, /* mpdu_proc */
 	211, /* cmac0_dma */
 	0, /* cma1_dma */
@@ -1161,7 +1197,7 @@ static struct ple_quota_t ple_qt33 = {
 
 /* SDIO SCC */
 static struct ple_quota_t ple_qt34 = {
-	836, /* cmac0_tx */
+	320, /* cmac0_tx */
 	0, /* cmac1_tx */
 	16, /* c2h */
 	16, /* h2c */
@@ -1177,15 +1213,15 @@ static struct ple_quota_t ple_qt34 = {
 
 /* SDIO SCC */
 static struct ple_quota_t ple_qt35 = {
-	836, /* cmac0_tx */
+	320, /* cmac0_tx */
 	0, /* cmac1_tx */
-	375, /* c2h */
+	123, /* c2h */
 	16, /* h2c */
-	385, /* wcpu */
+	133, /* wcpu */
 	0, /* mpdu_proc */
-	537, /* cmac0_dma */
+	285, /* cmac0_dma */
 	0, /* cma1_dma */
-	375, /* bb_rpt */
+	123, /* bb_rpt */
 	1, /* wd_rel */
 	24, /* cpu_io */
 	0, /* tx_rpt */
@@ -1527,13 +1563,13 @@ static struct ple_quota_t ple_qt56 = {
 	0, /* tx_rpt */
 };
 
-/* 8852B PCIE STF AB */
+/* PCIE SCC TURBO */
 static struct ple_quota_t ple_qt57 = {
-	442, /* cmac0_tx */
+	147, /* cmac0_tx */
 	0, /* cmac1_tx */
 	16, /* c2h */
 	20, /* h2c */
-	88, /* wcpu */
+	13, /* wcpu */
 	13, /* mpdu_proc */
 	178, /* cmac0_dma */
 	0, /* cma1_dma */
@@ -1543,49 +1579,17 @@ static struct ple_quota_t ple_qt57 = {
 	0, /* tx_rpt */
 };
 
-/* 8852B PCIE STF AB*/
+/* PCIE 64 */
 static struct ple_quota_t ple_qt58 = {
-	511, /* cmac0_tx */
-	0, /* cmac1_tx */
-	32, /* c2h */
-	20, /* h2c */
-	157, /* wcpu */
-	13, /* mpdu_proc */
-	247, /* cmac0_dma */
-	0, /* cma1_dma */
-	101, /* bb_rpt */
-	14, /* wd_rel */
-	24, /* cpu_io */
-	0, /* tx_rpt */
-};
-
-/* USB 52B CABV*/
-static struct ple_quota_t ple_qt59 = {
-	442, /* cmac0_tx */
+	147, /* cmac0_tx */
 	0, /* cmac1_tx */
 	16, /* c2h */
-	48, /* h2c */
-	88, /* wcpu */
+	20, /* h2c */
+	68, /* wcpu */
 	13, /* mpdu_proc */
-	178, /* cmac0_dma */
+	242, /* cmac0_dma */
 	0, /* cma1_dma */
-	32, /* bb_rpt */
-	14, /* wd_rel */
-	8, /* cpu_io */
-	0, /* tx_rpt */
-};
-
-/* USB 52B CABV*/
-static struct ple_quota_t ple_qt60 = {
-	442, /* cmac0_tx */
-	0, /* cmac1_tx */
-	32, /* c2h */
-	48, /* h2c */
-	121, /* wcpu */
-	13, /* mpdu_proc */
-	211, /* cmac0_dma */
-	0, /* cma1_dma */
-	65, /* bb_rpt */
+	96, /* bb_rpt */
 	14, /* wd_rel */
 	24, /* cpu_io */
 	0, /* tx_rpt */
@@ -1593,13 +1597,13 @@ static struct ple_quota_t ple_qt60 = {
 
 /* USB2.0 52B */
 static struct ple_quota_t ple_qt61 = {
-	780, /* cmac0_tx */
+	130, /* cmac0_tx */
 	0, /* cmac1_tx */
 	16, /* c2h */
 	48, /* h2c */
-	88, /* wcpu */
+	4, /* wcpu */
 	13, /* mpdu_proc */
-	370, /* cmac0_dma */
+	322, /* cmac0_dma */
 	0, /* cma1_dma */
 	32, /* bb_rpt */
 	14, /* wd_rel */
@@ -1609,13 +1613,13 @@ static struct ple_quota_t ple_qt61 = {
 
 /* USB2.0 52B */
 static struct ple_quota_t ple_qt62 = {
-	780, /* cmac0_tx */
+	130, /* cmac0_tx */
 	0, /* cmac1_tx */
 	32, /* c2h */
 	48, /* h2c */
-	121, /* wcpu */
+	37, /* wcpu */
 	13, /* mpdu_proc */
-	403, /* cmac0_dma */
+	355, /* cmac0_dma */
 	0, /* cma1_dma */
 	65, /* bb_rpt */
 	14, /* wd_rel */
@@ -1636,6 +1640,102 @@ static struct ple_quota_t ple_qt63 = {
 	64, /* bb_rpt */
 	128, /* wd_rel */
 	120, /* cpu_io */
+	0, /* tx_rpt */
+};
+
+/* SDIO SCC TURBO */
+static struct ple_quota_t ple_qt66 = {
+	836, /* cmac0_tx */
+	0, /* cmac1_tx */
+	16, /* c2h */
+	16, /* h2c */
+	26, /* wcpu */
+	0, /* mpdu_proc */
+	178, /* cmac0_dma */
+	0, /* cma1_dma */
+	16, /* bb_rpt */
+	1, /* wd_rel */
+	8, /* cpu_io */
+	0, /* tx_rpt */
+};
+
+/* SDIO SCC TURBO */
+static struct ple_quota_t ple_qt67 = {
+	836, /* cmac0_tx */
+	0, /* cmac1_tx */
+	375, /* c2h */
+	16, /* h2c */
+	385, /* wcpu */
+	0, /* mpdu_proc */
+	537, /* cmac0_dma */
+	0, /* cma1_dma */
+	375, /* bb_rpt */
+	1, /* wd_rel */
+	24, /* cpu_io */
+	0, /* tx_rpt */
+};
+
+/* USB2.0 52B TURBO*/
+static struct ple_quota_t ple_qt68 = {
+	858, /* cmac0_tx */
+	0, /* cmac1_tx */
+	16, /* c2h */
+	48, /* h2c */
+	4, /* wcpu */
+	13, /* mpdu_proc */
+	370, /* cmac0_dma */
+	0, /* cma1_dma */
+	32, /* bb_rpt */
+	14, /* wd_rel */
+	8, /* cpu_io */
+	0, /* tx_rpt */
+};
+
+/* USB2.0 52B TURBO*/
+static struct ple_quota_t ple_qt69 = {
+	858, /* cmac0_tx */
+	0, /* cmac1_tx */
+	32, /* c2h */
+	48, /* h2c */
+	37, /* wcpu */
+	13, /* mpdu_proc */
+	403, /* cmac0_dma */
+	0, /* cma1_dma */
+	65, /* bb_rpt */
+	14, /* wd_rel */
+	24, /* cpu_io */
+	0, /* tx_rpt */
+};
+
+/* USB3.0 52B TURBO*/
+static struct ple_quota_t ple_qt70 = {
+	1040, /* cmac0_tx */
+	0, /* cmac1_tx */
+	16, /* c2h */
+	48, /* h2c */
+	4, /* wcpu */
+	13, /* mpdu_proc */
+	178, /* cmac0_dma */
+	0, /* cma1_dma */
+	32, /* bb_rpt */
+	14, /* wd_rel */
+	8, /* cpu_io */
+	0, /* tx_rpt */
+};
+
+/* USB3.0 52B TURBO*/
+static struct ple_quota_t ple_qt71 = {
+	1040, /* cmac0_tx */
+	0, /* cmac1_tx */
+	32, /* c2h */
+	48, /* h2c */
+	37, /* wcpu */
+	13, /* mpdu_proc */
+	211, /* cmac0_dma */
+	0, /* cma1_dma */
+	65, /* bb_rpt */
+	14, /* wd_rel */
+	24, /* cpu_io */
 	0, /* tx_rpt */
 };
 
@@ -1676,33 +1776,17 @@ static struct dle_mem_t dle_mem_pcie_8852b[] = {
 	{MAC_AX_QTA_SCC, /* qta_mode */
 	 &wde_size6, &ple_size6, /* wde_size, ple_size */
 	 &wde_qt6, &wde_qt6, /* wde_min_qt, wde_max_qt */
-	 &ple_qt18, &ple_qt19}, /* ple_min_qt, ple_max_qt */
+	 &ple_qt18, &ple_qt58}, /* ple_min_qt, ple_max_qt */
+	 {MAC_AX_QTA_SCC_TURBO, /* qta_mode */
+	 &wde_size23, &ple_size24, /* wde_size, ple_size */
+	 &wde_qt23, &wde_qt23, /* wde_min_qt, wde_max_qt */
+	 &ple_qt57, &ple_qt19}, /* ple_min_qt, ple_max_qt */
 	{MAC_AX_QTA_SCC_STF, /* qta_mode */
 	 &wde_size8, &ple_size7, /* wde_size, ple_size */
 	 &wde_qt8, &wde_qt8, /* wde_min_qt, wde_max_qt */
 	 &ple_qt20, &ple_qt21}, /* ple_min_qt, ple_max_qt */
 	{MAC_AX_QTA_DLFW, /* qta_mode */
 	 &wde_size9, &ple_size8, /* wde_size, ple_size */
-	 &wde_qt4, &wde_qt4, /* wde_min_qt, wde_max_qt */
-	 &ple_qt13, &ple_qt13}, /* ple_min_qt, ple_max_qt */
-	{MAC_AX_QTA_LAMODE, /* qta_mode */
-	 &wde_size11, &ple_size11, /* wde_size, ple_size */
-	 &wde_qt10, &wde_qt10, /* wde_min_qt, wde_max_qt */
-	 &ple_qt30, &ple_qt31}, /* ple_min_qt, ple_max_qt */
-	{MAC_AX_QTA_INVALID, NULL, NULL, NULL, NULL, NULL, NULL},
-};
-
-static struct dle_mem_t dle_mem_pcie_8852b_cabv[] = {
-	{MAC_AX_QTA_SCC, /* qta_mode */
-	 &wde_size6, &ple_size23, /* wde_size, ple_size */
-	 &wde_qt6, &wde_qt6, /* wde_min_qt, wde_max_qt */
-	 &ple_qt18, &ple_qt56}, /* ple_min_qt, ple_max_qt */
-	{MAC_AX_QTA_SCC_STF, /* qta_mode */
-	 &wde_size23, &ple_size24, /* wde_size, ple_size */
-	 &wde_qt23, &wde_qt23, /* wde_min_qt, wde_max_qt */
-	 &ple_qt57, &ple_qt58}, /* ple_min_qt, ple_max_qt */
-	{MAC_AX_QTA_DLFW, /* qta_mode */
-	 &wde_size9, &ple_size25, /* wde_size, ple_size */
 	 &wde_qt4, &wde_qt4, /* wde_min_qt, wde_max_qt */
 	 &ple_qt13, &ple_qt13}, /* ple_min_qt, ple_max_qt */
 	{MAC_AX_QTA_LAMODE, /* qta_mode */
@@ -1793,7 +1877,7 @@ static struct dle_mem_t dle_mem_usb_8852a[] = {
 static struct dle_mem_t dle_mem_usb_8852a_ccv[] = {
 	{MAC_AX_QTA_SCC, /* qta_mode */
 	 &wde_size26, &ple_size1, /* wde_size, ple_size */
-	 &wde_qt26, &wde_qt26, /* wde_min_qt, wde_max_qt */
+	 &wde_qt27, &wde_qt27, /* wde_min_qt, wde_max_qt */
 	 &ple_qt25, &ple_qt63}, /* ple_min_qt, ple_max_qt */
 	{MAC_AX_QTA_DBCC, /* qta_mode */
 	 &wde_size1, &ple_size1, /* wde_size, ple_size */
@@ -1823,13 +1907,17 @@ static struct dle_mem_t dle_mem_usb2_8852b[] = {
 	 &wde_size16, &ple_size16, /* wde_size, ple_size */
 	 &wde_qt15, &wde_qt15, /* wde_min_qt, wde_max_qt */
 	 &ple_qt40, &ple_qt41}, /* ple_min_qt, ple_max_qt */
+	 {MAC_AX_QTA_SCC_TURBO, /* qta_mode */
+	 &wde_size27, &ple_size28, /* wde_size, ple_size */
+	 &wde_qt26, &wde_qt26, /* wde_min_qt, wde_max_qt */
+	 &ple_qt68, &ple_qt69}, /* ple_min_qt, ple_max_qt */
 	{MAC_AX_QTA_INVALID, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
 static struct dle_mem_t dle_mem_usb3_8852b[] = {
 	{MAC_AX_QTA_SCC, /* qta_mode */
-	 &wde_size8, &ple_size7, /* wde_size, ple_size */
-	 &wde_qt8, &wde_qt8, /* wde_min_qt, wde_max_qt */
+	 &wde_size25, &ple_size30, /* wde_size, ple_size */
+	 &wde_qt25, &wde_qt25, /* wde_min_qt, wde_max_qt */
 	 &ple_qt27, &ple_qt28}, /* ple_min_qt, ple_max_qt */
 	{MAC_AX_QTA_DLFW, /* qta_mode */
 	 &wde_size9, &ple_size8, /* wde_size, ple_size */
@@ -1839,22 +1927,10 @@ static struct dle_mem_t dle_mem_usb3_8852b[] = {
 	 &wde_size16, &ple_size16, /* wde_size, ple_size */
 	 &wde_qt15, &wde_qt15, /* wde_min_qt, wde_max_qt */
 	 &ple_qt40, &ple_qt41}, /* ple_min_qt, ple_max_qt */
-	{MAC_AX_QTA_INVALID, NULL, NULL, NULL, NULL, NULL, NULL},
-};
-
-static struct dle_mem_t dle_mem_usb_8852b_cabv[] = {
-	{MAC_AX_QTA_SCC, /* qta_mode */
-	 &wde_size24, &ple_size26, /* wde_size, ple_size */
-	 &wde_qt24, &wde_qt24, /* wde_min_qt, wde_max_qt */
-	 &ple_qt59, &ple_qt60}, /* ple_min_qt, ple_max_qt */
-	{MAC_AX_QTA_DLFW, /* qta_mode */
-	 &wde_size9, &ple_size25, /* wde_size, ple_size */
-	 &wde_qt4, &wde_qt4, /* wde_min_qt, wde_max_qt */
-	 &ple_qt13, &ple_qt13}, /* ple_min_qt, ple_max_qt */
-	 {MAC_AX_QTA_LAMODE, /* qta_mode */
-	 &wde_size16, &ple_size16, /* wde_size, ple_size */
-	 &wde_qt15, &wde_qt15, /* wde_min_qt, wde_max_qt */
-	 &ple_qt40, &ple_qt41}, /* ple_min_qt, ple_max_qt */
+	 {MAC_AX_QTA_SCC_TURBO, /* qta_mode */
+	 &wde_size27, &ple_size31, /* wde_size, ple_size */
+	 &wde_qt26, &wde_qt26, /* wde_min_qt, wde_max_qt */
+	 &ple_qt70, &ple_qt71}, /* ple_min_qt, ple_max_qt */
 	{MAC_AX_QTA_INVALID, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
@@ -1921,6 +1997,10 @@ static struct dle_mem_t dle_mem_sdio_8852b[] = {
 	 &wde_size13, &ple_size13, /* wde_size, ple_size */
 	 &wde_qt12, &wde_qt12, /* wde_min_qt, wde_max_qt */
 	 &ple_qt34, &ple_qt35}, /* ple_min_qt, ple_max_qt */
+	 {MAC_AX_QTA_SCC_TURBO, /* qta_mode */
+	 &wde_size13, &ple_size29, /* wde_size, ple_size */
+	 &wde_qt12, &wde_qt12, /* wde_min_qt, wde_max_qt */
+	 &ple_qt66, &ple_qt67}, /* ple_min_qt, ple_max_qt */
 	 {MAC_AX_QTA_LAMODE, /* qta_mode */
 	 &wde_size14, &ple_size14, /* wde_size, ple_size */
 	 &wde_qt13, &wde_qt13, /* wde_min_qt, wde_max_qt */
@@ -1928,6 +2008,8 @@ static struct dle_mem_t dle_mem_sdio_8852b[] = {
 	{MAC_AX_QTA_INVALID, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 #endif
+
+u32 dle_rsvd_size(struct mac_ax_adapter *adapter, enum mac_ax_qta_mode mode);
 
 u32 dle_is_txq_empty(struct mac_ax_adapter *adapter, u8 *val)
 {
@@ -2251,6 +2333,35 @@ u32 mac_chk_allq_empty(struct mac_ax_adapter *adapter, u8 *empty)
 	return MACSUCCESS;
 }
 
+u32 get_dle_rsvd_info(struct mac_ax_adapter *adapter, enum DLE_RSVD_INFO *info)
+{
+	enum mac_ax_qta_mode mode = adapter->dle_info.qta_mode;
+	u32 rsvd_size;
+
+	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
+		if (mode == MAC_AX_QTA_LAMODE)
+			*info = DLE_RSVD_INFO_LAMODE;
+		else if (mode == MAC_AX_QTA_SCC)
+			*info = DLE_RSVD_INFO_FW;
+		else
+			*info = DLE_RSVD_INFO_NONE;
+	} else {
+		if (mode == MAC_AX_QTA_LAMODE)
+			*info = DLE_RSVD_INFO_LAMODE;
+		else
+			*info = DLE_RSVD_INFO_NONE;
+	}
+
+	rsvd_size = dle_rsvd_size(adapter, mode);
+	if (rsvd_size != 0 && *info == DLE_RSVD_INFO_NONE) {
+		PLTFM_MSG_ERR("[ERR]get_dle_rsvd_info %d, rsvd_size %d\n",
+			      *info, rsvd_size);
+		return MACFFCFG;
+	}
+
+	return MACSUCCESS;
+}
+
 u32 dle_used_size(struct dle_size_t *wde, struct dle_size_t *ple)
 {
 	return (u32)(wde->pge_size * (wde->lnk_pge_num + wde->unlnk_pge_num)) +
@@ -2259,19 +2370,25 @@ u32 dle_used_size(struct dle_size_t *wde, struct dle_size_t *ple)
 
 u32 dle_rsvd_size(struct mac_ax_adapter *adapter, enum mac_ax_qta_mode mode)
 {
-	if (mode != MAC_AX_QTA_LAMODE)
+	if (mode == MAC_AX_QTA_LAMODE) {
+		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A))
+			return DLE_LAMODE_SIZE_8852A;
+		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B))
+			return DLE_LAMODE_SIZE_8852B;
+		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C))
+			return DLE_LAMODE_SIZE_8852C;
+		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB))
+			return DLE_LAMODE_SIZE_8192XB;
+		else
+			return 0;
+	} else if (mode == MAC_AX_QTA_SCC) {
+		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B))
+			return DLE_SCC_RSVD_SIZE_8852B;
+		else
+			return 0;
+	} else {
 		return 0;
-
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A))
-		return DLE_LAMODE_SIZE_8852A;
-	else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B))
-		return DLE_LAMODE_SIZE_8852B;
-	else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C))
-		return DLE_LAMODE_SIZE_8852C;
-	else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB))
-		return DLE_LAMODE_SIZE_8192XB;
-	else
-		return 0;
+	}
 }
 
 void dle_func_en(struct mac_ax_adapter *adapter, u8 en)
@@ -2333,9 +2450,6 @@ struct dle_mem_t *get_dle_mem_cfg(struct mac_ax_adapter *adapter,
 		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A))
 			cfg = dle_mem_usb_8852a;
 		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) &&
-			 (is_cv(adapter, CAV) || is_cv(adapter, CBV)))
-			cfg = dle_mem_usb_8852b_cabv;
-		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) &&
 			 (get_usb_mode(adapter) == MAC_AX_USB2))
 			cfg = dle_mem_usb2_8852b;
 		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B))
@@ -2352,9 +2466,6 @@ struct dle_mem_t *get_dle_mem_cfg(struct mac_ax_adapter *adapter,
 	case MAC_AX_INTF_PCIE:
 		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A))
 			cfg = dle_mem_pcie_8852a;
-		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) &&
-			 (is_cv(adapter, CAV) || is_cv(adapter, CBV)))
-			cfg = dle_mem_pcie_8852b_cabv;
 		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B))
 			cfg = dle_mem_pcie_8852b;
 		else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C))
@@ -2745,8 +2856,8 @@ u8 is_curr_dbcc(struct mac_ax_adapter *adapter)
 u32 is_qta_poh(struct mac_ax_adapter *adapter, enum mac_ax_qta_mode mode,
 	       u8 *is_poh)
 {
-	*is_poh = (mode == MAC_AX_QTA_SCC_STF || mode == MAC_AX_QTA_DBCC_STF) ?
-		  0 : 1;
+	*is_poh = (mode == MAC_AX_QTA_SCC_STF || mode == MAC_AX_QTA_DBCC_STF ||
+		   adapter->hw_info->intf != MAC_AX_INTF_PCIE) ? 0 : 1;
 
 	return MACSUCCESS;
 }

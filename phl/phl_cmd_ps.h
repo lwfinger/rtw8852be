@@ -40,6 +40,7 @@ struct phl_cmd_ps_basic_info {
 enum rtw_phl_status phl_register_ps_module(struct phl_info_t *phl_info);
 u8 phl_ps_get_cur_pwr_lvl(struct phl_info_t *phl_info);
 bool phl_ps_is_datapath_allowed(struct phl_info_t *phl_info);
+void phl_ps_tx_pkt_ntfy(struct phl_info_t *phl_info);
 void rtw_phl_ps_set_rt_cap(void *phl, u8 band_idx, bool ps_allow, enum phl_ps_rt_rson rt_rson);
 void phl_ps_dbg_set_ps(struct phl_info_t *phl_info, u8 ps_mode, bool enter);
 

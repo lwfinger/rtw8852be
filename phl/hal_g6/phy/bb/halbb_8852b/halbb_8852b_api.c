@@ -558,6 +558,8 @@ void halbb_ctrl_btg_8852b(struct bb_info *bb, bool btg)
 		halbb_set_reg(bb, 0x4738, BIT(19), 0x1);
 		halbb_set_reg(bb, 0x4738, BIT(22), 0x0);
 		// Path B
+		halbb_set_reg(bb, 0x476c, 0xFF000000, 0x20);
+		halbb_set_reg(bb, 0x4778, 0xFF, 0x30);
 		halbb_set_reg(bb, 0x4AA4, BIT(19), 0x1);
 		halbb_set_reg(bb, 0x4AA4, BIT(22), 0x1);
 		BB_DBG(bb, DBG_PHY_CONFIG, "[BT] Apply BTG Setting\n");
@@ -575,6 +577,8 @@ void halbb_ctrl_btg_8852b(struct bb_info *bb, bool btg)
 		halbb_set_reg(bb, 0x4738, BIT(19), 0x0);
 		halbb_set_reg(bb, 0x4738, BIT(22), 0x0);
 		// Path B
+		halbb_set_reg(bb, 0x476c, 0xFF000000, 0x1a);
+		halbb_set_reg(bb, 0x4778, 0xFF, 0x2a);
 		halbb_set_reg(bb, 0x4AA4, BIT(19), 0x0);
 		halbb_set_reg(bb, 0x4AA4, BIT(22), 0x0);
 		BB_DBG(bb, DBG_PHY_CONFIG, "[BT] Disable BTG Setting\n");
@@ -598,22 +602,56 @@ void halbb_ctrl_btc_preagc_8852b(struct bb_info *bb, bool bt_en)
 		// DFIR Corner
 		halbb_set_reg(bb, 0x46D0, BIT(1) | BIT(0), 0x3);
 		halbb_set_reg(bb, 0x4790, BIT(1) | BIT(0), 0x3);
-		// LNA Backoff at Normal
-		halbb_set_reg(bb, 0x46a0, 0x3f, 0x8);
-		halbb_set_reg(bb, 0x49f4, 0x3f, 0x8);
+		
+		// BT trakcing always on
+		halbb_set_reg(bb, 0x4ad4, MASKDWORD, 0xf);
+		halbb_set_reg(bb, 0x4ae0, MASKDWORD, 0xf);
+
+		// LNA6_OP1dB
+		halbb_set_reg(bb, 0x4688, MASKBYTE3, 0x80);
+		halbb_set_reg(bb, 0x476C, MASKBYTE3, 0x80);
+
+		// LNA6_TIA0_1_OP1dB
+		halbb_set_reg(bb, 0x4694, MASKBYTE0, 0x80);
+		halbb_set_reg(bb, 0x4694, MASKBYTE1, 0x80);
+		halbb_set_reg(bb, 0x4778, MASKBYTE0, 0x80);
+		halbb_set_reg(bb, 0x4778, MASKBYTE1, 0x80);
+		
 		// LNA, TIA, ADC backoff at BT TX
-		halbb_set_reg(bb, 0x4ae4, 0xffffff, 0x78899e);
-		halbb_set_reg(bb, 0x4aec, 0xffffff, 0x78899e);
+		halbb_set_reg(bb, 0x4ae4, 0xffffff, 0x780D1E);
+		halbb_set_reg(bb, 0x4aec, 0xffffff, 0x780D1E);
+
+		// IBADC backoff
+		halbb_set_reg(bb, 0x469c, 0xfc000000, 0x34);
+		halbb_set_reg(bb, 0x49f0, 0xfc000000, 0x34);
+		
 	} else {
 		// DFIR Corner
 		halbb_set_reg(bb, 0x46D0, BIT(1) | BIT(0), 0x0);
 		halbb_set_reg(bb, 0x4790, BIT(1) | BIT(0), 0x0);
-		// LNA Backoff at Normal
-		halbb_set_reg(bb, 0x46a0, 0x3f, 0x1e);
-		halbb_set_reg(bb, 0x49f4, 0x3f, 0x1e);
+		
+		// BT trakcing always on
+		halbb_set_reg(bb, 0x4ad4, MASKDWORD, 0x60);
+		halbb_set_reg(bb, 0x4ae0, MASKDWORD, 0x60);
+
+		// LNA6_OP1dB
+		halbb_set_reg(bb, 0x4688, MASKBYTE3, 0x1a);
+		halbb_set_reg(bb, 0x476C, MASKBYTE3, 0x1a);
+
+		// LNA6_TIA0_1_OP1dB
+		halbb_set_reg(bb, 0x4694, MASKBYTE0, 0x2a);
+		halbb_set_reg(bb, 0x4694, MASKBYTE1, 0x2a);
+		halbb_set_reg(bb, 0x4778, MASKBYTE0, 0x2a);
+		halbb_set_reg(bb, 0x4778, MASKBYTE1, 0x2a);
+
 		// LNA, TIA, ADC backoff at BT TX
-		halbb_set_reg(bb, 0x4ae4, 0xffffff, 0x4d34d2);
-		halbb_set_reg(bb, 0x4aec, 0xffffff, 0x4d34d2);
+		halbb_set_reg(bb, 0x4ae4, 0xffffff, 0x79E99E);
+		halbb_set_reg(bb, 0x4aec, 0xffffff, 0x79E99E);
+
+		// IBADC backoff
+		halbb_set_reg(bb, 0x469c, 0xfc000000, 0x26);
+		halbb_set_reg(bb, 0x49f0, 0xfc000000, 0x26);
+		
 	}
 }
 bool halbb_bw_setting_8852b(struct bb_info *bb, enum channel_width bw,

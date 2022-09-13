@@ -227,6 +227,17 @@ void dump_drv_cfg(void *sel)
 #endif /*CONFIG_SDIO_HCI*/
 
 #ifdef CONFIG_PCI_HCI
+#ifdef CONFIG_DMA_USE_COHERENT_MEM
+	RTW_PRINT_SEL(sel, "CONFIG_DMA_USE_COHERENT_MEM = y\n");
+#ifdef 	CONFIG_DMA_TX_USE_COHERENT_MEM
+	RTW_PRINT_SEL(sel, "CONFIG_DMA_TX_USE_COHERENT_MEM = y\n");
+#endif
+#ifdef 	CONFIG_DMA_RX_USE_COHERENT_MEM
+	RTW_PRINT_SEL(sel, "CONFIG_DMA_RX_USE_COHERENT_MEM = y\n");
+#endif
+#else
+	RTW_PRINT_SEL(sel, "CONFIG_DMA_USE_COHERENT_MEM = n\n");
+#endif
 #endif
 
 	RTW_PRINT_SEL(sel, "CONFIG_IFACE_NUMBER = %d\n", CONFIG_IFACE_NUMBER);
@@ -236,6 +247,36 @@ void dump_drv_cfg(void *sel)
 	RTW_PRINT_SEL(sel, "CONFIG_PCI_TX_POLLING\n");
 #endif
 	RTW_PRINT_SEL(sel, "CONFIG_RTW_UP_MAPPING_RULE = %s\n", (CONFIG_RTW_UP_MAPPING_RULE == 1) ? "dscp" : "tos");
+#ifdef CONFIG_MSG_NUM
+	RTW_PRINT_SEL(sel, "CONFIG_MSG_NUM = %d\n", CONFIG_MSG_NUM);
+#endif
+#ifdef CONFIG_DIS_DYN_RXBUF
+	RTW_PRINT_SEL(sel, "CONFIG_DIS_DYN_RXBUF\n");
+#endif
+#ifdef CONFIG_DYNAMIC_RX_BUF
+	RTW_PRINT_SEL(sel, "CONFIG_DYNAMIC_RX_BUF\n");
+#endif
+#ifdef CONFIG_TX_SKB_ORPHAN
+	RTW_PRINT_SEL(sel, "CONFIG_TX_SKB_ORPHAN\n");
+#endif
+#ifdef RTW_WKARD_98D_RXTAG
+	RTW_PRINT_SEL(sel, "RTW_WKARD_98D_RXTAG\n");
+#endif
+#ifdef CONFIG_RXBUF_NUM_1024
+	RTW_PRINT_SEL(sel, "CONFIG_RXBUF_NUM_1024\n");
+#endif
+#ifdef CONFIG_PHL_CPU_BALANCE
+	RTW_PRINT_SEL(sel, "CONFIG_PHL_CPU_BALANCE\n");
+#ifdef CONFIG_PHL_CPU_BALANCE_TX
+	RTW_PRINT_SEL(sel, "CONFIG_PHL_CPU_BALANCE_TX\n");
+#endif
+#ifdef CONFIG_PHL_CPU_BALANCE_RX
+	RTW_PRINT_SEL(sel, "CONFIG_PHL_CPU_BALANCE_RX\n");
+#endif
+#endif
+#ifdef USE_AML_PCIE_TEE_MEM
+	RTW_PRINT_SEL(sel, "USE_AML_PCIE_TEE_MEM\n");
+#endif
 
 	/*GEORGIA_TODO_TRX - need get trx buff accroding to IC spec*/
 	RTW_PRINT_SEL(sel, "\n=== XMIT-INFO ===\n");
@@ -846,7 +887,6 @@ ssize_t proc_set_ignore_go_and_low_rssi_in_scan(struct file *file,
 #endif /*CONFIG_IGNORE_GO_AND_LOW_RSSI_IN_SCAN_LIST*/
 
 #ifdef CONFIG_PROC_DEBUG
-
 int proc_get_rx_stat(struct seq_file *m, void *v)
 {
 	_list	*plist, *phead;
@@ -894,6 +934,56 @@ int proc_get_rx_stat(struct seq_file *m, void *v)
 	return 0;
 }
 
+int proc_get_sta_tx_stat(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *adapter = (_adapter *)rtw_netdev_priv(dev);
+	struct sta_priv	*stapriv = &(adapter->stapriv);
+	struct sta_priv	*stapriv_primary = &(GET_PRIMARY_ADAPTER(adapter))->stapriv;
+	struct sta_info *sta;
+	struct stainfo_stats *stats;
+	u8 mac[ETH_ALEN] = {0};
+	int ret = 0;
+
+	_rtw_memcpy(mac, stapriv_primary->c2h_sta_mac, ETH_ALEN);
+	sta = rtw_get_stainfo(stapriv, mac);
+	if (sta) {
+		ret = rtw_get_sta_tx_stat(adapter, sta);
+		stats = &sta->sta_stats;
+		RTW_PRINT_SEL(m, "MAC: " MAC_FMT " fail: %u retry: %u\n",
+			      MAC_ARG(mac), stats->tx_fail_cnt_sum, stats->tx_retry_cnt_sum);
+	} else
+		ret = -ENODATA;
+	return ret;
+}
+
+ssize_t proc_set_sta_tx_stat(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *adapter = (_adapter *)rtw_netdev_priv(dev);
+	struct sta_priv	*stapriv_primary = &(GET_PRIMARY_ADAPTER(adapter))->stapriv;
+	char tmp[18] = {0};
+
+	if (count < 1)
+		return -EFAULT;
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		if (sscanf(tmp, MAC_SFMT, MAC_SARG(stapriv_primary->c2h_sta_mac)) != 6) {
+			_rtw_memset(stapriv_primary->c2h_sta_mac, 0, 6);
+			RTW_PRINT(FUNC_ADPT_FMT" Invalid format\n",
+				  FUNC_ADPT_ARG(adapter));
+		}
+
+	}
+
+	return count;
+}
+
 int proc_get_tx_stat(struct seq_file *m, void *v)
 {
 	_list	*plist, *phead;
@@ -908,7 +998,6 @@ int proc_get_tx_stat(struct seq_file *m, void *v)
 	u32 i, macid_rec_idx = 0;
 	u8 bc_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	u8 null_addr[ETH_ALEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-	struct submit_ctx gotc2h;
 
 	_rtw_spinlock_bh(&pstapriv->sta_hash_lock);
 	for (i = 0; i < NUM_STA; i++) {
@@ -928,38 +1017,22 @@ int proc_get_tx_stat(struct seq_file *m, void *v)
 	}
 	_rtw_spinunlock_bh(&pstapriv->sta_hash_lock);
 	for (i = 0; i < macid_rec_idx; i++) {
-		_rtw_memcpy(pstapriv_primary->c2h_sta_mac, &sta_mac[i][0], ETH_ALEN);
-		pstapriv_primary->c2h_adapter_id = adapter->iface_id;
-		rtw_sctx_init(&gotc2h, 60);
-		pstapriv_primary->gotc2h = &gotc2h;
-		rtw_hal_reqtxrpt(adapter, mac_id[i]);
-		if (rtw_sctx_wait(&gotc2h, __func__)) {
-			psta = rtw_get_stainfo(pstapriv, &sta_mac[i][0]);
-			if(psta) {
-				pstats = &psta->sta_stats;
-#ifndef ROKU_PRIVATE
-				RTW_PRINT_SEL(m, "data_sent_cnt :\t%u\n", pstats->tx_ok_cnt + pstats->tx_fail_cnt);
-				RTW_PRINT_SEL(m, "success_cnt :\t%u\n", pstats->tx_ok_cnt);
-				RTW_PRINT_SEL(m, "failure_cnt :\t%u\n", pstats->tx_fail_cnt);
-				RTW_PRINT_SEL(m, "retry_cnt :\t%u\n\n", pstats->tx_retry_cnt);
+		psta = rtw_get_stainfo(pstapriv, &sta_mac[i][0]);
+		if(psta) {
+			rtw_get_sta_tx_stat(adapter, psta);
+			pstats = &psta->sta_stats;
+#if (!defined(ROKU_PRIVATE) && !defined(CONFIG_RTW_MULTI_AP))
+			RTW_PRINT_SEL(m, "data_sent_cnt :\t%u\n", pstats->tx_ok_cnt + pstats->tx_fail_cnt);
+			RTW_PRINT_SEL(m, "success_cnt :\t%u\n", pstats->tx_ok_cnt);
+			RTW_PRINT_SEL(m, "failure_cnt :\t%u\n", pstats->tx_fail_cnt);
+			RTW_PRINT_SEL(m, "retry_cnt :\t%u\n\n", pstats->tx_retry_cnt);
 #else
-				RTW_PRINT_SEL(m, "MAC: " MAC_FMT " sent: %u fail: %u retry: %u\n",
-				MAC_ARG(&sta_mac[i][0]), pstats->tx_ok_cnt, pstats->tx_fail_cnt, pstats->tx_retry_cnt);
+			RTW_PRINT_SEL(m, "MAC: " MAC_FMT " sent: %u fail: %u retry: %u\n",
+			MAC_ARG(&sta_mac[i][0]), pstats->tx_ok_cnt, pstats->tx_fail_cnt, pstats->tx_retry_cnt);
 #endif /* ROKU_PRIVATE */
 
-			} else
-				RTW_PRINT_SEL(m, "STA is gone\n");
-		} else {
-			//to avoid c2h modify counters
-			pstapriv_primary->gotc2h = NULL;
-			_rtw_memset(pstapriv_primary->c2h_sta_mac, 0, ETH_ALEN);
-			pstapriv_primary->c2h_adapter_id = CONFIG_IFACE_NUMBER;
-			RTW_PRINT_SEL(m, "Warming : Query timeout, operation abort!!\n");
-			break;
-		}
-		pstapriv_primary->gotc2h = NULL;
-		_rtw_memset(pstapriv_primary->c2h_sta_mac, 0, ETH_ALEN);
-		pstapriv_primary->c2h_adapter_id = CONFIG_IFACE_NUMBER;
+		} else
+			RTW_PRINT_SEL(m, "STA is gone\n");
 	}
 	return 0;
 }
@@ -1676,8 +1749,10 @@ int proc_get_ap_info(struct seq_file *m, void *v)
 		RTW_PRINT_SEL(m, "agg_enable_bitmap=%x, candidate_tid_bitmap=%x\n", psta->htpriv.agg_enable_bitmap, psta->htpriv.candidate_tid_bitmap);
 		RTW_PRINT_SEL(m, "ldpc_cap=0x%x, stbc_cap=0x%x, beamform_cap=0x%x\n", psta->htpriv.ldpc_cap, psta->htpriv.stbc_cap, psta->htpriv.beamform_cap);
 #endif /* CONFIG_80211N_HT */
+		if (MLME_IS_AP(padapter))
+			RTW_PRINT_SEL(m, " VHT or HE IE is configured by upper layer : %s\n", pmlmepriv->upper_layer_setting ? "True" : "False");
 #ifdef CONFIG_80211AC_VHT
-		RTW_PRINT_SEL(m, "vht_en=%u, upper_layer_setting=%u, vht_sgi_80m=%u\n", psta->vhtpriv.vht_option, psta->vhtpriv.upper_layer_setting, psta->vhtpriv.sgi_80m);
+		RTW_PRINT_SEL(m, "vht_en=%u, vht_sgi_80m=%u\n", psta->vhtpriv.vht_option, psta->vhtpriv.sgi_80m);
 		RTW_PRINT_SEL(m, "vht_ldpc_cap=0x%x, vht_stbc_cap=0x%x, vht_beamform_cap=0x%x\n", psta->vhtpriv.ldpc_cap, psta->vhtpriv.stbc_cap, psta->vhtpriv.beamform_cap);
 		RTW_PRINT_SEL(m, "vht_mcs_map=0x%x, vht_highest_rate=0x%x, vht_ampdu_len=%d\n", *(u16 *)psta->vhtpriv.vht_mcs_map, psta->vhtpriv.vht_highest_rate, psta->vhtpriv.ampdu_len);
 		if (psta->vhtpriv.vht_option) {
@@ -3804,7 +3879,8 @@ int proc_get_all_sta_info(struct seq_file *m, void *v)
 					RTW_PRINT_SEL(m,"Vendor Realtek 8812\n");
 #endif/*CONFIG_RTS_FULL_BW*/
 #ifdef CONFIG_80211N_HT
-				RTW_PRINT_SEL(m, "qos_en=%d, ht_en=%d, init_rate=%d\n", psta->qos_option, psta->htpriv.ht_option, psta->init_rate);
+				RTW_PRINT_SEL(m, "qos_en=%d, ht_en=%d, init_rate=%d, ht_bitrate=%u\n", psta->qos_option, psta->htpriv.ht_option, psta->init_rate
+					, rtw_desc_rate_to_bitrate(psta->phl_sta->chandef.bw, psta->init_rate, psta->phl_sta->chandef.bw ? psta->htpriv.sgi_40m : psta->htpriv.sgi_20m) / 10);
 				RTW_PRINT_SEL(m, "bwmode=%d, ch_offset=%d, sgi_20m=%d,sgi_40m=%d\n"
 					, psta->phl_sta->chandef.bw, psta->htpriv.ch_offset, psta->htpriv.sgi_20m, psta->htpriv.sgi_40m);
 				RTW_PRINT_SEL(m, "ampdu_enable = %d\n", psta->htpriv.ampdu_enable);
@@ -3813,7 +3889,8 @@ int proc_get_all_sta_info(struct seq_file *m, void *v)
 				RTW_PRINT_SEL(m, "agg_enable_bitmap=%x, candidate_tid_bitmap=%x\n", psta->htpriv.agg_enable_bitmap, psta->htpriv.candidate_tid_bitmap);
 #endif /* CONFIG_80211N_HT */
 #ifdef CONFIG_80211AC_VHT
-				RTW_PRINT_SEL(m, "vht_en=%d, vht_sgi_80m=%d\n", psta->vhtpriv.vht_option, psta->vhtpriv.sgi_80m);
+				RTW_PRINT_SEL(m, "vht_en=%d, vht_sgi_80m=%d, vht_bitrate=%u\n", psta->vhtpriv.vht_option, psta->vhtpriv.sgi_80m
+					, psta->vhtpriv.vht_option ? rtw_vht_mcs_to_data_rate(CHANNEL_WIDTH_80, psta->vhtpriv.sgi_80m, psta->vhtpriv.vht_highest_rate) / 2 : 0);
 				RTW_PRINT_SEL(m, "vht_ldpc_cap=0x%x, vht_stbc_cap=0x%x, vht_beamform_cap=0x%x\n", psta->vhtpriv.ldpc_cap, psta->vhtpriv.stbc_cap, psta->vhtpriv.beamform_cap);
 				RTW_PRINT_SEL(m, "vht_mcs_map=0x%x, vht_highest_rate=0x%x, vht_ampdu_len=%d\n", *(u16 *)psta->vhtpriv.vht_mcs_map, psta->vhtpriv.vht_highest_rate, psta->vhtpriv.ampdu_len);
 				if (psta->vhtpriv.vht_option) {
@@ -3880,6 +3957,16 @@ int proc_get_all_sta_info(struct seq_file *m, void *v)
 
 				if (STA_OP_WFD_MODE(psta))
 					RTW_PRINT_SEL(m, "op_wfd_mode:0x%02x\n", STA_OP_WFD_MODE(psta));
+
+				RTW_PRINT_SEL(m, "tx_bitrate_100kbps=%u\n",
+					      rtw_desc_rate_to_bitrate(psta->phl_sta->wrole->chandef.bw,
+								       rtw_get_current_tx_rate(padapter, psta),
+								       rtw_get_current_tx_sgi(padapter, psta)));
+				RTW_PRINT_SEL(m, "rx_bitrate_100kbps=%u\n",
+					      rtw_desc_rate_to_bitrate(psta->phl_sta->wrole->chandef.bw,
+					      psta->curr_rx_rate, psta->curr_rx_gi_ltf));
+
+				RTW_PRINT_SEL(m, "rssi=%d\n", rtw_phl_get_sta_rssi(psta->phl_sta));
 
 				dump_phl_tring_status(m, padapter, psta);
 				RTW_PRINT_SEL(m, "==============================\n");
@@ -4348,17 +4435,17 @@ int proc_get_pci_aspm(struct seq_file *m, void *v)
 
 	RTW_PRINT_SEL(m, "***** ASPM Backdoor *****\n");
 
-	tmp8 = rtw_hal_pci_dbi_read(padapter, 0x719);
+	pci_read_config_byte(pci_data->ppcidev, 0x719, &tmp8);
 	RTW_PRINT_SEL(m, "CLK REQ:	%s\n", (tmp8 & BIT4) ? "Enable" : "Disable");
 
-	tmp8 = rtw_hal_pci_dbi_read(padapter, 0x70f);
+	pci_read_config_byte(pci_data->ppcidev, 0x70f, &tmp8);
 	l1_idle = tmp8 & 0x38;
-	RTW_PRINT_SEL(m, "ASPM L0s:	%s\n", (tmp8&BIT7) ? "Enable" : "Disable");
+	RTW_PRINT_SEL(m, "ASPM L0s:	%s\n", (tmp8 & BIT7) ? "Enable" : "Disable");
 
-	tmp8 = rtw_hal_pci_dbi_read(padapter, 0x719);
+	pci_read_config_byte(pci_data->ppcidev, 0x719, &tmp8);
 	RTW_PRINT_SEL(m, "ASPM L1:	%s\n", (tmp8 & BIT3) ? "Enable" : "Disable");
 
-	tmp8 = rtw_hal_pci_dbi_read(padapter, 0x718);
+	pci_read_config_byte(pci_data->ppcidev, 0x718, &tmp8);
 	RTW_PRINT_SEL(m, "ASPM L1OFF:	%s\n", (tmp8 & BIT5) ? "Enable" : "Disable");
 
 	RTW_PRINT_SEL(m, "********* MISC **********\n");
@@ -4809,9 +4896,10 @@ int proc_get_wowlan_gpio_info(struct seq_file *m, void *v)
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct wow_priv *wowpriv = adapter_to_wowlan(padapter);
 	struct rtw_wow_gpio_info *wow_gpio = &wowpriv->wow_gpio;
+	struct rtw_dev2hst_gpio_info *d2h_gpio_info = &wow_gpio->d2h_gpio_info;
 
 	RTW_PRINT_SEL(m, "wakeup_gpio_idx: %d\n", WAKEUP_GPIO_IDX);
-	RTW_PRINT_SEL(m, "high_active: %d\n", wow_gpio->gpio_active);
+	RTW_PRINT_SEL(m, "high_active: %d\n", d2h_gpio_info->gpio_active);
 
 	return 0;
 }
@@ -4826,6 +4914,7 @@ ssize_t proc_set_wowlan_gpio_info(struct file *file, const char __user *buffer,
 	enum rtw_phl_status status = RTW_PHL_STATUS_FAILURE;
 	struct wow_priv *wowpriv = adapter_to_wowlan(padapter);
 	struct rtw_wow_gpio_info *wow_gpio = &wowpriv->wow_gpio;
+	struct rtw_dev2hst_gpio_info *d2h_gpio_info = &wow_gpio->d2h_gpio_info;
 	char tmp[32] = {0};
 	int num = 0;
 	u32 is_high_active = 0;
@@ -4848,7 +4937,7 @@ ssize_t proc_set_wowlan_gpio_info(struct file *file, const char __user *buffer,
 		}
 
 		wow_gpio->dev2hst_high = is_high_active == 0 ? 1 : 0;
-		wow_gpio->gpio_active = is_high_active;
+		d2h_gpio_info->gpio_active = is_high_active;
 
 		rtw_ps_deny(padapter, PS_DENY_IOCTL);
 		LeaveAllPowerSaveModeDirect(padapter);
@@ -4857,7 +4946,7 @@ ssize_t proc_set_wowlan_gpio_info(struct file *file, const char __user *buffer,
 		rtw_ps_deny_cancel(padapter, PS_DENY_IOCTL);
 
 		RTW_INFO("set %s %d\n", "gpio_high_active",
-			 wow_gpio->gpio_active);
+			 d2h_gpio_info->gpio_active);
 		RTW_INFO("%s: set GPIO_%d %d as default. status=%d\n",
 			 __func__, WAKEUP_GPIO_IDX, wow_gpio->dev2hst_high, status);
 	}
@@ -6551,6 +6640,200 @@ int proc_get_smps(struct seq_file *m, void *v)
 	return 0;
 }
 #endif /*CONFIG_SUPPORT_STATIC_SMPS*/
+
+#ifdef RTW_DETECT_HANG
+int proc_get_hang_info(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct dvobj_priv *pdvobjpriv = padapter->dvobj;
+	struct debug_priv *pdbgpriv = &pdvobjpriv->drv_dbg;
+	struct hang_info *phang_info = &pdbgpriv->dbg_hang_info;
+	struct fw_hang_info *pfw_hang_info = &phang_info->dbg_fw_hang_info;
+	struct rxff_hang_info *prxff_hang_info = &phang_info->dbg_rxff_hang_info;
+	u8 is_hang = _FALSE;
+	u8 fw_gone = _FALSE;
+
+	if (dev_is_surprise_removed(pdvobjpriv))
+		is_hang = _TRUE;
+
+	if (pfw_hang_info->dbg_is_fw_gone &&
+	    rtw_hw_get_init_completed(pdvobjpriv) &&
+	    !padapter->registrypriv.mp_mode)
+		fw_gone = _TRUE;
+
+	if (pfw_hang_info->dbg_is_fw_hang || is_hang || fw_gone ||
+	    prxff_hang_info->dbg_is_rxff_hang) {
+		RTW_PRINT_SEL(m, "1\n");
+
+		if (pfw_hang_info->dbg_is_fw_hang)
+			RTW_PRINT_SEL(m, "FW hang\n");
+		if (prxff_hang_info->dbg_is_rxff_hang)
+			RTW_PRINT_SEL(m, "RXFF hang\n");
+		if (is_hang)
+			RTW_PRINT_SEL(m, "surprise remove\n");
+		if (fw_gone)
+			RTW_PRINT_SEL(m, "FW gone\n");
+	} else {
+		RTW_PRINT_SEL(m, "0\n");
+	}
+
+	RTW_PRINT_SEL(m, "Enter cnt = %d\n", phang_info->enter_cnt);
+exit:
+	return 0;
+}
+#endif /* RTW_DETECT_HANG */
+
+int proc_get_disconnect_info(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
+	char *disconnect_reason;
+	char *illegal_beacon_reason;
+
+	if (pmlmeinfo) {
+		switch (pmlmeinfo->disconnect_code) {
+		case DISCONNECTION_NOT_YET_OCCUR:
+			disconnect_reason = "Disconnection has not yet occurred.";
+			break;
+		case DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND:
+			disconnect_reason = "System requests to disconnect by command.";
+			break;
+		case DISCONNECTION_BY_SYSTEM_DUE_TO_NET_DEVICE_DOWN:
+			disconnect_reason = "System makes net_device down to cause disconnection.";
+			break;
+		case DISCONNECTION_BY_SYSTEM_DUE_TO_SYSTEM_IN_SUSPEND:
+			disconnect_reason = "System enters suspend state to cause disconnection.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_CONNECTION_EXIST:
+			disconnect_reason = "The connection is exist so it triggers disconnection when joinbss.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_EACH_IFACE_CHBW_NOT_SYNC:
+			disconnect_reason = "Multiple interfaces do not synchronize channel and bandwidth when joinbss.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_DFS_DETECTION:
+			disconnect_reason = "DFS Slave mechanism detects radar to cause disconnection.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_IOCTL_DBG_PORT:
+			disconnect_reason = "Using ioctl dbg port command to accomplish disconnection.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_AP_BEACON_CHANGED:
+			disconnect_reason = "AP's beacon content was changed to cause disconnection.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_KEEPALIVE_TIMEOUT:
+			disconnect_reason = "Maybe AP disappears to trigger station keepalive timeout and connection break.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_LAYER2_ROAMING_TERMINATE:
+			disconnect_reason = "Layer2 roaming terminated to trigger disconnection.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_JOINBSS_TIMEOUT:
+			disconnect_reason = "Station joinbss process is timeout to trigger disconnection.";
+			break;
+		case DISCONNECTION_BY_FW_DUE_TO_FW_DECISION_IN_WOW_RESUME:
+			disconnect_reason = "FW decides to disconnect in WOW resume flow.";
+			break;
+		case DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DISASSOC_IN_WOW_RESUME:
+			disconnect_reason = "Receiving Disassociation frame from AP to cause disconnection in WOW resume flow.";
+			break;
+		case DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DEAUTH_IN_WOW_RESUME:
+			disconnect_reason = "Receiving Deauth frame from AP to cause disconnection in WOW resume flow.";
+			break;
+		case DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DEAUTH:
+			disconnect_reason = "Receiving Deauth frame from AP to cause disconnection.";
+			break;
+		case DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DISASSOC:
+			disconnect_reason = "Receiving Disassociation frame from AP to cause disconnection.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_NON_DFS:
+			disconnect_reason = "Disconnection due to AP switched to unsupported channel.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_DFS:
+			disconnect_reason = "Disconnection due to AP switched to unsupported DFS channel.";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_INVALID_CSA:
+			disconnect_reason = "Disconnection due to received invalid CSA IE";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_JOIN_WRONG_CHANNEL:
+			disconnect_reason = "Disconnection due to joined wrong channel";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_FT:
+			disconnect_reason = "Disconnection due to FT";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_ROAMING:
+			disconnect_reason = "Disconnection due to roaming";
+			break;
+		case DISCONNECTION_BY_DRIVER_DUE_TO_SA_QUERY_TIMEOUT:
+			disconnect_reason = "Disconnection due to SA Query timeout";
+			break;
+		default:
+			disconnect_reason = "Unspecified";
+			break;
+		}
+
+		RTW_PRINT_SEL(m, "occurred disconnection time = %d\n", pmlmeinfo->disconnect_occurred_time);
+		RTW_PRINT_SEL(m, "disconnect code = %d\n", pmlmeinfo->disconnect_code);
+		RTW_PRINT_SEL(m, "last disconnect reason: %s\n", disconnect_reason);
+		RTW_PRINT_SEL(m, "beacon code: %d\n", pmlmeinfo->illegal_beacon_code);
+		if (pmlmeinfo->disconnect_code == DISCONNECTION_BY_DRIVER_DUE_TO_AP_BEACON_CHANGED) {
+			if(pmlmeinfo->illegal_beacon_code & SSID_CHANGED)
+				RTW_PRINT_SEL(m, "illegal beacon reason: The SSID of beacon is changed.\n");
+			if(pmlmeinfo->illegal_beacon_code & SSID_LENGTH_CHANGED)
+				RTW_PRINT_SEL(m, "illegal beacon reason: The SSID length of beacon is changed.\n");
+			if(pmlmeinfo->illegal_beacon_code & BEACON_CHANNEL_CHANGED)
+				RTW_PRINT_SEL(m, "illegal beacon reason: The Beacon channel of beacon is changed.\n");
+			if(pmlmeinfo->illegal_beacon_code & ENCRYPT_PROTOCOL_CHANGED)
+				RTW_PRINT_SEL(m, "illegal beacon reason: The Encrypt protocol of beacon is changed.\n");
+			if(pmlmeinfo->illegal_beacon_code & PAIRWISE_CIPHER_CHANGED)
+				RTW_PRINT_SEL(m, "illegal beacon reason: The Pairwise cipheris of beacon changed.\n");
+			if(pmlmeinfo->illegal_beacon_code & GROUP_CIPHER_CHANGED)
+				RTW_PRINT_SEL(m, "illegal beacon reason: The Group cipher of beacon is changed.\n");
+			if(pmlmeinfo->illegal_beacon_code & IS_8021X_CHANGED)
+				RTW_PRINT_SEL(m, "illegal beacon reason: The 802.1x of beacon is changed.\n");
+		} else {
+			RTW_PRINT_SEL(m, "illegal beacon reason: NA.\n");
+		}
+
+		RTW_PRINT_SEL(m, "Wi-Fi reason code: %d\n",
+			      pmlmeinfo->disconnect_code ? pmlmeinfo->wifi_reason_code : 0);
+	}
+
+	return 0;
+}
+
+ssize_t proc_set_disconnect_info(struct file *file, const char __user *buffer,
+				 size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+	char tmp[32];
+	u8 clear;
+
+	if (!pmlmeinfo)
+		return -EPERM;
+
+	if (count < 1)
+		return -EFAULT;
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+		int num = sscanf(tmp, "%hhd", &clear);
+		if (num == 1 && clear == 0) {
+			pmlmeinfo->disconnect_occurred_time = 0;
+			pmlmeinfo->disconnect_code = DISCONNECTION_NOT_YET_OCCUR;
+			pmlmeinfo->illegal_beacon_code = 0;
+		}
+	}
+
+	return count;
+}
 
 int proc_get_chan(struct seq_file *m, void *v)
 {

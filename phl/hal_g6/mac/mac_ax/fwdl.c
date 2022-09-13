@@ -599,7 +599,7 @@ static void fwdl_fail_dump(struct mac_ax_adapter *adapter,
 			   struct fw_bin_info *info, u32 ret)
 {
 	u32 val32, digest_addr, digest;
-	u16 val16, index;
+	u16 index;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 #if MAC_AX_FEATURE_DBGPKG
 	struct mac_ax_ops *mac_ops = adapter_to_mac_ops(adapter);
@@ -611,8 +611,8 @@ static void fwdl_fail_dump(struct mac_ax_adapter *adapter,
 	val32 = MAC_REG_R32(R_AX_WCPU_FW_CTRL);
 	PLTFM_MSG_ERR("[ERR]fwdl 0x1E0 = 0x%x\n", val32);
 
-	val16 = MAC_REG_R16(R_AX_BOOT_DBG + 2);
-	PLTFM_MSG_ERR("[ERR]fwdl 0x83F2 = 0x%x\n", val16);
+	val32 = MAC_REG_R32(R_AX_BOOT_DBG);
+	PLTFM_MSG_ERR("[ERR]fwdl 0x83F0 = 0x%x\n", val32);
 
 	val32 = MAC_REG_R32(R_AX_UDM3);
 	PLTFM_MSG_ERR("[ERR]fwdl 0x1FC = 0x%x\n", val32);
@@ -738,6 +738,7 @@ u32 mac_fwredl(struct mac_ax_adapter *adapter, u8 *fw, u32 len)
 		goto fwdl_err;
 	}
 
+	mac_scanofld_reset_state(adapter);
 	return MACSUCCESS;
 
 fwdl_err:
@@ -1163,9 +1164,25 @@ u32 mac_enable_fw(struct mac_ax_adapter *adapter, enum rtw_fw_type cat)
 			break;
 #endif /*MAC_FW_8852B_U2*/
 		default:
-			PLTFM_MSG_ERR("[ERR]%s: invalid cut\n", __func__);
-			fw_len = 0;
-			fw = 0;
+			switch (cat) {
+#ifdef PHL_FEATURE_NIC
+			case RTW_FW_NIC:
+				fw_len = array_length_8852b_u2_nic;
+				fw = array_8852b_u2_nic;
+				break;
+#ifdef CONFIG_WOWLAN
+			case RTW_FW_WOWLAN:
+				fw_len = array_length_8852b_u2_wowlan;
+				fw = array_8852b_u2_wowlan;
+				break;
+#endif /*CONFIG_WOWLAN*/
+#endif /*PHL_FEATURE_NIC*/
+			default:
+				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
+				fw_len = 0;
+				fw = 0;
+				break;
+			}
 			break;
 		}
 		break;
@@ -1254,6 +1271,179 @@ u32 mac_enable_fw(struct mac_ax_adapter *adapter, enum rtw_fw_type cat)
 				      __func__);
 			return ret;
 		}
+	}
+
+#endif /* #if defined(PHL_FEATURE_AP) || defined(PHL_FEATURE_NIC) */
+	return ret;
+}
+
+u32 mac_query_fw_buff(struct mac_ax_adapter *adapter, enum rtw_fw_type cat, u8 **fw, u32 *fw_len)
+{
+	u32 ret = MACSUCCESS;
+#if defined(PHL_FEATURE_AP) || defined(PHL_FEATURE_NIC)
+	u32 chip_id, cv;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	chip_id = GET_FIELD(MAC_REG_R32(R_AX_SYS_CHIPINFO), B_AX_HW_ID);
+	cv = GET_FIELD(MAC_REG_R32(R_AX_SYS_CFG1), B_AX_CHIP_VER);
+
+	switch (chip_id) {
+#ifdef CONFIG_RTL8852A
+	case RTL8852A_ID:
+		switch (cv) {
+#ifdef MAC_FW_8852A_U2
+		case FWDL_CBV:
+			switch (cat) {
+#ifdef PHL_FEATURE_AP
+			case RTW_FW_AP:
+				*fw_len = array_length_8852a_u2_ap;
+				*fw = array_8852a_u2_ap;
+				break;
+#endif /*PHL_FEATURE_AP*/
+#ifdef PHL_FEATURE_NIC
+			case RTW_FW_NIC:
+				*fw_len = array_length_8852a_u2_nic;
+				*fw = array_8852a_u2_nic;
+				break;
+#ifdef CONFIG_WOWLAN
+			case RTW_FW_WOWLAN:
+				*fw_len = array_length_8852a_u2_wowlan;
+				*fw = array_8852a_u2_wowlan;
+				break;
+#endif /*CONFIG_WOWLAN*/
+#endif /*PHL_FEATURE_NIC*/
+			default:
+				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
+				*fw_len = 0;
+				fw = 0;
+				break;
+			}
+			break;
+#endif /*MAC_FW_8852A_U2*/
+#ifdef MAC_FW_8852A_U3
+		case FWDL_CCV:
+			switch (cat) {
+#ifdef PHL_FEATURE_AP
+			case RTW_FW_AP:
+				*fw_len = array_length_8852a_u3_ap;
+				*fw = array_8852a_u3_ap;
+				break;
+#endif /*PHL_FEATURE_AP*/
+#ifdef PHL_FEATURE_NIC
+			case RTW_FW_NIC:
+				*fw_len = array_length_8852a_u3_nic;
+				*fw = array_8852a_u3_nic;
+				break;
+#ifdef CONFIG_WOWLAN
+			case RTW_FW_WOWLAN:
+				*fw_len = array_length_8852a_u3_wowlan;
+				*fw = array_8852a_u3_wowlan;
+				break;
+#endif /*CONFIG_WOWLAN*/
+#endif /*PHL_FEATURE_NIC*/
+			default:
+				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
+				*fw_len = 0;
+				fw = 0;
+				break;
+			}
+			break;
+#endif /*MAC_FW_8852A_U3*/
+		default:
+			PLTFM_MSG_ERR("[ERR]%s: invalid cut\n", __func__);
+			*fw_len = 0;
+			fw = 0;
+			break;
+		}
+		break;
+#endif /*MAC_AX_8852A_SUPPORT*/
+#ifdef CONFIG_RTL8852B
+	case RTL8852B_ID:
+		switch (cv) {
+#ifdef MAC_FW_8852B_U2
+		case FWDL_CBV:
+			switch (cat) {
+#ifdef PHL_FEATURE_AP
+			case RTW_FW_AP:
+				PLTFM_MSG_ERR("[ERR]%s: 8852b does not have ap image\n", __func__);
+				*fw_len = 0;
+				fw = 0;
+				break;
+#endif /*PHL_FEATURE_AP*/
+#ifdef PHL_FEATURE_NIC
+			case RTW_FW_NIC:
+				*fw_len = array_length_8852b_u2_nic;
+				*fw = array_8852b_u2_nic;
+				break;
+#ifdef CONFIG_WOWLAN
+			case RTW_FW_WOWLAN:
+				*fw_len = array_length_8852b_u2_wowlan;
+				*fw = array_8852b_u2_wowlan;
+				break;
+#endif /*CONFIG_WOWLAN*/
+#endif /*PHL_FEATURE_NIC*/
+			default:
+				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
+				*fw_len = 0;
+				fw = 0;
+				break;
+			}
+			break;
+#endif /*MAC_FW_8852B_U1*/
+		default:
+			PLTFM_MSG_ERR("[ERR]%s: invalid cut\n", __func__);
+			*fw_len = 0;
+			fw = 0;
+			break;
+		}
+		break;
+#endif /*MAC_AX_8852B_SUPPORT*/
+#ifdef CONFIG_RTL8852C
+	case RTL8852C_ID:
+		switch (cv) {
+#ifdef MAC_FW_8852C_U1
+		case FWDL_CAV:
+			switch (cat) {
+#ifdef PHL_FEATURE_AP
+			case RTW_FW_AP:
+				*fw_len = array_length_8852c_u1_ap;
+				*fw = array_8852c_u1_ap;
+				break;
+#endif /*PHL_FEATURE_AP*/
+#ifdef PHL_FEATURE_NIC
+			case RTW_FW_NIC:
+				*fw_len = array_length_8852c_u1_nic;
+				*fw = array_8852c_u1_nic;
+				break;
+#ifdef CONFIG_WOWLAN
+			case RTW_FW_WOWLAN:
+				*fw_len = array_length_8852c_u1_wowlan;
+				*fw = array_8852c_u1_wowlan;
+				break;
+#endif /*CONFIG_WOWLAN*/
+#endif /*PHL_FEATURE_NIC*/
+			default:
+				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
+				*fw_len = 0;
+				fw = 0;
+				break;
+				}
+				break;
+#endif /*MAC_FW_8852C_U1*/
+		default:
+			PLTFM_MSG_ERR("[ERR]%s: invalid cut\n", __func__);
+			*fw_len = 0;
+			fw = 0;
+			break;
+		}
+		break;
+#endif /*MAC_AX_8852C_SUPPORT*/
+
+	default:
+		PLTFM_MSG_ERR("[ERR]%s: invalid chip\n", __func__);
+		*fw_len = 0;
+		fw = 0;
+		break;
 	}
 
 #endif /* #if defined(PHL_FEATURE_AP) || defined(PHL_FEATURE_NIC) */

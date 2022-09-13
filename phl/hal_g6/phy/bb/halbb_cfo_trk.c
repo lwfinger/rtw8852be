@@ -280,14 +280,19 @@ void halbb_cfo_trk_init(struct bb_info *bb)
 	bb_cfo_trk->tb_tx_comp_cfo_th = DIGI_CFO_COMP_LIMIT << 2;
 	halbb_digital_cfo_comp_init(bb);
 
-	bb_cfo_trk->cfo_timer_i.cb_time = 2000;
+	bb_cfo_trk->cfo_period_cnt = CFO_PERIOD_CNT;
+	bb_cfo_trk->cfo_timer_i.cb_time = CFO_COMP_PERIOD;
 	bb_cfo_trk->cfo_trig_by_timer_en = false;
+
+	bb_cfo_trk->cfo_tf_cnt_th = CFO_TF_CNT_TH;
+	bb_cfo_trk->cfo_tf_cnt_pre = 0;
+	bb_cfo_trk->bb_cfo_trk_acc_mode = CFO_ACC_MODE_1;
 
 	bb_cfo_trk->bb_cfo_trk_state = CFO_STATE_0;
 	bb_cfo_trk->bb_cfo_trk_cnt = 0;
 	bb_cfo_trk->cfo_src = CFO_SRC_PREAMBLE;
 
-	// For NIC only, to speed up sw CFO compensation 
+	// For NIC only, to speed up sw CFO compensation
 	bb_cfo_trk->cfo_dyn_acc_en = (dev->rfe_type < 50) ? true : false;
 	bb_cfo_trk->cfo_trk_by_data_en = false;
 }
@@ -337,7 +342,7 @@ void halbb_crystal_cap_adjust(struct bb_info *bb, s32 curr_cfo)
 		if (cfo_abs > bb_cfo_trk->cfo_th_en)
 			bb_cfo_trk->is_adjust = true;
 	} else {
-		if (cfo_abs < bb_cfo_trk->cfo_th_stop)
+		if (cfo_abs <= bb_cfo_trk->cfo_th_stop)
 			bb_cfo_trk->is_adjust = false;
 	}
 
@@ -367,7 +372,7 @@ void halbb_crystal_cap_adjust(struct bb_info *bb, s32 curr_cfo)
 	//x_cap = (is_positive) ? (x_cap + step) : (x_cap - step);
 
 	BB_DBG(bb, DBG_CFO_TRK, "TH[en, stop]={%d, %d}, TH[3:0]={%d, %d, %d, %d}\n",
-	       bb_cfo_trk->cfo_th_en >> 2, bb_cfo_trk->cfo_th_en >> 2,
+	       bb_cfo_trk->cfo_th_en >> 2, bb_cfo_trk->cfo_th_stop >> 2,
 	       bb_cfo_trk->cfo_th[3] >> 2, bb_cfo_trk->cfo_th[2] >> 2,
 	       bb_cfo_trk->cfo_th[1] >> 2, bb_cfo_trk->cfo_th[0] >> 2);
 
@@ -699,34 +704,102 @@ void halbb_cfo_trk(struct bb_info *bb, s32 curr_cfo)
 	halbb_crystal_cap_adjust(bb, curr_cfo); /*Decide xcap need to adjust or not */
 }
 
-bool halbb_cfo_acc_mode_en(struct bb_info *bb) {
+void halbb_cfo_ul_ofdma_acc_enable(struct bb_info *bb)
+{
+	struct bb_cfo_trk_info *bb_cfo_trk = &bb->bb_cfo_trk_i;
 
+	BB_DBG(bb, DBG_CFO_TRK, "[%s]\n", __func__);
+	bb_cfo_trk->bb_cfo_trk_acc_mode = CFO_ACC_MODE_1;
+}
+
+/*need to call before cfo_trk_init for embedded system*/
+void halbb_cfo_ul_ofdma_acc_disable(struct bb_info *bb)
+{
+	struct bb_cfo_trk_info *bb_cfo_trk = &bb->bb_cfo_trk_i;
+
+	BB_DBG(bb, DBG_CFO_TRK, "[%s]\n", __func__);
+	if (bb==NULL)
+	{
+		BB_DBG(bb, DBG_CFO_TRK, "cfo_ul_ofdma_acc_disable fail !\n");
+		return;
+	}
+	bb_cfo_trk->bb_cfo_trk_acc_mode = CFO_ACC_MODE_0;
+}
+
+bool halbb_cfo_acc_mode_en(struct bb_info *bb)
+{
 	struct bb_cfo_trk_info *cfo_trk = &bb->bb_cfo_trk_i;
 	struct bb_link_info *link = &bb->bb_link_i;
+	struct rtw_phl_com_t *phl = bb->phl_com;
+	struct dev_cap_t *dev = &phl->dev_cap;
+	struct rtw_phl_stainfo_t *sta;
+	u32 i = 0, cfo_tf_cnt, cfo_tf_cnt_cur = 0;
+	bool is_ul_ofdma = false;
 
 	if (!cfo_trk->cfo_dyn_acc_en)
 		return false;
 
-	// Check TP, switch compensation period  
+	for (i = 0; i < PHL_MAX_STA_NUM; i++) {
+		if (!bb->sta_exist[i])
+			continue;
+
+		sta = bb->phl_sta_info[i];
+
+		if (!is_sta_active(sta))
+			continue;
+
+		if (sta->macid == 0)
+			continue;
+
+		cfo_tf_cnt_cur += sta->stats.rx_tf_cnt;
+		BB_DBG(bb, DBG_COMMON_FLOW, "[%d] macid=%d\n", i, sta->macid);
+	}
+
+	cfo_tf_cnt = cfo_tf_cnt_cur - cfo_trk->cfo_tf_cnt_pre;
+
+	if (cfo_tf_cnt > cfo_trk->cfo_tf_cnt_th)
+		is_ul_ofdma = true;
+
+	// Check TP, switch compensation period
 	switch (cfo_trk->bb_cfo_trk_state) {
 	case CFO_STATE_0:
 		if (link->total_tp >= CFO_TP_UPPER) {
 			cfo_trk->bb_cfo_trk_state = CFO_STATE_1;
 			cfo_trk->cfo_trig_by_timer_en = true;
 			// cfo_trk speed up
-			cfo_trk->cfo_timer_i.cb_time = CFO_COMP_PERIOD;
+			//cfo_trk->cfo_timer_i.cb_time = CFO_COMP_PERIOD;
 			halbb_cfo_acc_io_en(bb);
 		}
 		break;
 
 	case CFO_STATE_1:
-		if (cfo_trk->bb_cfo_trk_cnt >= CFO_PERIOD_CNT) {
+		if (cfo_trk->bb_cfo_trk_cnt >= cfo_trk->cfo_period_cnt) {
+			if (cfo_trk->bb_cfo_trk_acc_mode==CFO_ACC_MODE_0) {
+				cfo_trk->cfo_trig_by_timer_en = false;
+				cfo_trk->bb_cfo_trk_state = CFO_STATE_2;
+			}
+			else if (!is_ul_ofdma) {
+				cfo_trk->cfo_trig_by_timer_en = false;
+				cfo_trk->bb_cfo_trk_state = CFO_STATE_2;
+			}
+		}
+		else
+			cfo_trk->bb_cfo_trk_cnt++;
+
+		if (link->total_tp <= CFO_TP_LOWER) {
+			cfo_trk->bb_cfo_trk_state = CFO_STATE_0;
 			cfo_trk->bb_cfo_trk_cnt = 0;
 			cfo_trk->cfo_trig_by_timer_en = false;
 		}
-		if (cfo_trk->cfo_trig_by_timer_en) {
-			cfo_trk->bb_cfo_trk_cnt++;
+		break;
+
+	case CFO_STATE_2:
+		if ((cfo_trk->bb_cfo_trk_acc_mode==CFO_ACC_MODE_1) && (is_ul_ofdma)) {
+			cfo_trk->bb_cfo_trk_state = CFO_STATE_1;
+			cfo_trk->cfo_trig_by_timer_en = true;
+			halbb_cfo_acc_io_en(bb);
 		}
+
 		if (link->total_tp <= CFO_TP_LOWER) {
 			cfo_trk->bb_cfo_trk_state = CFO_STATE_0;
 			cfo_trk->bb_cfo_trk_cnt = 0;
@@ -739,9 +812,14 @@ bool halbb_cfo_acc_mode_en(struct bb_info *bb) {
 		cfo_trk->bb_cfo_trk_cnt = 0;
 		break;
 	}
-	BB_DBG(bb, DBG_CFO_TRK, "[CFO_COMP] WD, total_tp = %d, cfo_trk_state = %d, timer_en = %d, trk_cnt = %d\n",
-		link->total_tp, cfo_trk->bb_cfo_trk_state, cfo_trk->cfo_trig_by_timer_en, cfo_trk->bb_cfo_trk_cnt);
+	BB_DBG(bb, DBG_CFO_TRK, "[CFO_COMP] WD, total_tp = %d, cfo_trk_state = %d, timer_en = %d, trk_cnt = %d, is_ul_ofdma = %d\n",
+		link->total_tp, cfo_trk->bb_cfo_trk_state, cfo_trk->cfo_trig_by_timer_en, cfo_trk->bb_cfo_trk_cnt, is_ul_ofdma);
+	BB_DBG(bb, DBG_CFO_TRK, "[CFO_COMP] WD, cfo_trk_acc_mode = %d, cfo_tf_cnt_cur = %d, cfo_tf_cnt_pre = %d\n",
+		cfo_trk->bb_cfo_trk_acc_mode, cfo_tf_cnt_cur, cfo_trk->cfo_tf_cnt_pre);
+	BB_DBG(bb, DBG_CFO_TRK, "[CFO_COMP] WD, cfo_tf_cnt = %d, cfo_tf_cnt_th = %d \n",
+		cfo_tf_cnt, cfo_trk->cfo_tf_cnt_th);
 
+	cfo_trk->cfo_tf_cnt_pre = cfo_tf_cnt_cur;
 	return cfo_trk->cfo_trig_by_timer_en;
 }
 
@@ -912,9 +990,11 @@ void halbb_cfo_trk_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "tb_comp {s(8,2)}\n");
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			    "sw_comp {Xcap_enable_th (kHz)} {sw_comp_fine_tune (kHz)}\n");
+			    "sw_comp {Xcap_enable_th (kHz)} {Xcap_stop_th (kHz)} {sw_comp_fine_tune (kHz)}\n");
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			    "period {en} {ms}\n");
+			    "acc {en} {ms} {period_cnt}\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "acc_mode {0: disable_ul_ofmda_acc, 1: enable_ul_ofdma_acc} {tf_cnt_th}\n");
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "set_mode {multi-sta cfo_trk mode - 0:Pkts averaged mode, 1: Entry averaged mode, 2: TP based mode}\n");
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
@@ -933,6 +1013,8 @@ void halbb_cfo_trk_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			    "X_cap=0x%x\n", bb_cfo_trk->crystal_cap);
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "Xcap_enable_th = %d (kHz)\n", bb_cfo_trk->cfo_th_en >> 2);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "Xcap_stop_th = %d (kHz)\n", bb_cfo_trk->cfo_th_stop >> 2);
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "sw_comp_fine_tune = %d (kHz)\n", bb_cfo_trk->sw_comp_fine_tune >> 2);
 
@@ -955,9 +1037,10 @@ void halbb_cfo_trk_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "cfo_src: %s\n",
 			    ((bb_cfo_trk->cfo_src == CFO_SRC_FD) ? "FD" : "PAB"));
-	} else if (_os_strcmp(input[1], "period") == 0) {
+	} else if (_os_strcmp(input[1], "acc") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &var[0]);
 		HALBB_SCAN(input[3], DCMD_DECIMAL, &var[1]);
+		HALBB_SCAN(input[4], DCMD_DECIMAL, &var[2]);
 
 		timer_en_pre = bb_cfo_trk->cfo_trig_by_timer_en;
 		bb_cfo_trk->cfo_trig_by_timer_en = (bool)var[0];
@@ -969,15 +1052,26 @@ void halbb_cfo_trk_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		else
 			bb_cfo_trk->cfo_timer_i.cb_time = (u16)var[1];
 
+		bb_cfo_trk->cfo_period_cnt = (bool)var[2];
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			    "timer=%d ms, trig_by_timer_en=%d\n",
-			    bb_cfo_trk->cfo_timer_i.cb_time, bb_cfo_trk->cfo_trig_by_timer_en);
-		
+			    "timer=%d ms, period_cnt=%d cnt, trig_by_timer_en=%d\n",
+			    bb_cfo_trk->cfo_timer_i.cb_time, bb_cfo_trk->cfo_period_cnt, bb_cfo_trk->cfo_trig_by_timer_en);
+
 		if (!timer_en_pre && bb_cfo_trk->cfo_trig_by_timer_en) {
 			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "[Start callback]\n");
 			halbb_cfo_acc_io_en(bb);
 		}
+	}else if (_os_strcmp(input[1], "acc_mode") == 0) {
+		HALBB_SCAN(input[2], DCMD_DECIMAL, &var[0]);
+		HALBB_SCAN(input[3], DCMD_DECIMAL, &var[1]);
+
+		bb_cfo_trk->bb_cfo_trk_acc_mode= (enum bb_cfo_trk_acc_mode_t)var[0] ;
+		bb_cfo_trk->cfo_tf_cnt_th= var[1] ;
+
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "cfo_trk_acc_mode = %d, cfo_tf_cnt_th = %d\n",
+			    bb_cfo_trk->bb_cfo_trk_acc_mode,bb_cfo_trk->cfo_tf_cnt_th);
 	} else if (_os_strcmp(input[1], "th") == 0) {
 
 		HALBB_SCAN(input[3], DCMD_DECIMAL, &var[1]);
@@ -996,7 +1090,7 @@ void halbb_cfo_trk_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		}
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "TH[en, stop]={%d, %d}, TH[3:0]={%d, %d, %d, %d}\n",
-			    bb_cfo_trk->cfo_th_en, bb_cfo_trk->cfo_th_en,
+			    bb_cfo_trk->cfo_th_en, bb_cfo_trk->cfo_th_stop,
 		            bb_cfo_trk->cfo_th[3], bb_cfo_trk->cfo_th[2],
 		            bb_cfo_trk->cfo_th[1], bb_cfo_trk->cfo_th[0]);
 
@@ -1011,13 +1105,15 @@ void halbb_cfo_trk_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	} else if (_os_strcmp(input[1], "sw_comp") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &var[0]);
 		HALBB_SCAN(input[3], DCMD_DECIMAL, &var[1]);
+		HALBB_SCAN(input[4], DCMD_DECIMAL, &var[2]);
 
 		bb_cfo_trk->cfo_th_en = (u8)var[0] << 2;
-		bb_cfo_trk->sw_comp_fine_tune = (u8)var[1] << 2;
+		bb_cfo_trk->cfo_th_stop = (u8)var[1] << 2;
+		bb_cfo_trk->sw_comp_fine_tune = (u8)var[2] << 2;
 
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			    "xcap_enable_th = %d,sw_comp_fine_tune = %d\n",
-			    bb_cfo_trk->cfo_th_en >> 2, bb_cfo_trk->sw_comp_fine_tune >> 2);
+			    "xcap_enable_th = %d,xcap_stop_th = %d,sw_comp_fine_tune = %d\n",
+			    bb_cfo_trk->cfo_th_en >> 2,bb_cfo_trk->cfo_th_stop >> 2, bb_cfo_trk->sw_comp_fine_tune >> 2);
 	} else if (_os_strcmp(input[1], "set_mode") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &var[0]);
 

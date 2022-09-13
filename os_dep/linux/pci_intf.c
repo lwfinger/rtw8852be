@@ -1053,11 +1053,25 @@ static void rtw_dev_shutdown(struct pci_dev *pdev)
 	rtw_dev_remove(pdev);
 }
 
+#ifdef CONFIG_PLATFORM_AML_S905
+extern struct device *get_pcie_reserved_mem_dev(void);
+struct device * g_pcie_reserved_mem_dev;
+#endif
+
 static int __init rtw_drv_entry(void)
 {
 	int ret = 0;
 
 	RTW_PRINT("module init start\n");
+
+#ifdef CONFIG_PLATFORM_AML_S905
+#ifdef USE_AML_PCIE_TEE_MEM
+	g_pcie_reserved_mem_dev = get_pcie_reserved_mem_dev();
+	if (g_pcie_reserved_mem_dev)
+		RTW_PRINT("#######use amlogic pcie TEE protect mem#######\n");
+#endif
+#endif
+
 	dump_drv_version(RTW_DBGDUMP);
 #ifdef BTCOEXVERSION
 	RTW_PRINT(DRV_NAME" BT-Coex version = %s\n", BTCOEXVERSION);

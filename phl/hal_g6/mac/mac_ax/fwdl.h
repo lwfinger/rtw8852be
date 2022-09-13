@@ -426,4 +426,20 @@ u32 mac_enable_fw(struct mac_ax_adapter *adapter, enum rtw_fw_type cat);
  * @}
  * @}
  */
+
+/**
+ * @brief mac_query_fw_buff
+ *
+ * @param *adapter
+ * @param cat
+ * @param **fw
+ * @param *fw_len
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_query_fw_buff(struct mac_ax_adapter *adapter, enum rtw_fw_type cat, u8 **fw, u32 *fw_len);
+/**
+ * @}
+ * @}
+ */
 #endif

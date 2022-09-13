@@ -242,5 +242,17 @@ rtw_hal_bb_query_txsts_rpt(struct hal_info_t *hal_info,
 enum rtw_hal_status
 rtw_hal_bb_set_tb_pwr_ofst(struct hal_info_t *hal_info,
 			s16 ofst, enum phl_phy_idx phy_idx);
+#ifdef CONFIG_MCC_SUPPORT
+enum rtw_hal_status
+rtw_hal_bb_upd_mcc_macid(struct hal_info_t *hal_info,
+                         struct rtw_phl_mcc_role *mrole);
 
+void
+rtw_hal_bb_mcc_stop(struct hal_info_t *hal_info);
+
+enum rtw_hal_status
+rtw_hal_bb_mcc_start(struct hal_info_t *hal_info,
+                     struct rtw_phl_mcc_role *m_role1,
+                     struct rtw_phl_mcc_role *m_role2);
+#endif
 #endif /*_HAL_API_BB_H_*/

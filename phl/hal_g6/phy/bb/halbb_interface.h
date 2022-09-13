@@ -101,6 +101,8 @@ enum halbb_h2c_ra_cmdid {
 	RA_H2C_RSSISETTING	= 0x1,
 	RA_H2C_GET_TXSTS	= 0x2,
 	RA_H2C_RA_ADJUST	= 0x3,
+	RA_H2C_ADJUST_RA_MASK		= 0x4,
+	RA_H2C_RA_D_O_TIMER	= 0x5,
 	RA_H2C_MUCFG		= 0x10,
 	RA_MAX_H2CCMD
 };
@@ -164,7 +166,8 @@ enum halbb_event_idx_t {
 	BB_EVENT_TIMER_DIG		= 0,
 	BB_EVENT_TIMER_CFO		= 1,
 	BB_EVENT_TIMER_ANTDIV		= 2,
-	BB_EVENT_TIMER_TDMA_CR		= 3
+	BB_EVENT_TIMER_TDMA_CR		= 3,
+	BB_EVENT_TIMER_LA		= 4
 };
 
 enum halbb_timer_state_t {

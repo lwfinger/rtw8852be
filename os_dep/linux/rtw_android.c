@@ -102,50 +102,6 @@ const char *android_wifi_cmd_str[ANDROID_WIFI_CMD_MAX] = {
 #endif
 };
 
-#ifdef CONFIG_PNO_SUPPORT
-#define PNO_TLV_PREFIX			'S'
-#define PNO_TLV_VERSION			'1'
-#define PNO_TLV_SUBVERSION		'2'
-#define PNO_TLV_RESERVED		'0'
-#define PNO_TLV_TYPE_SSID_IE	'S'
-#define PNO_TLV_TYPE_TIME		'T'
-#define PNO_TLV_FREQ_REPEAT		'R'
-#define PNO_TLV_FREQ_EXPO_MAX	'M'
-
-typedef struct cmd_tlv {
-	char prefix;
-	char version;
-	char subver;
-	char reserved;
-} cmd_tlv_t;
-
-#ifdef CONFIG_PNO_SET_DEBUG
-char pno_in_example[] = {
-	'P', 'N', 'O', 'S', 'E', 'T', 'U', 'P', ' ',
-	'S', '1', '2', '0',
-	'S',	/* 1 */
-	0x05,
-	'd', 'l', 'i', 'n', 'k',
-	'S',	/* 2 */
-	0x06,
-	'B', 'U', 'F', 'B', 'U', 'F',
-	'S',	/* 3 */
-	0x20,
-	'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '!', '@', '#', '$', '%', '^',
-	'S',	/* 4 */
-	0x0a,
-	'!', '@', '#', '$', '%', '^', '&', '*', '(', ')',
-	'T',
-	'0', '5',
-	'R',
-	'2',
-	'M',
-	'2',
-	0x00
-};
-#endif /* CONFIG_PNO_SET_DEBUG */
-#endif /* PNO_SUPPORT */
-
 typedef struct android_wifi_priv_cmd {
 	char *buf;
 	int used_len;
@@ -172,190 +128,6 @@ static int g_wifi_on = _TRUE;
 
 unsigned int oob_irq = 0;
 unsigned int oob_gpio = 0;
-
-#ifdef CONFIG_PNO_SUPPORT
-/*
- * rtw_android_pno_setup
- * Description:
- * This is used for private command.
- *
- * Parameter:
- * net: net_device
- * command: parameters from private command
- * total_len: the length of the command.
- *
- * */
-static int rtw_android_pno_setup(struct net_device *net, char *command, int total_len)
-{
-	pno_ssid_t pno_ssids_local[MAX_PNO_LIST_COUNT];
-	int res = -1;
-	int nssid = 0;
-	cmd_tlv_t *cmd_tlv_temp;
-	char *str_ptr;
-	int tlv_size_left;
-	int pno_time = 0;
-	int pno_repeat = 0;
-	int pno_freq_expo_max = 0;
-	int cmdlen = strlen(android_wifi_cmd_str[ANDROID_WIFI_CMD_PNOSETUP_SET]) + 1;
-
-#ifdef CONFIG_PNO_SET_DEBUG
-	int i;
-	char *p;
-	p = pno_in_example;
-
-	total_len = sizeof(pno_in_example);
-	str_ptr = p + cmdlen;
-#else
-	str_ptr = command + cmdlen;
-#endif
-
-	if (total_len < (cmdlen + sizeof(cmd_tlv_t))) {
-		RTW_INFO("%s argument=%d less min size\n", __func__, total_len);
-		goto exit_proc;
-	}
-
-	tlv_size_left = total_len - cmdlen;
-
-	cmd_tlv_temp = (cmd_tlv_t *)str_ptr;
-	memset(pno_ssids_local, 0, sizeof(pno_ssids_local));
-
-	if ((cmd_tlv_temp->prefix == PNO_TLV_PREFIX) &&
-	    (cmd_tlv_temp->version == PNO_TLV_VERSION) &&
-	    (cmd_tlv_temp->subver == PNO_TLV_SUBVERSION)) {
-
-		str_ptr += sizeof(cmd_tlv_t);
-		tlv_size_left -= sizeof(cmd_tlv_t);
-
-		nssid = rtw_parse_ssid_list_tlv(&str_ptr, pno_ssids_local,
-			     MAX_PNO_LIST_COUNT, &tlv_size_left);
-		if (nssid <= 0) {
-			RTW_INFO("SSID is not presented or corrupted ret=%d\n", nssid);
-			goto exit_proc;
-		} else {
-			if ((str_ptr[0] != PNO_TLV_TYPE_TIME) || (tlv_size_left <= 1)) {
-				RTW_INFO("%s scan duration corrupted field size %d\n",
-					 __func__, tlv_size_left);
-				goto exit_proc;
-			}
-			str_ptr++;
-			pno_time = simple_strtoul(str_ptr, &str_ptr, 16);
-			RTW_INFO("%s: pno_time=%d\n", __func__, pno_time);
-
-			if (str_ptr[0] != 0) {
-				if ((str_ptr[0] != PNO_TLV_FREQ_REPEAT)) {
-					RTW_INFO("%s pno repeat : corrupted field\n",
-						 __func__);
-					goto exit_proc;
-				}
-				str_ptr++;
-				pno_repeat = simple_strtoul(str_ptr, &str_ptr, 16);
-				RTW_INFO("%s :got pno_repeat=%d\n", __FUNCTION__, pno_repeat);
-				if (str_ptr[0] != PNO_TLV_FREQ_EXPO_MAX) {
-					RTW_INFO("%s FREQ_EXPO_MAX corrupted field size\n",
-						 __func__);
-					goto exit_proc;
-				}
-				str_ptr++;
-				pno_freq_expo_max = simple_strtoul(str_ptr, &str_ptr, 16);
-				RTW_INFO("%s: pno_freq_expo_max=%d\n",
-					 __func__, pno_freq_expo_max);
-			}
-		}
-	} else {
-		RTW_INFO("%s get wrong TLV command\n", __FUNCTION__);
-		goto exit_proc;
-	}
-
-	res = rtw_dev_pno_set(net, pno_ssids_local, nssid, pno_time, pno_repeat, pno_freq_expo_max);
-
-#ifdef CONFIG_PNO_SET_DEBUG
-	rtw_dev_pno_debug(net);
-#endif
-
-exit_proc:
-	return res;
-}
-
-/*
- * rtw_android_cfg80211_pno_setup
- * Description:
- * This is used for cfg80211 sched_scan.
- *
- * Parameter:
- * net: net_device
- * request: cfg80211_request
- * */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
-int rtw_android_cfg80211_pno_setup(struct net_device *net,
-		   struct cfg80211_ssid *ssids, int n_ssids, int interval)
-{
-	int res = -1;
-	int nssid = 0;
-	int pno_time = 0;
-	int pno_repeat = 0;
-	int pno_freq_expo_max = 0;
-	int index = 0;
-	pno_ssid_t pno_ssids_local[MAX_PNO_LIST_COUNT];
-
-	if (n_ssids > MAX_PNO_LIST_COUNT || n_ssids < 0) {
-		RTW_INFO("%s: nssids(%d) is invalid.\n", __func__, n_ssids);
-		return -EINVAL;
-	}
-
-	memset(pno_ssids_local, 0, sizeof(pno_ssids_local));
-
-	nssid = n_ssids;
-
-	for (index = 0 ; index < nssid ; index++) {
-		pno_ssids_local[index].SSID_len = ssids[index].ssid_len;
-		_rtw_memcpy(pno_ssids_local[index].SSID, ssids[index].ssid,
-		       ssids[index].ssid_len);
-	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
-	if(ssids)
-		rtw_mfree((u8 *)ssids, (n_ssids * sizeof(struct cfg80211_ssid)));
-#endif
-	pno_time = (interval / 1000);
-
-	RTW_INFO("%s: nssids: %d, pno_time=%d\n", __func__, nssid, pno_time);
-
-	res = rtw_dev_pno_set(net, pno_ssids_local, nssid, pno_time,
-			      pno_repeat, pno_freq_expo_max);
-
-#ifdef CONFIG_PNO_SET_DEBUG
-	rtw_dev_pno_debug(net);
-#endif
-
-	return res;
-}
-#endif
-int rtw_android_pno_enable(struct net_device *net, int pno_enable)
-{
-	_adapter *padapter = (_adapter *)rtw_netdev_priv(net);
-	struct pwrctrl_priv *pwrctl = adapter_to_pwrctl(padapter);
-
-	if (pwrctl) {
-		pwrctl->wowlan_pno_enable = pno_enable;
-		RTW_INFO("%s: wowlan_pno_enable: %d\n", __func__, pwrctl->wowlan_pno_enable);
-		if (pwrctl->wowlan_pno_enable == 0) {
-			if (pwrctl->pnlo_info != NULL) {
-				rtw_mfree((u8 *)pwrctl->pnlo_info, sizeof(pno_nlo_info_t));
-				pwrctl->pnlo_info = NULL;
-			}
-			if (pwrctl->pno_ssid_list != NULL) {
-				rtw_mfree((u8 *)pwrctl->pno_ssid_list, sizeof(pno_ssid_list_t));
-				pwrctl->pno_ssid_list = NULL;
-			}
-			if (pwrctl->pscan_info != NULL) {
-				rtw_mfree((u8 *)pwrctl->pscan_info, sizeof(pno_scan_info_t));
-				pwrctl->pscan_info = NULL;
-			}
-		}
-		return 0;
-	} else
-		return -1;
-}
-#endif /* CONFIG_PNO_SUPPORT */
 
 int rtw_android_cmdstr_to_num(char *cmdstr)
 {
@@ -606,10 +378,6 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	char *command = NULL;
 	int cmd_num;
 	int bytes_written = 0;
-#ifdef CONFIG_PNO_SUPPORT
-	uint cmdlen = 0;
-	uint pno_enable = 0;
-#endif
 	android_wifi_priv_cmd priv_cmd;
 	_adapter	*padapter = (_adapter *) rtw_netdev_priv(net);
 #ifdef CONFIG_WFD
@@ -798,15 +566,10 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 
 #ifdef CONFIG_PNO_SUPPORT
 	case ANDROID_WIFI_CMD_PNOSSIDCLR_SET:
-		/* bytes_written = dhd_dev_pno_reset(net); */
 		break;
 	case ANDROID_WIFI_CMD_PNOSETUP_SET:
-		bytes_written = rtw_android_pno_setup(net, command, priv_cmd.total_len);
 		break;
 	case ANDROID_WIFI_CMD_PNOENABLE_SET:
-		cmdlen = strlen(android_wifi_cmd_str[ANDROID_WIFI_CMD_PNOENABLE_SET]);
-		pno_enable = *(command + cmdlen + 1) - '0';
-		bytes_written = rtw_android_pno_enable(net, pno_enable);
 		break;
 #endif
 

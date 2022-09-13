@@ -29,7 +29,7 @@
  * btcx_desired: BT FW coex version -> main-version + 1 if update.
  * wlcx_desired: WL FW coex version -> sub-version + 1 if update
  */
-const u32 coex_ver = 0x0601000f;
+const u32 coex_ver = 0x0601040f;
 
 static struct btc_ops _btc_ops = {
 	_send_fw_cmd,
@@ -264,6 +264,8 @@ void _write_scbd(struct btc_t *btc, u32 val, bool state)
 		wl->scbd = scbd_val;
 
 		btc->cx.cnt_wl[BTC_WCNT_SCBDUPDATE]++;
+		/* Add delay to avoid BT FW loss information */
+		_os_delay_us(btc->hal, BTC_SCBD_REWRITE_DELAY);
 	}
 }
 
@@ -747,7 +749,8 @@ void _run_coex(struct btc_t *btc, const char *reason)
 			return;
 	    	}
 
-		if (wl->status.map.rf_off == 1 || wl->status.map.lps == 1)  {
+		if (wl->status.map.rf_off == 1 ||
+		    wl->status.map.lps == BTC_LPS_RF_OFF) {
 			PHL_INFO("[BTC], %s(): return for WL rf off state!!\n",
 				 __func__);
 			return;
@@ -999,7 +1002,6 @@ static void _ntfy_power_off(struct btc_t *btc)
 
 	btc->cx.wl.status.map.rf_off = 1;
 	btc->cx.wl.status.map.busy = 0;
-	_os_delay_us(btc->hal, 1000);
 	_write_scbd(btc, BTC_WSCB_ALL, false);
 	_run_coex(btc, __func__);
 
@@ -1339,12 +1341,16 @@ static void _update_bt_info(struct btc_t *btc, u8 *buf, u32 len)
 }
 
 static void _ntfy_role_info(struct btc_t *btc, u8 rid,
-			    struct btc_wl_link_info *info,
+			    struct rtw_wifi_role_t *wrole,
+			    struct rtw_phl_stainfo_t *sta,
 			    enum role_state reason)
 {
 	struct rtw_hal_com_t *h = btc->hal;
 	struct btc_wl_info *wl = &btc->cx.wl;
-	struct btc_wl_link_info *wlinfo = NULL;
+	struct btc_wl_link_info *r = NULL;
+#ifdef CONFIG_PHL_P2PPS
+	u8 i =0;
+#endif /* CONFIG_PHL_P2PPS */
 
 	PHL_INFO("[BTC], %s(), role_id=%d, reason=%d\n", __func__, rid, reason);
 
@@ -1353,15 +1359,57 @@ static void _ntfy_role_info(struct btc_t *btc, u8 rid,
 
 	btc->dm.cnt_notify[BTC_NCNT_ROLE_INFO]++;
 
-	wlinfo = &wl->link_info[rid];
+	r = &wl->link_info[rid];
 
-	hal_mem_cpy(h, wlinfo, info, sizeof(struct btc_wl_link_info));
+	if (wrole) {
+		r->role = wrole->type;
+#ifdef RTW_WKARD_ROLE_TYPE
+		if (wrole->mstate != MLME_NO_LINK &&
+			wrole->real_type != PHL_RTYPE_NONE) {
+			r->role = wrole->real_type;
+			PHL_INFO("[BTC], rtw_hal_btc_update_role_info_ntfy(): set r.role from type(%d) to real_type(%d)\n",
+				 wrole->type, wrole->real_type);
+		}
+#endif /* RTW_WKARD_ROLE_TYPE */
+#ifdef CONFIG_PHL_P2PPS
+		r->noa = 0;
+		r->noa_duration = 0;
+		for (i = 0; i < MAX_NOA_DESC; i++) {
+			if (wrole->noa_desc[i].enable) {
+				r->noa = 1;
+				r->noa_duration = wrole->noa_desc[i].duration;
+				break;
+			}
+		}
+#endif /* CONFIG_PHL_P2PPS */
+		r->phy = wrole->hw_band;
+		r->pid = wrole->hw_port;
+		r->active = wrole->active;
+		r->connected = wrole->mstate;
+		r->mode = wrole->cap.wmode;
+		r->client_cnt = wrole->assoc_sta_queue.cnt;
+#ifdef RTW_PHL_BCN
+		r->bcn_period = wrole->bcn_cmn.bcn_interval;
+		r->dtim_period = wrole->dtim_period;
+#endif
+		hal_mem_cpy(h, &r->chdef, &wrole->chandef,
+			    sizeof(struct rtw_chan_def));
+		hal_mem_cpy(h, r->mac_addr, wrole->mac_addr, MAC_ALEN);
+	}
 
-	/* update wifi_link_info_ext variable */
+	if (sta && wrole->type == PHL_RTYPE_STATION) {/*associated node info??*/
+		r->mac_id = sta->macid;
+		r->mode = (u8)sta->wmode;
+		r->stbc_he_tx = (u32)sta->asoc_cap.stbc_he_tx;
+		r->stbc_vht_tx = (u32)sta->asoc_cap.stbc_vht_tx;
+		r->stbc_ht_tx = (u32)sta->asoc_cap.stbc_ht_tx;
+	}
+
+	/* refresh wifi info */
 	_update_wl_info(btc);
 
-	if (wlinfo->role == PHL_RTYPE_STATION &&
-	    wlinfo->connected == MLME_NO_LINK)
+	if (r->role == PHL_RTYPE_STATION &&
+	    r->connected == MLME_NO_LINK)
 	    btc->dm.leak_ap = 0;
 
 	if (reason == PHL_ROLE_MSTS_STA_CONN_START)
@@ -1386,23 +1434,23 @@ static void _ntfy_radio_state(struct btc_t *btc, u8 rf_state)
 	switch(rf_state) {
 	case BTC_RFCTRL_WL_OFF:
 		wl->status.map.rf_off = 1;
-		wl->status.map.lps = 0;
+		wl->status.map.lps = BTC_LPS_OFF;
 		wl->status.map.busy = 0;
 		break;
 	case BTC_RFCTRL_FW_CTRL: /*  LPS-PG, LPS-CG */
 		wl->status.map.rf_off = 0;
-		wl->status.map.lps = 1;
+		wl->status.map.lps = BTC_LPS_RF_OFF;
 		wl->status.map.busy = 0;
 		break;
 	case BTC_RFCTRL_LPS_WL_ON: /* LPS-Protocol (RFon) */
 		wl->status.map.rf_off = 0;
-		wl->status.map.lps = 2;
+		wl->status.map.lps = BTC_LPS_RF_ON;
 		wl->status.map.busy = 0;
 		break;
 	case BTC_RFCTRL_WL_ON:
 	default:
 		wl->status.map.rf_off = 0;
-		wl->status.map.lps = 0;
+		wl->status.map.lps = BTC_LPS_OFF;
 		break;
 	}
 
@@ -1421,7 +1469,6 @@ static void _ntfy_radio_state(struct btc_t *btc, u8 rf_state)
 		    wl->status.map.lps_pre != 0) {
 			_write_scbd(btc, BTC_WSCB_ON, true);
 		} else {
-			_os_delay_us(btc->hal, 1000);
 			_write_scbd(btc, BTC_WSCB_ALL, false);
 		}
 	}
@@ -1516,17 +1563,21 @@ static u8 _ntfy_wl_rfk(struct btc_t *btc, u8 phy_path, u8 type, u8 state)
 	return result;
 }
 
-static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
-			 struct btc_wl_stat_info stat_info[], u8 reason)
+static void _ntfy_wl_sta(struct btc_t *btc, struct rtw_stats *phl_stats,
+			u8 ntfy_num, struct rtw_phl_stainfo_t *sta[],
+			u8 reason)
 {
 	struct rtw_hal_com_t *h = btc->hal;
 	struct btc_wl_info *wl = &btc->cx.wl;
+	struct btc_dm *dm = &btc->dm;
 	struct btc_module *module = &btc->mdinfo;
-	struct btc_wl_stat_info *w = NULL;
+	struct btc_wl_stat_info w[MAX_WIFI_ROLE_NUMBER] = {0};
 	struct btc_traffic *t = NULL, *link_info_t = NULL;
 	struct btc_wl_link_info *link_info = NULL;
+	struct rtw_phl_rainfo ra_info = {0};
 	u8 i, j, busy = 0, dir = 0, rssi_map = 0;
 	u8 busy_all = 0, dir_all = 0, rssi_map_all = 0;
+	u8 *rssi_state = NULL, rssi_thres = 0;
 	bool is_sta_change = false, is_traffic_change = false;
 	u16 last_tx_rate, last_rx_rate, last_tx_lvl, last_rx_lvl;
 	u32 chk_intvl = 20;
@@ -1539,15 +1590,32 @@ static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
 	 * if rssi < 20%           --> map = 4b'1111 --> rssi_level = 4
 	 */
 
-	btc->dm.cnt_notify[BTC_NCNT_WL_STA]++;
+	dm->cnt_notify[BTC_NCNT_WL_STA]++;
 
 	for (i = 0; i < ntfy_num; i++) {
-		w = &stat_info[i];
-		t = &w->stat.traffic;
+		/* Extract btc_wl_stat_info from rtw_phl_stainfo_t */
+		hal_mem_set(h, &ra_info, 0, sizeof(ra_info));
+		w[i].pid = sta[i]->wrole->id;
+		w[i].stat.rssi = sta[i]->hal_sta->rssi_stat.rssi >> 1;
 
-		link_info = &wl->link_info[w->pid];
+		t = &w[i].stat.traffic;
+		t->tx_lvl = phl_stats->tx_traffic.lvl;
+		t->tx_sts = phl_stats->tx_traffic.sts;
+
+		t->rx_lvl = phl_stats->rx_traffic.lvl;
+		t->rx_sts = phl_stats->rx_traffic.sts;
+
+		 if (RTW_HAL_STATUS_SUCCESS ==
+		    rtw_hal_bb_query_rainfo(h, sta[i]->hal_sta, &ra_info))
+			t->tx_rate = ra_info.rate;
+		else
+			t->tx_rate = RTW_DATA_RATE_MAX;
+
+		t->rx_rate = h->trx_stat.rx_rate_plurality;
+
+		/* transfer btc_wl_stat_info to btc_wl_link_info */
+		link_info = &wl->link_info[w[i].pid];
 		link_info_t = &link_info->stat.traffic;
-		rssi_map = 0;
 
 		if (link_info->connected == MLME_NO_LINK) {
 			link_info->rx_rate_drop_cnt = 0;
@@ -1564,26 +1632,34 @@ static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
 		hal_mem_cpy(h, (void *)link_info_t, (void *)t,
 			    sizeof(struct btc_traffic));
 
-		link_info->stat.rssi = w->stat.rssi;
+		link_info->stat.rssi = w[i].stat.rssi;
+		rssi_map = 0;
 
 		/* check if rssi across wl_rssi_thres boundary */
 		for (j = 0; j < BTC_WL_RSSI_THMAX; j++) {
-			link_info->rssi_state[j] =
-				_update_rssi_state(btc,
-						   link_info->rssi_state[j],
-						   link_info->stat.rssi,
-						   btc->chip->wl_rssi_thres[j]);
+			if (module->ant.type == BTC_ANT_SHARED && j == 0)
+				rssi_thres = BTC_WL_RSSI_MAX_BTG;
+			else
+				rssi_thres = btc->chip->wl_rssi_thres[j];
+
+			rssi_state = &link_info->rssi_state[j];
+			*rssi_state = _update_rssi_state(btc, *rssi_state,
+							link_info->stat.rssi,
+							rssi_thres);
+
 			/* fill rssi bit map 0~3 if rssi < threshold  */
-			if (BTC_RSSI_LOW(link_info->rssi_state[j]))
+			if (BTC_RSSI_LOW(*rssi_state))
 				rssi_map |= BIT(j);
 
 			if (module->ant.type == BTC_ANT_DEDICATED &&
-			    BTC_RSSI_CHANGE(link_info->rssi_state[j]))
+			    BTC_RSSI_CHANGE(*rssi_state))
 				is_sta_change = true;
 		}
 
-		/* OR all role rssi map */
-		rssi_map_all |= rssi_map;
+		/* OR STA/GC role rssi map */
+		if (link_info->role == PHL_RTYPE_STATION ||
+		    link_info->role == PHL_RTYPE_P2P_GC)
+			rssi_map_all |= rssi_map;
 
 		/* set busy once idle->busy immediately */
 		if (t->tx_lvl != RTW_TFC_IDLE || t->rx_lvl != RTW_TFC_IDLE) {
@@ -1596,8 +1672,9 @@ static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
 				dir = TRAFFIC_DL;
 		} else {/*set idle if busy -> idle after BTC_BUSY2IDLE_THRES*/
 			if (phl_get_passing_time_ms(link_info->busy_t) >
-				BTC_BUSY2IDLE_THRES || !wl->role_info.role_map.role.station ||
-				wl->role_info.link_mode == BTC_WLINK_NOLINK) {
+			    BTC_BUSY2IDLE_THRES ||
+			    !wl->role_info.role_map.role.station ||
+			    wl->role_info.link_mode == BTC_WLINK_NOLINK) {
 				busy = 0;
 				dir = TRAFFIC_DL;
 			} else {
@@ -1612,6 +1689,7 @@ static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
 			link_info->dir = dir;
 		}
 
+		/* OR all role busy/dir state */
 		busy_all |= link_info->busy;
 		dir_all |= BIT(link_info->dir);
 
@@ -1626,10 +1704,10 @@ static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
 		    last_rx_lvl != link_info_t->rx_lvl )
 			is_traffic_change = true;
 
-		wl->role_info.active_role[w->pid].tx_lvl = (u16)t->tx_lvl;
-		wl->role_info.active_role[w->pid].rx_lvl = (u16)t->rx_lvl;
-		wl->role_info.active_role[w->pid].tx_rate = t->tx_rate;
-		wl->role_info.active_role[w->pid].rx_rate = t->rx_rate;
+		wl->role_info.active_role[w[i].pid].tx_lvl = (u16)t->tx_lvl;
+		wl->role_info.active_role[w[i].pid].rx_lvl = (u16)t->rx_lvl;
+		wl->role_info.active_role[w[i].pid].tx_rate = t->tx_rate;
+		wl->role_info.active_role[w[i].pid].rx_rate = t->rx_rate;
 	}
 
 	wl->rssi_level = 0;
@@ -1641,26 +1719,23 @@ static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
 		}
 	}
 
+	chk_intvl = BTC_RPT_PERIOD/BTC_PERIODIC_TIME;
+
+	if (dm->cnt_notify[BTC_NCNT_WL_STA] >=
+	    dm->cnt_dm[BTC_DCNT_WL_STA_LAST] + chk_intvl)
+		_get_wl_nhm_dbm(btc);
+
+	dm->cnt_dm[BTC_DCNT_WL_STA_LAST] = dm->cnt_notify[BTC_NCNT_WL_STA];
+
 	/* for TDD/FDD packet estimation in WL FW */
 	if (is_traffic_change)
 		hal_btc_fw_set_drv_info(btc, CXDRVINFO_ROLE);
 
-	chk_intvl = 2000/BTC_PERIODIC_TIME;
-
 	if (is_sta_change) {
 		wl->status.map.busy = (u32)busy_all;
 		wl->status.map.traffic_dir = (u32)dir_all;
-		_write_scbd(btc, BTC_WSCB_WLBUSY, (bool)(!!wl->status.map.busy));
+		_write_scbd(btc, BTC_WSCB_WLBUSY, (bool)(!!busy_all));
 		_run_coex(btc, __func__);
-	} else if (btc->dm.cnt_notify[BTC_NCNT_WL_STA] >=
-		   btc->dm.cnt_dm[BTC_DCNT_WL_STA_LAST] + chk_intvl) {
-		_get_wl_nhm_dbm(btc);
-		btc->dm.cnt_dm[BTC_DCNT_WL_STA_LAST] =
-			btc->dm.cnt_notify[BTC_NCNT_WL_STA];
-	} else if (btc->dm.cnt_notify[BTC_NCNT_WL_STA] <
-		   btc->dm.cnt_dm[BTC_DCNT_WL_STA_LAST]) {
-		   btc->dm.cnt_dm[BTC_DCNT_WL_STA_LAST] =
-			btc->dm.cnt_notify[BTC_NCNT_WL_STA];
 	}
 }
 

@@ -35,7 +35,8 @@ void halbb_supportability_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u8 i;
 
 	for (i = 0; i < 5; i++) {
-		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
+		if (input[i + 1])
+			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
 	}
 
 	pre_support_ability = bb->support_ability;
@@ -79,6 +80,9 @@ void halbb_supportability_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "11. (( %s ))DIG\n",
 			 ((comp & BB_DIG) ? ("V") : (".")));
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			 "13. (( %s ))UL_TB_CTRL\n",
+			 ((comp & BB_UL_TB_CTRL) ? ("V") : (".")));
 		
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "31. (( %s ))Dyn CSI RSP\n",
@@ -222,6 +226,10 @@ void halbb_media_status_update(struct bb_info *bb,
 		phl_sta_info->hal_sta->rssi_stat.pkt_cnt_data = 0;
 		phl_sta_info->hal_sta->rssi_stat.rssi_bcn = 0;
 		phl_sta_info->hal_sta->rssi_stat.rssi_bcn_ma = 0;
+		phl_sta_info->hal_sta->rssi_stat.rssi_bcn_ma_path[0] = 0;
+		phl_sta_info->hal_sta->rssi_stat.rssi_bcn_ma_path[1] = 0;
+		phl_sta_info->hal_sta->rssi_stat.rssi_bcn_ma_path[2] = 0;
+		phl_sta_info->hal_sta->rssi_stat.rssi_bcn_ma_path[3] = 0;
 		phl_sta_info->hal_sta->rssi_stat.pkt_cnt_bcn = 0;
 		phl_sta_info->hal_sta->rssi_stat.rssi_ofdm = 0;
 		phl_sta_info->hal_sta->rssi_stat.rssi_cck = 0;
@@ -285,6 +293,13 @@ void halbb_sta_info_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "[Bcn]  rssi_avg=%s, MA=1/%02d\n",
 				    dbg_buf, 1 << rssi_t->ma_factor_bcn);
+
+
+			for (j = 0; j < HALBB_MAX_PATH; j++) {
+				halbb_print_sign_frac_digit(bb, rssi_t->rssi_bcn_ma_path[j], 16, 5, dbg_buf, HALBB_SNPRINT_SIZE_S);
+				BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+					    "       rssi[%d]= %s\n", j, dbg_buf);
+			}
 
 			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "rssi_cck=%02d.%d, rssi_ofdm=%02d.%d\n",
@@ -690,6 +705,9 @@ void halbb_watchdog_normal(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	#ifdef HALBB_CFO_TRK_SUPPORT
 	halbb_cfo_watchdog(bb);
 	#endif
+	#ifdef HALBB_UL_TB_CTRL_SUPPORT
+	halbb_ul_tb_ctrl(bb);
+	#endif
 	#ifdef HALBB_RA_SUPPORT
 	halbb_ra_watchdog(bb);
 	#endif
@@ -717,6 +735,10 @@ void halbb_watchdog_low_io(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	halbb_basic_dbg_message(bb);
 	#ifdef HALBB_DIG_SUPPORT
 	halbb_dig_lps(bb);
+	#endif
+
+	#ifdef HALBB_RA_SUPPORT
+	halbb_ra_watchdog(bb);
 	#endif
 
 	#if 0//def HALBB_EDCCA_SUPPORT
@@ -804,6 +826,10 @@ void halbb_bb_cmd_notify(struct bb_info *bb, void *bb_cmd, enum phl_phy_idx phy_
 	} else if (event_idx == BB_EVENT_TIMER_TDMA_CR) {
 		#ifdef HALBB_TDMA_CR_SUPPORT
 		halbb_tdma_cr_sel_io_en(bb);
+		#endif
+	} else if (event_idx == BB_EVENT_TIMER_LA) {
+		#ifdef HALBB_LA_MODE_SUPPORT
+		halbb_la_io_en(bb);
 		#endif
 	} else {
 		BB_WARNING("[%s] event_idx=%d\n", __func__, event_idx);

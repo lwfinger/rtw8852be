@@ -85,8 +85,7 @@ static struct mac_role_tbl *role_alloc(struct mac_ax_adapter *adapter)
 	if (!role)
 		return NULL;
 
-	role->macid = 0;
-	role->wmm = 0;
+	PLTFM_MEMSET(role, 0, sizeof(struct mac_role_tbl));
 
 	return role;
 }
@@ -434,6 +433,7 @@ u32 sec_info_deinit(struct mac_ax_adapter *adapter,
 	/* deinit info */
 	info->a_info.sec_ent_mode = 0;
 	info->a_info.sec_ent_valid = 0;
+	info->a_info.wapi = 0;
 	for (i = 0; i < 7; i++) {
 		info->a_info.sec_ent_keyid[i] = 0;
 		info->a_info.sec_ent[i] = 0;
@@ -442,6 +442,7 @@ u32 sec_info_deinit(struct mac_ax_adapter *adapter,
 	/* deinit role */
 	role->info.a_info.sec_ent_mode = 0;
 	role->info.a_info.sec_ent_valid = 0;
+	role->info.a_info.wapi = 0;
 	for (i = 0; i < 7; i++) {
 		role->info.a_info.sec_ent_keyid[i] = 0;
 		role->info.a_info.sec_ent[i] = 0;
@@ -469,10 +470,21 @@ u32 role_init(struct mac_ax_adapter *adapter,
 	 * MAC HW use wmm 0~3 to indicate
 	 * phy0-wmm0, phy0-wmm1, phy1-wmm0, phy1-wmm1 correspondingly.
 	 * Drivers use wmm 0/1 & band 0/1
+	 * Notice that wmm mapping may be changed in DBCC feature,
+	 * so we use dbcc_role to indicate DBCC feature
 	 */
 	role->macid = info->macid;
 	role->wmm = (info->band ? MAC_AX_ACTUAL_WMM_BAND : 0) |
-			(info->wmm ? MAC_AX_ACTUAL_WMM_DRV_WMM : 0);
+		    (info->wmm ? MAC_AX_ACTUAL_WMM_DRV_WMM : 0);
+
+	if (info->dbcc_role) {
+		ret = dbcc_wmm_add_macid(adapter, info);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("dbcc_wmm_add_macid %d\n", ret);
+			return ret;
+		}
+	}
+
 	role->info = *info;
 
 	return MACSUCCESS;
@@ -623,6 +635,11 @@ u32 mac_add_role(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
 
 role_add_fail:
 	role_enqueue(adapter, list_head->role_tbl_pool, role);
+	if (role->info.dbcc_role) {
+		ret = dbcc_wmm_rm_macid(adapter, &role->info);
+		if (ret != MACSUCCESS)
+			PLTFM_MSG_ERR("add role fail dbcc wmm rm macid %d\n", ret);
+	}
 	return ret;
 }
 
@@ -630,8 +647,7 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 		    struct mac_ax_role_info *info)
 {
 	struct mac_role_tbl *role;
-	u32 ret;
-	u32 cmac_en;
+	u32 ret, cmac_en;
 
 	cmac_en = check_mac_en(adapter, info->band, MAC_AX_CMAC_SEL);
 	if (cmac_en != MACSUCCESS)
@@ -647,19 +663,45 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 		return MACNOITEM;
 	}
 
-	info->a_info = role->info.a_info;
-	if (role_info_init(adapter, info)) {
-		PLTFM_MSG_ERR("role change failed\n");
-		return MACROLEINITFL;
+	if (info->upd_mode == MAC_AX_ROLE_BAND_SW) {
+		if (!role->info.dbcc_role) {
+			PLTFM_MSG_ERR("role band sw runs only for dbcc role\n");
+			return MACFUNCINPUT;
+		}
+
+		ret = mac_dbcc_move_wmm(adapter, info);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("mac_dbcc_move_wmm %d/%d/%d\n",
+				      info->band, info->macid, ret);
+			return ret;
+		}
+
+		role->info.band = info->band;
+		role->info.a_info.bb_sel = info->band;
+		role->info.b_info.bb_sel = info->band;
+		role->info.upd_mode = info->upd_mode;
+		role->wmm = (info->band ? MAC_AX_ACTUAL_WMM_BAND : 0) |
+			    (info->wmm ? MAC_AX_ACTUAL_WMM_DRV_WMM : 0);
+		role->info.wmm = role->wmm;
+		*info = role->info;
+	} else {
+		info->a_info = role->info.a_info;
+		info->dbcc_role = role->info.dbcc_role;
+
+		if (role_info_init(adapter, info)) {
+			PLTFM_MSG_ERR("role change failed\n");
+			return MACROLEINITFL;
+		}
+
+		role->macid = info->macid;
+		role->wmm = (info->band ? MAC_AX_ACTUAL_WMM_BAND : 0) |
+			    (info->wmm ? MAC_AX_ACTUAL_WMM_DRV_WMM : 0);
+		role->info = *info;
 	}
 
-	role->macid = info->macid;
-	role->wmm = (info->band ? MAC_AX_ACTUAL_WMM_BAND : 0) |
-			(info->wmm ? MAC_AX_ACTUAL_WMM_DRV_WMM : 0);
-	role->info = *info;
-
 	if (info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE ||
-	    info->upd_mode == MAC_AX_ROLE_REMOVE) {
+	    info->upd_mode == MAC_AX_ROLE_REMOVE ||
+	    info->upd_mode == MAC_AX_ROLE_FW_RESTORE) {
 		ret = mac_fw_role_maintain(adapter, info);
 		if (ret != MACSUCCESS) {
 			if (ret == MACFWNONRDY) {
@@ -670,7 +712,8 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 				return ret;
 			}
 		}
-		if (info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE &&
+		if ((info->upd_mode == MAC_AX_ROLE_TYPE_CHANGE ||
+		     info->upd_mode == MAC_AX_ROLE_FW_RESTORE) &&
 		    info->self_role == MAC_AX_SELF_ROLE_AP) {
 			ret = mac_h2c_join_info(adapter, info);
 			if (ret != MACSUCCESS) {
@@ -700,7 +743,8 @@ u32 mac_change_role(struct mac_ax_adapter *adapter,
 				return ret;
 			}
 		}
-	} else if (info->upd_mode == MAC_AX_ROLE_INFO_CHANGE) {
+	} else if (info->upd_mode == MAC_AX_ROLE_INFO_CHANGE ||
+		   info->upd_mode == MAC_AX_ROLE_BAND_SW) {
 		ret = mac_h2c_join_info(adapter, info);
 		if (ret != MACSUCCESS) {
 			if (ret == MACFWNONRDY) {
@@ -749,6 +793,15 @@ u32 mac_remove_role(struct mac_ax_adapter *adapter, u8 macid)
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("%s: %d\n", __func__, ret);
 		return ret;
+	}
+
+	if (role->info.dbcc_role) {
+		role->info.dbcc_role = 0;
+		ret = dbcc_wmm_rm_macid(adapter, &role->info);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("dbcc_wmm_rm_macid %d\n", ret);
+			return ret;
+		}
 	}
 
 	role_return(adapter, role);
@@ -1167,3 +1220,33 @@ role_maintain_fail:
 	return ret;
 }
 
+u32 mac_role_sync(struct mac_ax_adapter *adapter, struct mac_ax_role_info *info)
+{
+	struct mac_role_tbl *role;
+	u32 ret = MACSUCCESS;
+
+	role = mac_role_srch(adapter, info->macid);
+	if (!role) {
+		PLTFM_MSG_ERR("role search failed\n");
+		return MACNOITEM;
+	}
+
+	ret = mac_fw_role_maintain(adapter, info);
+	if (ret) {
+		if (ret == MACFWNONRDY)
+			PLTFM_MSG_WARN("skip fw role sync since fw not ready\n");
+		else
+			PLTFM_MSG_ERR("mac_fw_role_maintain failed:%d\n", ret);
+		return ret;
+	}
+	if (info->self_role == MAC_AX_SELF_ROLE_AP) {
+		ret = mac_h2c_join_info(adapter, info);
+		if (ret) {
+			if (ret == MACFWNONRDY)
+				PLTFM_MSG_WARN("skip join info\n");
+			else
+				PLTFM_MSG_ERR("mac_h2c_join_info: %d\n", ret);
+		}
+	}
+	return ret;
+}

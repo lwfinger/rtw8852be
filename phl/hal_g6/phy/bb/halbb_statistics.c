@@ -564,7 +564,9 @@ void halbb_print_cnt(struct bb_info *bb, bool cck_en, enum phl_phy_idx phy_idx, 
 		  "[CCA Spoofing Cnt] {CCK, OFDM} = {%d, %d}\n",
 		  cca->cnt_cck_spoofing, cca->cnt_ofdm_spoofing);
 	BB_DBG(bb, DBG_FA_CNT,
-		  "[AMPDU miss] = {%d}\n", crc->cnt_ampdu_miss);
+		  "[MPDU] {miss, CRC ok, CRC err} = {%d, %d, %d}\n",
+		  crc->cnt_ampdu_miss, crc->cnt_ampdu_crc_ok,
+		  crc->cnt_ampdu_crc_error);
 	BB_DBG(bb, DBG_FA_CNT,
 		  "[Total HW Break counter] = {%d}\n", fa->cnt_total_brk);
 	BB_DBG(bb, DBG_FA_CNT,
@@ -817,6 +819,10 @@ void halbb_ofdm_cnt_statistics(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	cca->cnt_ofdm_spoofing = ret_value;
 	ret_value = halbb_get_reg_cmn(bb, cr->ampdu_miss, cr->ampdu_miss_m, phy_idx);
 	crc->cnt_ampdu_miss = ret_value;
+	ret_value = halbb_get_reg_cmn(bb, cr->ampdu_crc_ok, cr->ampdu_crc_ok_m, phy_idx);
+	crc->cnt_ampdu_crc_ok = ret_value;
+	ret_value = halbb_get_reg_cmn(bb, cr->ampdu_crc_err, cr->ampdu_crc_err_m, phy_idx);
+	crc->cnt_ampdu_crc_error = ret_value;
 	/* POP counter */
 	ret_value = halbb_get_reg_cmn(bb, cr->cnt_pop_trig, cr->cnt_pop_trig_m, phy_idx);
 	cca->pop_cnt = ret_value;
@@ -1249,6 +1255,10 @@ void halbb_cr_cfg_stat_init(struct bb_info *bb)
 		cr->ampdu_rxon_m = CNT_AMPDU_RXON_A_M;
 		cr->ampdu_miss = CNT_AMPDU_MISS_A;
 		cr->ampdu_miss_m = CNT_AMPDU_MISS_A_M;
+		cr->ampdu_crc_ok = CNT_AMPDU_RX_CRC32_OK_A;
+		cr->ampdu_crc_ok_m = CNT_AMPDU_RX_CRC32_OK_A_M;
+		cr->ampdu_crc_err = CNT_AMPDU_RX_CRC32_ERR_A;
+		cr->ampdu_crc_err_m = CNT_AMPDU_RX_CRC32_ERR_A_M;
 		cr->hesu_err_sig_a_crc4 = CNT_HESU_ERR_SIG_A_CRC4_A;
 		cr->hesu_err_sig_a_crc4_m = CNT_HESU_ERR_SIG_A_CRC4_A_M;
 		cr->heersu_err_sig_a_crc4 = CNT_HEERSU_ERR_SIG_A_CRC4_A;
@@ -1418,6 +1428,10 @@ void halbb_cr_cfg_stat_init(struct bb_info *bb)
 		cr->ampdu_rxon_m = CNT_AMPDU_RXON_C_M;
 		cr->ampdu_miss = CNT_AMPDU_MISS_C;
 		cr->ampdu_miss_m = CNT_AMPDU_MISS_C_M;
+		cr->ampdu_crc_ok = CNT_AMPDU_RX_CRC32_OK_C;
+		cr->ampdu_crc_ok_m = CNT_AMPDU_RX_CRC32_OK_C_M;
+		cr->ampdu_crc_err = CNT_AMPDU_RX_CRC32_ERR_C;
+		cr->ampdu_crc_err_m = CNT_AMPDU_RX_CRC32_ERR_C_M;
 		cr->hesu_err_sig_a_crc4 = CNT_HESU_ERR_SIG_A_CRC4_C;
 		cr->hesu_err_sig_a_crc4_m = CNT_HESU_ERR_SIG_A_CRC4_C_M;
 		cr->heersu_err_sig_a_crc4 = CNT_HEERSU_ERR_SIG_A_CRC4_C;

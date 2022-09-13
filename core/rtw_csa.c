@@ -414,6 +414,8 @@ static void rtw_sta_ecsa_invalid_hdl(struct _ADAPTER *a, s16 req_ch, u8 req_bw, 
 {
 	struct dvobj_priv *d = adapter_to_dvobj(a);
 	struct rf_ctl_t *rfctl = dvobj_to_rfctl(d);
+	struct mlme_ext_priv *pmlmeext = &a->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 	u8 ifbmp_s = rtw_mi_get_ld_sta_ifbmp(a);
 	struct rtw_chan_def mr_chdef = {0};
 
@@ -438,6 +440,10 @@ static void rtw_sta_ecsa_invalid_hdl(struct _ADAPTER *a, s16 req_ch, u8 req_bw, 
 	#endif
 	rtw_free_network_queue(a, _TRUE);
 	RTW_INFO("CSA : "FUNC_ADPT_FMT" disconnect with AP\n", FUNC_ADPT_ARG(a));
+
+	pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+	pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_INVALID_CSA;
+	pmlmeinfo->wifi_reason_code = WLAN_REASON_DEAUTH_LEAVING;
 
 	reset_ecsa_param(a);
 

@@ -1105,7 +1105,7 @@ void halbb_dig_init(struct bb_info *bb)
 	/* DIG sub-DM configurations */
 	halbb_dig_mode_update(bb, DIG_ORIGIN);
 	bb_dig->igi_pause_cnt = 0;
-	bb_dig->le_igi_ofst = 10;
+	bb_dig->le_igi_ofst = 0;
 	bb_dig->dbg_lv = DIG_DBG_LV2;
 	bb_dig->dig_state_h_i.state_num_lmt = 3;
 	bb_dig->dig_state_h_i.sdagc_follow_pagc_en = false;
@@ -1162,31 +1162,6 @@ bool halbb_dig_abort(struct bb_info *bb)
 	return false;
 }
 
-void halbb_dig_lps(struct bb_info *bb)
-{
-	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
-	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
-	s16 final_rssi = bb_dig->igi_rssi + bb_dig->le_igi_ofst;
-
-	BB_DIG_DBG(bb, DIG_DBG_LV0, "%s ======>\n", __func__);
-
-	final_rssi = MIN_2(final_rssi, RSSI_MAX);
-	final_rssi = MAX_2(final_rssi, RSSI_MIN);
-
-
-	BB_DIG_DBG(bb, DIG_DBG_LV0, "rssi=%03d, le_ofst=(%03d), final_rssi=%d\n",
-		   bb_dig->igi_rssi, bb_dig->le_igi_ofst, (s8)final_rssi);
-
-#ifdef BB_8852A_2_SUPPORT
-	/* IGI decision */
-	if (halbb_dig_gaincode_update_en_8852a(bb))
-		halbb_dig_set_igi_cr_8852a(bb, bb_dig_u->cur_gaincode);
-#endif
-
-	/* Dynamic sync-dagc follow pagc*/
-	halbb_sdagc_follow_pagc_config(bb, false);
-}
-
 void halbb_dig_cfg_bbcr(struct bb_info *bb, u8 igi_new)
 {
 	struct bb_dig_info *dig = &bb->bb_dig_i;
@@ -1241,6 +1216,27 @@ void halbb_dig_new_entry_connect(struct bb_info *bb)
 	halbb_dig_cfg_bbcr(bb, igi_new);
 	/*Update EDCCA threshold*/
 	halbb_edcca_thre_calc(bb);
+}
+
+void halbb_dig_lps(struct bb_info *bb)
+{
+	struct bb_dig_info *bb_dig = &bb->bb_dig_i;
+	struct bb_dig_op_unit *bb_dig_u = bb_dig->p_cur_dig_unit;
+	struct bb_link_info *bb_link = &bb->bb_link_i;
+	s16 final_rssi = 0;
+
+	BB_DIG_DBG(bb, DIG_DBG_LV0, "%s ======>\n", __func__);
+
+	/* Update igi_rssi */
+	bb_dig->igi_rssi = (bb_link->is_linked) ? (bb->bb_ch_i.rssi_min >> 1) : IGI_NOLINK;
+
+	final_rssi = MIN_2(bb_dig->igi_rssi + bb_dig->le_igi_ofst, RSSI_MAX);
+	final_rssi = SUBTRACT_TO_0(final_rssi, 10);
+
+	BB_DIG_DBG(bb, DIG_DBG_LV0, "rssi=%03d, le_ofst=(%03d)\n",
+		   bb_dig->igi_rssi, bb_dig->le_igi_ofst);
+
+	halbb_dig_cfg_bbcr(bb, (u8)final_rssi);
 }
 
 void halbb_dig(struct bb_info *bb)

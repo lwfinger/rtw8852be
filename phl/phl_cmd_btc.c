@@ -341,6 +341,15 @@ _btc_query_info(void *dispr, void *priv,
 	return MDL_RET_SUCCESS;
 }
 
+static void _btc_set_stbc(struct phl_info_t *phl_info, u8 *buf)
+{
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl_info->hal);
+
+	hal_com->btc_ctrl.disable_rx_stbc = buf[0];
+	PHL_INFO("[BTCCMD], %s(): disable_rx_stbc(%d) \n",
+			__func__, hal_com->btc_ctrl.disable_rx_stbc);
+}
+
 enum rtw_phl_status phl_register_btc_module(struct phl_info_t *phl_info)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
@@ -390,6 +399,9 @@ bool rtw_phl_btc_send_cmd(struct rtw_phl_com_t *phl_com,
 		SET_MSG_EVT_ID_FIELD(msg.msg_id,
 			MSG_EVT_BTC_FWEVNT);
 		break;
+	case BTC_HMSG_SET_BT_REQ_STBC:
+		_btc_set_stbc(phl_info, buf);
+		return true;
 	default:
 		PHL_ERR("%s: Unknown msg !\n", __func__);
 		return false;

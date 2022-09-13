@@ -16,6 +16,10 @@
 #define _PLTFM_OPS_LINUX_H_
 #include "drv_types.h"
 
+#ifdef CONFIG_PLATFORM_AML_S905
+extern struct device * g_pcie_reserved_mem_dev;
+#endif
+
 static inline char *_os_strpbrk(const char *s, const char *ct)
 {
 	return strpbrk(s, ct);
@@ -148,8 +152,22 @@ static inline void _os_cache_wback(void *d, _dma *bus_addr_l,
 	pci_cache_wback(pdev, bus_addr_l, buf_sz, direction);
 }
 
+static inline void *_os_dma_pool_create(void *d, char *name, u32 wd_page_sz)
+{
+	struct dvobj_priv *dvobj = (struct dvobj_priv *)d;
+
+	return pci_create_dma_pool(dvobj->pci_data.ppcidev, name, wd_page_sz);
+}
+
+static inline void _os_dma_pool_destory(void *d, void *pool)
+{
+	struct dvobj_priv *dvobj = (struct dvobj_priv *)d;
+
+	pci_destory_dma_pool(dvobj->pci_data.ppcidev, (struct dma_pool *)pool);
+}
+
 /* txbd, rxbd, wd */
-static inline void *_os_shmem_alloc(void *d, _dma *bus_addr_l,
+static inline void *_os_shmem_alloc(void *d, void *pool, _dma *bus_addr_l,
 				    _dma *bus_addr_h, u32 buf_sz,
 				    u8 cache, u8 direction, void **os_rsvd)
 {
@@ -157,13 +175,17 @@ static inline void *_os_shmem_alloc(void *d, _dma *bus_addr_l,
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
 
-	if(cache)
-		return pci_alloc_cache_mem(pdev, bus_addr_l, buf_sz, direction);
-	else
+	if (cache == DMA_ADDR)
 		return pci_alloc_noncache_mem(pdev, bus_addr_l, buf_sz);
+	else if (cache == POOL_ADDR) {
+		return pci_zalloc_pool_mem(pdev, (struct dma_pool *)pool, bus_addr_l);
+	} else
+		return pci_alloc_cache_mem(pdev, bus_addr_l, buf_sz, direction);
+
+	return NULL;
 }
 
-static inline void _os_shmem_free(void *d, u8 *vir_addr, _dma *bus_addr_l,
+static inline void _os_shmem_free(void *d, void *pool, u8 *vir_addr, _dma *bus_addr_l,
 				  _dma *bus_addr_h, u32 buf_sz,
 				  u8 cache, u8 direction, void *os_rsvd)
 {
@@ -171,10 +193,12 @@ static inline void _os_shmem_free(void *d, u8 *vir_addr, _dma *bus_addr_l,
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
 
-	if(cache)
-		return pci_free_cache_mem(pdev, vir_addr, bus_addr_l, buf_sz, direction);
-	else
+	if (cache == DMA_ADDR)
 		return pci_free_noncache_mem(pdev, vir_addr, bus_addr_l, buf_sz);
+	else if (cache == POOL_ADDR)
+		return pci_free_pool_mem(pdev, (struct dma_pool *)pool, vir_addr, bus_addr_l);
+	else
+		return pci_free_cache_mem(pdev, vir_addr, bus_addr_l, buf_sz, direction);
 }
 #endif /*CONFIG_PCI_HCI*/
 
@@ -186,10 +210,17 @@ static inline void *_os_pkt_buf_unmap_rx(void *d, _dma bus_addr_l, _dma bus_addr
 	struct pci_dev *pdev = pci_data->ppcidev;
 #endif /*CONFIG_PCI_HCI*/
 
+#ifdef CONFIG_PCI_HCI
+#ifdef CONFIG_PLATFORM_AML_S905
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 	pci_unmap_single(pdev, bus_addr_l, buf_sz, PCI_DMA_FROMDEVICE);
 #else
 	dma_unmap_single(&pdev->dev, bus_addr_l, buf_sz, DMA_FROM_DEVICE);
+#endif
 #endif
 
 #ifdef RTW_CORE_RECORD
@@ -207,6 +238,10 @@ static inline void *_os_pkt_buf_map_rx(void *d, _dma *bus_addr_l, _dma *bus_addr
 	struct pci_dev *pdev = pci_data->ppcidev;
 	struct sk_buff *skb = os_priv;
 
+#ifdef CONFIG_PLATFORM_AML_S905
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
 	*bus_addr_l = pci_map_single(pdev, skb->data, buf_sz, PCI_DMA_FROMDEVICE);
 #else
@@ -218,10 +253,49 @@ static inline void *_os_pkt_buf_map_rx(void *d, _dma *bus_addr_l, _dma *bus_addr
 	return NULL;
 }
 
+#ifdef CONFIG_PCI_HCI
+static inline struct sk_buff *_os_alloc_noncashe_skb(struct pci_dev *pdev, u32 buf_sz)
+{
+	struct sk_buff *skb = NULL;
+	unsigned char *data = NULL;
+
+	skb = rtw_zmalloc(sizeof(struct sk_buff));
+	if (!skb)
+		goto out;
+
+	data = pci_alloc_noncache_mem(pdev, (dma_addr_t *)&skb->cb, buf_sz);
+
+	if (!data)
+		goto nodata;
+
+	skb->head = data;
+	skb->data = data;
+	skb_reset_tail_pointer(skb);
+	skb->end = skb->tail + buf_sz;
+	skb->len = buf_sz;
+out:
+	return skb;
+nodata:
+	_rtw_mfree(skb, sizeof(struct sk_buff));
+	skb = NULL;
+	goto out;
+}
+
+static inline void _os_free_noncashe_skb(struct pci_dev *pdev,
+	struct sk_buff *skb, u32 buf_sz)
+{
+	/* skb buffer */
+	pci_free_noncache_mem(pdev, skb->data, (dma_addr_t *)skb->cb, buf_sz);
+
+	/* skb */
+	rtw_mfree(skb, sizeof(struct sk_buff));
+}
+#endif /*CONFIG_PCI_HCI*/
+
 /* rxbuf */
-#define PHL_RX_HEADROOM 50
+#define PHL_RX_HEADROOM 0
 static inline void *_os_pkt_buf_alloc_rx(void *d, _dma *bus_addr_l,
-			_dma *bus_addr_h, u32 buf_sz, void **os_priv)
+			_dma *bus_addr_h, u32 buf_sz, u8 cache, void **os_priv)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
 #ifdef CONFIG_PCI_HCI
@@ -231,26 +305,39 @@ static inline void *_os_pkt_buf_alloc_rx(void *d, _dma *bus_addr_l,
 	struct sk_buff *skb = NULL;
 	u32 rxbuf_size = buf_sz + PHL_RX_HEADROOM;
 
-
-	skb = rtw_skb_alloc(rxbuf_size);
-
+	if (cache)
+		skb = rtw_skb_alloc(rxbuf_size);
+#ifdef CONFIG_PCI_HCI
+	else
+		skb = _os_alloc_noncashe_skb(pdev, rxbuf_size);
+#endif
 	if (!skb)
 		return NULL;
 
-	skb_pull(skb, PHL_RX_HEADROOM);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-	*bus_addr_l = pci_map_single(pdev, skb->data, rxbuf_size, PCI_DMA_FROMDEVICE);
-#else
-	*bus_addr_l = dma_map_single(&pdev->dev, skb->data, rxbuf_size, DMA_FROM_DEVICE);
+	//skb_pull(skb, PHL_RX_HEADROOM);
+#ifdef CONFIG_PCI_HCI
+#ifdef CONFIG_PLATFORM_AML_S905
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
 #endif
+	if (cache)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
+		*bus_addr_l = pci_map_single(pdev, skb->data, rxbuf_size, PCI_DMA_FROMDEVICE);
+#else
+		*bus_addr_l = dma_map_single(&pdev->dev, skb->data, rxbuf_size,
+					     DMA_FROM_DEVICE);
+#endif
+	else
+		*bus_addr_l = *(dma_addr_t *)skb->cb;
 	/* *bus_addr_h = NULL;*/
+#endif /*CONFIG_PCI_HCI*/
 	*os_priv = skb;
 
 	return skb->data;
 }
 
 static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, _dma bus_addr_l,
-				_dma bus_addr_h, u32 buf_sz, void *os_priv)
+				_dma bus_addr_h, u32 buf_sz, u8 cache, void *os_priv)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
 #ifdef CONFIG_PCI_HCI
@@ -259,24 +346,35 @@ static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, _dma bus_addr_l,
 #endif /*CONFIG_PCI_HCI*/
 	struct sk_buff *skb = (struct sk_buff *)os_priv;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-	pci_unmap_single(pdev, bus_addr_l, buf_sz, PCI_DMA_FROMDEVICE);
-#else
-	dma_unmap_single(&pdev->dev, bus_addr_l, buf_sz, DMA_FROM_DEVICE);
+#ifdef CONFIG_PCI_HCI
+#ifdef CONFIG_PLATFORM_AML_S905
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
 #endif
-	rtw_skb_free(skb);
+	if (cache)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
+		pci_unmap_single(pdev, bus_addr_l, buf_sz, PCI_DMA_FROMDEVICE);
+#else
+		dma_unmap_single(&pdev->dev, bus_addr_l, buf_sz, DMA_FROM_DEVICE);
+#endif
+
+	if (!cache)
+		_os_free_noncashe_skb(pdev, skb, buf_sz);
+	else
+#endif /*CONFIG_PCI_HCI*/
+		rtw_skb_free(skb);
 }
 
 /* phl pre-alloc network layer buffer */
 static inline void * _os_alloc_netbuf(void *d, u32 buf_sz, void **os_priv)
 {
-	return _os_pkt_buf_alloc_rx(d, NULL, NULL, buf_sz, os_priv);
+	return _os_pkt_buf_alloc_rx(d, NULL, NULL, buf_sz, true, os_priv);
 }
 
 /* Free netbuf for error case. (ex. drop rx-reorder packet) */
 static inline void _os_free_netbuf(void *d, u8 *vir_addr, u32 buf_sz, void *os_priv)
 {
-	_os_pkt_buf_free_rx(d, vir_addr, 0,0, buf_sz, os_priv);
+	_os_pkt_buf_free_rx(d, vir_addr, 0,0, buf_sz, true, os_priv);
 }
 
 
@@ -584,11 +682,16 @@ static inline bool _os_atomic_inc_unless(void *d, _os_atomic *v, int u)
 }
 */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
+static inline u8 _os_tasklet_init(void *drv_priv, _os_tasklet *task,
+	void (*call_back_func)(unsigned long context), void *context)
+#else
 static inline u8 _os_tasklet_init(void *drv_priv, _os_tasklet *task,
 	void (*call_back_func)(void* context), void *context)
+#endif
 {
 	rtw_tasklet_init(task,
-			 (void(*))call_back_func,
+			 (void(*)(unsigned long))call_back_func,
 			 (unsigned long)task);
 	return 0;
 }
@@ -679,9 +782,13 @@ static inline u8 _os_workitem_config_cpu(void *drv_priv, _os_workitem *workitem,
 }
 #endif
 
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
+static inline u8 _os_workitem_init(void *drv_priv, _os_workitem *workitem,
+			void (*call_back_func)(unsigned long context), void *context)
+#else
 static inline u8 _os_workitem_init(void *drv_priv, _os_workitem *workitem,
 			void (*call_back_func)(void* context), void *context)
+#endif
 {
 #ifdef CONFIG_PHL_CPU_BALANCE
 	_init_workitem_cpu(workitem, call_back_func, context);

@@ -69,6 +69,9 @@ phl_mr_ctrl_init(struct phl_info_t *phl_info);
 enum rtw_phl_status
 phl_mr_ctrl_deinit(struct phl_info_t *phl_info);
 
+enum rtw_phl_status
+phl_mr_err_recovery(struct phl_info_t *phl, enum phl_msg_evt_id eid);
+
 #ifdef CONFIG_MCC_SUPPORT
 enum rtw_phl_status
 phl_mr_mcc_query_role_time_slot_lim (struct phl_info_t *phl_info, struct rtw_wifi_role_t *wrole,

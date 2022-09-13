@@ -377,6 +377,22 @@ void phl_msg_hub_phy_mgnt_evt_hdlr(struct phl_info_t* phl, u16 evt_id)
 	}
 }
 
+void phl_msg_hub_tx_evt_hdlr(struct phl_info_t *phl, u16 evt_id,
+                             u8 *buf, u32 len)
+{
+	PHL_INFO("%s : evt_id %d.\n", __func__, evt_id);
+
+	switch (evt_id) {
+	case MSG_EVT_LTR_TX_DLY:
+		_os_delay_us(phl_to_drvpriv(phl), 500);
+		rtw_phl_tx_req_notify(phl);
+		break;
+	default:
+		break;
+	}
+
+}
+
 void phl_msg_hub_rx_evt_hdlr(struct phl_info_t* phl, u16 evt_id,
 		u8 *buf, u32 len)
 {

@@ -1568,8 +1568,7 @@ void rtw_mbo_build_assoc_rsp_ies(
 	u8 *pcap = NULL;
 	u32 len = 0, cap_len = 0 ;
 
-	/* driver would't reload all assoc-rsp ie from hostapd */
-	#if 0
+	#if 1
 	if ((pcap = rtw_mbo_attrs_get(
 		(cur_network->IEs + _FIXED_IE_LENGTH_),
 		(cur_network->IELength - _FIXED_IE_LENGTH_),

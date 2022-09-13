@@ -401,6 +401,12 @@ u32 mac_ax_ops_init(void *drv_adapter, struct mac_ax_pltfm_cb *pltfm_cb,
 		return ret;
 	}
 
+	ret = dbcc_info_init(adapter);
+	if (ret != MACSUCCESS) {
+		PLTFM_MSG_ERR("[ERR]dbcc info init %d\n", ret);
+		return ret;
+	}
+
 	return MACSUCCESS;
 }
 #endif /*CONFIG_NEW_HALMAC_INTERFACE*/
@@ -419,6 +425,7 @@ u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 {
 	u32 ret;
 	struct mac_ax_efuse_param *efuse_param = &adapter->efuse_param;
+	struct scan_chinfo_list *scan_list;
 
 	ret = h2cb_exit(adapter);
 	if (ret != MACSUCCESS) {
@@ -482,6 +489,12 @@ u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 		return ret;
 	}
 
+	ret = dbcc_info_exit(adapter);
+	if (ret != MACSUCCESS) {
+		PLTFM_MSG_ERR("[ERR]dbcc info exit %d\n", ret);
+		return ret;
+	}
+
 	if (efuse_param->efuse_map) {
 		PLTFM_FREE(efuse_param->efuse_map,
 			   adapter->hw_info->efuse_size);
@@ -516,6 +529,13 @@ u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 		PLTFM_FREE(efuse_param->dav_log_efuse_map,
 			   adapter->hw_info->dav_log_efuse_size);
 		efuse_param->dav_log_efuse_map = (u8 *)NULL;
+	}
+
+	scan_list = adapter->scanofld_info.list;
+	if (scan_list) {
+		mac_scanofld_ch_list_clear(adapter, scan_list);
+		PLTFM_FREE((u8 *)scan_list, sizeof(struct scan_chinfo_list));
+		adapter->scanofld_info.list = NULL;
 	}
 
 	PLTFM_FREE(adapter->hw_info, sizeof(struct mac_ax_hw_info));

@@ -56,13 +56,9 @@ u8 pq_push(void *d, struct phl_queue *q, _os_list *obj, u8 pos, enum lock_type t
 u8 pq_pop(void *d, struct phl_queue *q, _os_list **obj, u8 pos, enum lock_type type)
 {
 	_os_spinlockfg sp_flags = 0;
-	int need_unlock = 0;
 
 	(*obj) = NULL;
-	if (!in_hardirq()) {
-		_os_spinlock(d, &q->lock, type, &sp_flags);
-		need_unlock = 1;
-	}
+	_os_spinlock(d, &q->lock, type, &sp_flags);
 	if(!list_empty(&q->queue) && (q->cnt > 0)) {
 		if(pos == _first)
 			(*obj) = _get_next(&q->queue);
@@ -71,10 +67,8 @@ u8 pq_pop(void *d, struct phl_queue *q, _os_list **obj, u8 pos, enum lock_type t
 		list_del(*obj);
 		q->cnt--;
 	}
-	if (need_unlock) {
-		_os_spinunlock(d, &q->lock, type, &sp_flags);
-		need_unlock = 0;
-	}
+	_os_spinunlock(d, &q->lock, type, &sp_flags);
+
 	return ((*obj) == NULL || (*obj) == &q->queue) ? (false) : (true);
 }
 
@@ -139,13 +133,9 @@ u8 pq_search_node(void *d, struct phl_queue *q, _os_list **obj,
 	_os_spinlockfg sp_flags = 0;
 	_os_list *newobj = NULL;
 	bool bhit = false;
-	int need_unlock =0;
 
 	(*obj) = NULL;
-	if (!in_hardirq()) {
-		_os_spinlock(d, &q->lock, type, &sp_flags);
-		need_unlock = 1;
-	}
+	_os_spinlock(d, &q->lock, type, &sp_flags);
 
 	if(!list_empty(&q->queue) && (q->cnt > 0))
 		newobj = _get_next(&q->queue);
@@ -166,11 +156,8 @@ u8 pq_search_node(void *d, struct phl_queue *q, _os_list **obj,
 		}
 
 		newobj = newobj->next;
-	}
-	if (need_unlock) {
-		_os_spinunlock(d, &q->lock, type, &sp_flags);
-		need_unlock = 0;
-	}
+	};
+	_os_spinunlock(d, &q->lock, type, &sp_flags);
 
 	return ((*obj) == NULL || (*obj) == &(q->queue)) ? (false) : (true);
 }

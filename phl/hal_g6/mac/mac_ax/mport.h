@@ -57,6 +57,8 @@
 #define PORT_H2C_DLY_US 10
 #define PORT_H2C_DLY_CNT 20000
 
+#define TBTT_SHIFT_OFST_MSB 0x800
+
 /*--------------------Define MACRO--------------------------------------*/
 /*--------------------Define Enum---------------------------------------*/
 enum port_stat {

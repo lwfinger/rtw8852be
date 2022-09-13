@@ -333,8 +333,8 @@ void rtw_vht_get_dft_setting(_adapter *padapter,
 	pvhtpriv->ampdu_len = pregistrypriv->ampdu_factor;
 	pvhtpriv->max_mpdu_len = dft_proto_cap->max_amsdu_len;
 
-	tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
-	rx_nss = GET_HAL_RX_NSS(adapter_to_dvobj(padapter));
+	tx_nss = GET_PHY_TX_NSS_BY_BAND(padapter, HW_BAND_0);
+	rx_nss = GET_PHY_RX_NSS_BY_BAND(padapter, HW_BAND_0);
 
 	/* for now, vhtpriv.vht_mcs_map comes from RX NSS */
 	rtw_vht_nss_to_mcsmap(rx_nss, pvhtpriv->vht_mcs_map, pregistrypriv->vht_rx_mcs_map);
@@ -488,8 +488,8 @@ void rtw_vht_get_real_setting(_adapter *padapter)
 	pvhtpriv->ampdu_len = pregistrypriv->ampdu_factor;
 	pvhtpriv->max_mpdu_len = proto_cap->max_amsdu_len;
 
-	tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
-	rx_nss = GET_HAL_RX_NSS(adapter_to_dvobj(padapter));
+	tx_nss = get_phy_tx_nss(padapter);
+	rx_nss = get_phy_rx_nss(padapter);
 
 	/* for now, vhtpriv.vht_mcs_map comes from RX NSS */
 	rtw_vht_nss_to_mcsmap(rx_nss, pvhtpriv->vht_mcs_map, pregistrypriv->vht_rx_mcs_map);
@@ -859,7 +859,7 @@ void VHT_caps_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 	pvhtpriv->ampdu_len = GET_VHT_CAPABILITY_ELE_MAX_RXAMPDU_FACTOR(pIE->data);
 
 	pcap_mcs = GET_VHT_CAPABILITY_ELE_RX_MCS(pIE->data);
-	rx_nss = GET_HAL_RX_NSS(adapter_to_dvobj(padapter));
+	rx_nss = get_phy_rx_nss(padapter);
 	rtw_vht_nss_to_mcsmap(rx_nss, pvhtpriv->vht_mcs_map, pcap_mcs);
 	pvhtpriv->vht_highest_rate = rtw_get_vht_highest_rate(pvhtpriv->vht_mcs_map);
 }
@@ -900,7 +900,7 @@ void rtw_process_vht_op_mode_notify(_adapter *padapter, u8 *pframe, void *sta)
 		return;
 
 	target_bw = GET_VHT_OPERATING_MODE_FIELD_CHNL_WIDTH(pframe);
-	tx_nss = GET_HAL_TX_NSS(adapter_to_dvobj(padapter));
+	tx_nss = get_phy_tx_nss(padapter);
 	target_rxss = rtw_min(tx_nss, (GET_VHT_OPERATING_MODE_FIELD_RX_NSS(pframe) + 1));
 
 	if (target_bw != psta->phl_sta->chandef.bw) {
@@ -1145,7 +1145,11 @@ u32	rtw_build_vht_cap_ie(_adapter *padapter, u8 *pbuf)
 	/* find the largest bw supported by both registry and hal */
 	bw = rtw_hw_largest_bw(adapter_to_dvobj(padapter), REGSTY_BW_5G(pregistrypriv));
 
-	HighestRate = VHT_MCS_DATA_RATE[bw][pvhtpriv->sgi_80m][((pvhtpriv->vht_highest_rate - MGN_VHT1SS_MCS0) & 0x3f)];
+	if(bw >= ARRAY_SIZE(VHT_MCS_DATA_RATE)){
+		RTW_WARN("BW parameter value is out of range:%u\n", bw);
+		bw = ARRAY_SIZE(VHT_MCS_DATA_RATE) - 1;
+	}
+	HighestRate = VHT_MCS_DATA_RATE[bw][0][((pvhtpriv->vht_highest_rate - MGN_VHT1SS_MCS0) & 0x3f)];
 	HighestRate = (HighestRate + 1) >> 1;
 
 	SET_VHT_CAPABILITY_ELE_MCS_RX_HIGHEST_RATE(pcap, HighestRate); /* indicate we support highest rx rate is 600Mbps. */
@@ -1366,14 +1370,6 @@ void rtw_check_for_vht20(_adapter *adapter, u8 *ies, int ies_len)
 /* We need to update the (mlmepriv->vhtpriv) */
 void rtw_update_drv_vht_cap(_adapter *padapter, u8 *vht_cap_ie)
 {
-	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
-	struct vht_priv *pvhtpriv = &(pmlmepriv->vhtpriv);
-	struct registry_priv *pregpriv = &padapter->registrypriv;
-	s32 ie_len = 0;
-	u32 rx_packet_offset, max_recvbuf_sz, available_mpdu_sz;
-	u8 cap_val;
-	u8 *pvht_cap;
-
 	/* Initialize VHT capability element */
 	rtw_vht_get_real_setting(padapter);
 
@@ -1420,16 +1416,17 @@ void rtw_reattach_vht_ies(_adapter *padapter, WLAN_BSSID_EX *pnetwork)
 
 	RTW_INFO(FUNC_ADPT_FMT"\n", FUNC_ADPT_ARG(padapter));
 
-	vht_op_ie = rtw_set_ie(vht_cap_ie, EID_VHTCapability, VHT_CAP_IE_LEN,
-		pvhtpriv->vht_cap_ie_backup, &(pnetwork->IELength));
+	if (pnetwork->IEs != NULL) {
+		vht_op_ie = rtw_set_ie(vht_cap_ie, EID_VHTCapability, VHT_CAP_IE_LEN,
+			pvhtpriv->vht_cap_ie_backup, &(pnetwork->IELength));
 
-	rtw_set_ie(vht_op_ie, EID_VHTOperation, VHT_OP_IE_LEN,
-		pvhtpriv->vht_op_ie_backup, &(pnetwork->IELength));
+		rtw_set_ie(vht_op_ie, EID_VHTOperation, VHT_OP_IE_LEN,
+			pvhtpriv->vht_op_ie_backup, &(pnetwork->IELength));
 
-	rtw_add_ext_cap_info(pmlmepriv->ext_capab_ie_data, &(pmlmepriv->ext_capab_ie_len),
-			     OP_MODE_NOTIFICATION);
-	rtw_update_ext_cap_ie(pmlmepriv->ext_capab_ie_data, pmlmepriv->ext_capab_ie_len,
-			      pnetwork->IEs, &(pnetwork->IELength), _BEACON_IE_OFFSET_);
+		rtw_add_ext_cap_info(pmlmepriv->ext_capab_ie_data, &(pmlmepriv->ext_capab_ie_len), OP_MODE_NOTIFICATION);
+		rtw_update_ext_cap_ie(pmlmepriv->ext_capab_ie_data, pmlmepriv->ext_capab_ie_len, pnetwork->IEs \
+		, &(pnetwork->IELength), _BEACON_IE_OFFSET_);
+	}
 
 	pmlmepriv->vhtpriv.vht_option = _TRUE;
 }

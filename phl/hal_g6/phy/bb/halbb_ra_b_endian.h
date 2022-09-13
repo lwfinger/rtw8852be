@@ -129,9 +129,9 @@ struct bb_h2c_ra_cfg_info {
 
 struct bb_h2c_rssi_setting {
 	u8 macid;
-	u8 rssi;
-	u8 rainfo1;
-	u8 rainfo2;
+	u8 rssi_a; /* BIT(7) : parse rssi_b*/
+	u8 bcn_rssi_a; /* BIT(7) : parse bcn_rssi*/
+	u8 bcn_rssi_b;
 
 	u8 drv_ractrl;
 	/* RSVD */
@@ -145,7 +145,20 @@ struct bb_h2c_rssi_setting {
 	u8 fixed_rate_md:2;
 	
 	u8 endcmd:1;
-	u8 rsvd2_rssi_b:7;
+	u8 rssi_b:7;
+};
+
+struct bb_h2c_ra_mask {
+	u8 macid;
+
+	u8 mask_rate:7;
+	u8 mask_or_reveal:1;
+
+	u8 rsvd1:5;
+	u8 is_manual_adjust_ra_mask:1;
+	u8 mask_rate_md:2;
+
+	u8 rsvd2;
 };
 
 struct bb_h2c_ra_adjust {
@@ -153,6 +166,13 @@ struct bb_h2c_ra_adjust {
 	
 	u8 drv_shift_en:1;
 	u8 drv_shift_value:7;
+};
+
+struct bb_h2c_ra_d_o_timer {
+	u8 macid;
+	
+	u8 d_o_timer_en:1;
+	u8 d_o_timer_value:7;
 };
 
 struct bb_h2c_mu_cfg {

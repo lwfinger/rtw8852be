@@ -305,7 +305,7 @@ void _dump_wifi_role(struct phl_info_t *phl_info, char *output, u32 out_len)
 	PHL_DBG_MON_INFO(out_len, used, output + used, out_len - used,
 				"==> PHL_DBG_DUMP_WROLE CH/BW information\n");
 	for( j = 0; j < MAX_WIFI_ROLE_NUMBER; j++) {
-		wrole = phl_get_wrole_by_ridx(phl_info, j);
+		wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, j);
 		if (NULL == wrole)
 			continue;
 		PHL_DBG_MON_INFO(out_len, used, output + used,
@@ -877,7 +877,7 @@ void phl_dbg_cmd_asoc_sta(struct phl_info_t *phl_info, char input[][MAX_ARGV],
 			out_len - used, "Wrole Index shall < 5\n");
 		return;
 	}
-	wrole = phl_get_wrole_by_ridx(phl_info, (u8)wrole_idx);
+	wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, (u8)wrole_idx);
 	if (1 == ctrl) {
 		_os_spinlock(drv, &wrole->assoc_sta_queue.lock, _bh, NULL);
 		phl_list_for_loop_safe(psta, n, struct rtw_phl_stainfo_t,
@@ -1233,13 +1233,13 @@ void phl_dbg_cmd_parser(struct phl_info_t *phl_info, char input[][MAX_ARGV],
 		u32 ret = 0;
 
 		PHL_DBG_MON_INFO(out_len, used, output + used, out_len - used,
-			"[DBG] PHL_DBG_COMP [1=set, 2=clear] [comp_bit] \n");
+			"[DBG] PHL_DBG_COMP [1=set comp_bit, 2=clear comp_bit, 4=set value]\n");
 		if (input_num <= 2)
 			break;
 		_get_hex_from_string(input[1], &ctrl);
 		_get_hex_from_string(input[2], &comp);
 
-		ret = rtw_phl_dbg_ctrl_comp((u8)ctrl, (u8)comp);
+		ret = rtw_phl_dbg_ctrl_comp((u8)ctrl, comp);
 		PHL_DBG_MON_INFO(out_len, used, output + used, out_len - used,
 			"[DBG] PHL_DBG_COMP (COMP = 0x%x) \n", (int)ret);
 	}
@@ -1338,7 +1338,7 @@ void phl_dbg_cmd_parser(struct phl_info_t *phl_info, char input[][MAX_ARGV],
 		_os_sscanf(input[5], "%d", &op_class);
 		_os_sscanf(input[6], "%d", &mode);
 		_os_sscanf(input[7], "%d", &delay_start_ms);
-		role = phl_get_wrole_by_ridx(phl_info, 2);
+		role = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, 2);
 		if(role){
 			param.ecsa_type = ECSA_TYPE_AP;
 			param.ch = (u8)chan;

@@ -234,8 +234,8 @@ struct rm_meas_req {
 	u8 ch_set_ch_amount;
 	s8 rx_pwr;		/* in dBm */
 	u8 rx_bw;
-	u8 rx_rate;
 	u8 rx_rsni;
+	u16 rx_rate;
 };
 
 struct rm_meas_rep {

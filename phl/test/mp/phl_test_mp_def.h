@@ -91,6 +91,7 @@ enum mp_config_cmd {
 	MP_CONFIG_CMD_GET_RFE_TYPE,
 	MP_CONFIG_CMD_GET_DEV_IDX,
 	MP_CONFIG_CMD_TRIGGER_FW_CONFLICT,
+	MP_CONFIG_CMD_GET_UUID,
 	MP_CONFIG_CMD_MAX,
 };
 
@@ -146,6 +147,8 @@ enum mp_efuse_cmd {
 	MP_EFUSE_CMD_WIFI_GET_PHY_MAP = 29,
 	MP_EFUSE_CMD_BT_GET_PHY_MAP = 30,
 	MP_EFUSE_CMD_WIFI_SET_RENEW = 31,
+	MP_EFUSE_CMD_WIFI_GET_MASK_BUF = 32,
+	MP_EFUSE_CMD_BT_GET_MASK_BUF = 33,
 	MP_EFUSE_CMD_MAX,
 };
 
@@ -270,6 +273,7 @@ struct mp_config_arg {
 	u8 dev_id;
 	u32 offset;
 	u8 voltag;
+	u32 uuid;
 };
 
 struct mp_tx_arg {

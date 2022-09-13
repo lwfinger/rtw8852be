@@ -249,6 +249,7 @@ u64 halbb_supportability_default(struct bb_info *bb)
 				BB_ENVMNTR |
 				BB_CFO_TRK |
 				BB_DIG |
+				BB_UL_TB_CTRL |
 				/*BB_ANT_DIV |*/
 				0;
 		break;
@@ -263,6 +264,7 @@ u64 halbb_supportability_default(struct bb_info *bb)
 				BB_CFO_TRK |
 				BB_ENVMNTR |
 				BB_DIG |
+				BB_UL_TB_CTRL |
 				0;
 
 		break;
@@ -277,6 +279,7 @@ u64 halbb_supportability_default(struct bb_info *bb)
 					BB_ENVMNTR |
 					BB_CFO_TRK |
 					BB_DIG |
+					BB_UL_TB_CTRL |
 					/*BB_ANT_DIV |*/
 					0;
 			break;
@@ -410,6 +413,9 @@ enum rtw_hal_status halbb_dm_init(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	#ifdef HALBB_CFO_TRK_SUPPORT
 	halbb_cfo_trk_init(bb);
 	#endif
+	#ifdef HALBB_UL_TB_CTRL_SUPPORT
+	halbb_ul_tb_ctrl_init(bb);
+	#endif
 	#ifdef HALBB_RA_SUPPORT
 	halbb_ra_init(bb);
 	#endif
@@ -443,6 +449,7 @@ void halbb_timer_ctrl(struct bb_info *bb, enum bb_timer_cfg_t timer_state)
 {
 	BB_DBG(bb, DBG_INIT, "[%s] timer_state = %d\n", __func__, timer_state);
 
+	/*BB-0 & BB-1 timer*/
 	#ifdef HALBB_ANT_DIV_SUPPORT
 	halbb_cfg_timers(bb, timer_state, &bb->bb_ant_div_i.antdiv_timer_i);
 	#endif
@@ -455,6 +462,14 @@ void halbb_timer_ctrl(struct bb_info *bb, enum bb_timer_cfg_t timer_state)
 	#ifdef HALBB_DIG_TDMA_SUPPORT
 	halbb_cfg_timers(bb, timer_state, &bb->bb_dig_i.dig_timer_i);
 	#endif
+
+	if (!bb->bb_cmn_hooker)
+		return;
+
+	/*BB Common Timer*/
+	#ifdef HALBB_LA_MODE_SUPPORT
+	halbb_cfg_timers(bb, timer_state, &bb->bb_cmn_hooker->bb_la_mode_i.la_timer_i);
+	#endif	
 }
 
 void halbb_timer_init(struct bb_info *bb)
@@ -473,6 +488,9 @@ void halbb_timer_init(struct bb_info *bb)
 	#ifdef HALBB_DIG_TDMA_SUPPORT
 	halbb_dig_timer_init(bb);
 	#endif
+	#ifdef HALBB_LA_MODE_SUPPORT
+	halbb_la_timer_init(bb);
+	#endif	
 }
 
 void halbb_cr_cfg_init(struct bb_info *bb)
@@ -513,12 +531,21 @@ void halbb_cr_cfg_init(struct bb_info *bb)
 	#ifdef HALBB_CFO_TRK_SUPPORT
 	halbb_cr_cfg_cfo_trk_init(bb);
 	#endif
+	#ifdef HALBB_UL_TB_CTRL_SUPPORT
+	halbb_cr_cfg_ul_tb_init(bb);
+	#endif
+
+
 }
 
 void halbb_buffer_deinit(struct rtw_phl_com_t *phl_com,
 			 struct rtw_hal_com_t *hal_com, void *bb_phy_0)
 {
 	struct bb_info *bb = (struct bb_info *)bb_phy_0;
+
+	BB_DBG(bb, DBG_INIT, "deinit phy-%d", bb->bb_phy_idx);
+	halbb_timer_ctrl(bb, BB_CANCEL_TIMER);
+	halbb_timer_ctrl(bb, BB_RELEASE_TIMER);
 
 	/*Deinit phy-cmn*/
 	if (bb->bb_cmn_hooker) {
@@ -536,9 +563,6 @@ void halbb_buffer_deinit(struct rtw_phl_com_t *phl_com,
 	#endif
 	/*Deinit phy-0*/
 	if (bb) {
-		BB_DBG(bb, DBG_INIT, "deinit phy-%d", bb->bb_phy_idx);
-		halbb_timer_ctrl(bb, BB_CANCEL_TIMER);
-		halbb_timer_ctrl(bb, BB_RELEASE_TIMER);
 		hal_mem_free(hal_com, bb, sizeof(struct bb_info));
 	}
 }

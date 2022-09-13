@@ -172,6 +172,11 @@ void rtw_add_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index, u8 *d
 	u8	*p = NULL, *dst_ie = NULL, *premainder_ie = NULL, *pbackup_remainder_ie = NULL;
 	u32	i, offset, ielen = 0, ie_offset, remainder_ielen = 0;
 
+	if (pnetwork->IELength + len > MAX_IE_SZ) {
+		RTW_ERR("Can't add IE to beacon, because size is more than MAX_IE_SZ\n");
+		return;
+	}
+
 	/* Search element id (index) exits or not */
 	for (i = sizeof(NDIS_802_11_FIXED_IEs); i < pnetwork->IELength;) {
 		pIE = (PNDIS_802_11_VARIABLE_IEs)(pnetwork->IEs + i);
@@ -266,6 +271,90 @@ void rtw_remove_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index)
 	}
 
 	offset = (uint)(dst_ie - pie);
+	pnetwork->IELength = offset + remainder_ielen;
+}
+
+/**
+ * rtw_add_bcn_ie_ex - Add Element ID Extension into Element ID (0xff)
+ * Frame format: | element id (0xff) | length | element id extension | content |
+ *
+ * @eid_ex: element id extension
+ * @data: eid_ex + content
+ * @len: length
+*/
+void rtw_add_bcn_ie_ex(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 eid_ex, u8 *data, u8 len)
+{
+	struct ieee80211_info_element *pie;
+	bool find_ex_ie = _FALSE;
+	bool bmatch = _FALSE;
+	u8 *ies = pnetwork->IEs;
+	u8 *p = NULL, *dst_ie = NULL, *premainder_ie = NULL, *pbackup_remainder_ie = NULL;
+	u32 i, offset, ielen = 0, ie_offset, remainder_ielen = 0;
+
+	if (pnetwork->IELength + len > MAX_IE_SZ) {
+		RTW_ERR("Can't add IE to beacon, because size is more than MAX_IE_SZ\n");
+		return;
+	}
+
+	/* Search element id extension exits or not */
+	for (i = sizeof(NDIS_802_11_FIXED_IEs); i < pnetwork->IELength;) {
+		pie = (struct ieee80211_info_element *)(ies + i);
+
+		if (pie->id == WLAN_EID_EXTENSION) {
+			find_ex_ie = _TRUE;
+			if (pie->data[0] > eid_ex) { /* first byte of data is element id extension */
+				break;
+			} else if (pie->data[0] == eid_ex) { /* already exist the same Element ID Extension */
+				p = (u8 *)pie;
+				ielen = pie->len;
+				bmatch = _TRUE;
+				break;
+			}
+		} else if (find_ex_ie) { /* append to last element id (0xff) */
+			break;
+		}
+
+		p = (u8 *)pie;
+		ielen = pie->len;
+		i += (pie->len + 2);
+	}
+
+	/* Backup remainder IE */
+	if (p != NULL && ielen > 0) {
+		ielen += 2;
+		premainder_ie = p + ielen;
+		ie_offset = (sint)(p - ies);
+		remainder_ielen = pnetwork->IELength - ie_offset - ielen;
+
+		if (bmatch)
+			dst_ie = p;
+		else
+			dst_ie = (p + ielen);
+	}
+
+	if (dst_ie == NULL)
+		return;
+
+	if (remainder_ielen > 0) {
+		pbackup_remainder_ie = rtw_malloc(remainder_ielen);
+		if (pbackup_remainder_ie && premainder_ie)
+			_rtw_memcpy(pbackup_remainder_ie, premainder_ie, remainder_ielen);
+	}
+
+	*dst_ie++ = WLAN_EID_EXTENSION;
+	*dst_ie++ = len;
+
+	_rtw_memcpy(dst_ie, data, len);
+	dst_ie += len;
+
+	/* Append remainder IE */
+	if (pbackup_remainder_ie) {
+		_rtw_memcpy(dst_ie, pbackup_remainder_ie, remainder_ielen);
+
+		rtw_mfree(pbackup_remainder_ie, remainder_ielen);
+	}
+
+	offset = (uint)(dst_ie - ies);
 	pnetwork->IELength = offset + remainder_ielen;
 }
 
@@ -2045,7 +2134,7 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 	psecuritypriv->mfp_opt = mfp_opt;
 
 	/* RRM */
-	update_rm_cap(pbuf, padapter, len, _BEACON_IE_OFFSET_);
+	rm_update_cap(pbuf, padapter, len, _BEACON_IE_OFFSET_);
 
 	/* wmm */
 	ie_len = 0;
@@ -2134,7 +2223,7 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 				u8 rx_nss = 0;
 				int i;
 
-				rx_nss = GET_HAL_RX_NSS(adapter_to_dvobj(padapter));
+				rx_nss = get_phy_rx_nss(padapter);
 
 				/* RX MCS Bitmask */
 				switch (rx_nss) {
@@ -2237,8 +2326,9 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 	}
 #endif
 
+	pmlmepriv->upper_layer_setting = _FALSE;
+
 #ifdef CONFIG_80211AC_VHT
-	pmlmepriv->vhtpriv.upper_layer_setting = _FALSE;
 	pmlmepriv->vhtpriv.vht_option = _FALSE;
 
 	if (pmlmepriv->htpriv.ht_option == _TRUE
@@ -2248,7 +2338,7 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 		&& RFCTL_REG_EN_11AC(rfctl)
 	) {
 		/* Parsing VHT_CAP_IE */
-		p = rtw_get_ie(ie + _BEACON_IE_OFFSET_, EID_VHTCapability, 
+		p = rtw_get_ie(ie + _BEACON_IE_OFFSET_, WLAN_EID_VHT_CAPABILITY, 
 			&ie_len, (pbss_network->IELength - _BEACON_IE_OFFSET_));
 		if (p && ie_len > 0)
 			vht_cap = _TRUE;
@@ -2258,7 +2348,7 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 		/* Update VHT related IEs */
 		if (vht_cap == _TRUE) {
 			RTW_INFO(FUNC_ADPT_FMT" VHT IEs is configured by hostapd/wpa_supplicant\n", FUNC_ADPT_ARG(padapter));
-			pmlmepriv->vhtpriv.upper_layer_setting = _TRUE;
+			pmlmepriv->upper_layer_setting = _TRUE;
 			pmlmepriv->vhtpriv.vht_option = _TRUE;
 
 			rtw_check_for_vht20(padapter, ie + _BEACON_IE_OFFSET_, 
@@ -2295,8 +2385,14 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 
 		/* If He capability is in beacon IE, enable he_option */ 
 		pmlmepriv->hepriv.he_option = he_cap;
-		rtw_he_use_default_setting(padapter);
-		if (REGSTY_IS_11AX_AUTO(pregistrypriv)) {
+
+		/* Update HE related IEs */
+		if (he_cap == _TRUE) {
+			RTW_INFO(FUNC_ADPT_FMT" HE IEs is configured by hostapd/wpa_supplicant\n", FUNC_ADPT_ARG(padapter));
+			pmlmepriv->upper_layer_setting = _TRUE;
+
+			rtw_update_he_ies(padapter, pbss_network);
+		} else if (REGSTY_IS_11AX_AUTO(pregistrypriv)) {
 			rtw_he_ies_detach(padapter, pbss_network);
 			rtw_he_ies_attach(padapter, pbss_network);
 		}
@@ -4005,9 +4101,10 @@ int rtw_sta_flush(_adapter *padapter, bool enqueue)
 		u8 sta_addr[ETH_ALEN];
 
 		psta = rtw_get_stainfo_by_offset(pstapriv, flush_list[i]);
-		_rtw_memcpy(sta_addr, psta->phl_sta->mac_addr, ETH_ALEN);
-
-		ap_free_sta(padapter, psta, _TRUE, WLAN_REASON_DEAUTH_LEAVING, enqueue, _FALSE);
+		if (psta != NULL) {
+			_rtw_memcpy(sta_addr, psta->phl_sta->mac_addr, ETH_ALEN);
+			ap_free_sta(padapter, psta, _TRUE, WLAN_REASON_DEAUTH_LEAVING, enqueue, _FALSE);
+		}
 		#ifdef CONFIG_RTW_MESH
 		if (MLME_IS_MESH(padapter))
 			rtw_mesh_expire_peer(padapter, sta_addr);
@@ -4373,8 +4470,8 @@ void rtw_ap_update_bss_chbw(_adapter *adapter, WLAN_BSSID_EX *bss, u8 ch, u8 bw,
 		int vht_cap_ielen, vht_op_ielen;
 		u8	center_freq;
 
-		vht_cap_ie = rtw_get_ie((bss->IEs + sizeof(NDIS_802_11_FIXED_IEs)), EID_VHTCapability, &vht_cap_ielen, (bss->IELength - sizeof(NDIS_802_11_FIXED_IEs)));
-		vht_op_ie = rtw_get_ie((bss->IEs + sizeof(NDIS_802_11_FIXED_IEs)), EID_VHTOperation, &vht_op_ielen, (bss->IELength - sizeof(NDIS_802_11_FIXED_IEs)));
+		vht_cap_ie = rtw_get_ie((bss->IEs + sizeof(NDIS_802_11_FIXED_IEs)), WLAN_EID_VHT_CAPABILITY, &vht_cap_ielen, (bss->IELength - sizeof(NDIS_802_11_FIXED_IEs)));
+		vht_op_ie = rtw_get_ie((bss->IEs + sizeof(NDIS_802_11_FIXED_IEs)), WLAN_EID_VHT_OPERATION, &vht_op_ielen, (bss->IELength - sizeof(NDIS_802_11_FIXED_IEs)));
 		center_freq = rtw_phl_get_center_ch(ch, bw, offset);
 
 		/* update vht cap ie */

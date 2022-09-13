@@ -199,15 +199,6 @@ static inline bool rtw_hal_sec_read_cam_is_gk(_adapter *adapter, u8 id)
 	return _TRUE;
 }
 
-static inline u8 rtw_hal_get_current_tx_rate(_adapter *adapter, struct sta_info *psta)
-{
-	return 0;
-}
-static u8 rtw_get_current_tx_sgi(_adapter *padapter, struct sta_info *psta)
-{
-	return 0;
-}
-
 static inline void rtw_hal_linked_info_dump(_adapter *padapter, u8 benable)
 {}
 
@@ -237,7 +228,7 @@ static inline u8 rtw_hal_get_vht_ndp_tx_rate(_adapter *adapter, u8 bfer_str_num)
 }
 
 static inline u8 rtw_hal_get_sounding_info(_adapter *adapter,u16 *throughput,
-				       u8 total_bfee_num, u8 *tx_rate)
+				       u8 total_bfee_num, u16 *tx_rate)
 {
 	return 0;
 }

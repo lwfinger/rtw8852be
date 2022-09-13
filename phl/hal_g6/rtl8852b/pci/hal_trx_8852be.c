@@ -701,8 +701,7 @@ hal_update_txbd_8852be(struct hal_info_t *hal,
 	struct bus_hw_cap_t *bus_hw_cap = &hal_com->bus_hw_cap;
 	u8 *ring_head = 0;
 	u8 *target_txbd = 0;
-	u16 host_idx = 0, txbd_host_idx = 0, hw_idx = 0;
-	u16 avail_txbd = 0, wcnt = 0;
+	u16 host_idx = 0;
 	u16 txbd_num = (u16)hal_com->bus_cap.txbd_num;
 
 	do {
@@ -713,17 +712,12 @@ hal_update_txbd_8852be(struct hal_info_t *hal,
 
 		/* connect with halmac */
 		host_idx = txbd_ring[ch_idx].host_idx;
-		avail_txbd = hal_get_avail_txbd_8852be(hal->hal_com, ch_idx,
-							&txbd_host_idx, &hw_idx);
-
-		wcnt = (wd_num > avail_txbd) ? avail_txbd : wd_num;
 
 		PHL_TRACE(COMP_PHL_XMIT, _PHL_DEBUG_,
-			  "hal_update_txbd_8852be => ch_idx %d, host_idx %d, "
-			  "hw_idx %d, avail_txbd %d, wcnt %d\n",
-			  ch_idx, txbd_host_idx, hw_idx, avail_txbd, wcnt);
+		          "hal_update_txbd_8852be => ch_idx %d, wd_num %d\n",
+			  ch_idx, wd_num);
 
-		while (wcnt > 0) {
+		while (wd_num > 0) {
 
 			ring_head = txbd_ring[ch_idx].vir_addr;
 			target_txbd = ring_head + (host_idx *
@@ -737,11 +731,11 @@ hal_update_txbd_8852be(struct hal_info_t *hal,
 							wd_page->phy_addr_h);
 			host_idx = (host_idx + 1) % txbd_num;
 			wd_page->host_idx = host_idx;
-			wcnt--;
+			wd_num--;
 
 			//multi wd page in one update txbd
 			#if 0//S_TODO
-			if(wcnt > 0){
+			if(wd_num > 0){
 				wd_page = list_first_entry(wd_page->list,
 								struct rtw_wd_page,
 								wd_page->list);
@@ -887,19 +881,19 @@ static u8 hal_check_rxrdy_8852be(struct rtw_phl_com_t *phl_com, u8 *rxbd_info,
 
 u16 hal_handle_rx_report_8852be(struct hal_info_t *hal, u8 *rp, u16 len,
 				u8 *sw_retry, u8 *dma_ch, u16 *wp_seq,
-				u8 *txsts)
+				u8 *macid, u8 *ac_queue, u8 *txsts)
 {
 	u8 polluted = false;
 	u16 rsize = 0;
-	u16 macid = 0;
 	u8 tid = 0, qsel_value = 0, band = 0, tid_indic = 0;
 
 	do {
 		if (len < RX_RP_PACKET_SIZE)
 			break;
 
-		macid = (u8)GET_RX_RP_PKT_MAC_ID(rp);
+		*macid = (u8)GET_RX_RP_PKT_MAC_ID(rp);
 		qsel_value = (u8)GET_RX_RP_PKT_QSEL(rp);
+		*ac_queue = qsel_value % RTW_MAX_AC_QUEUE_NUM;
 		*txsts = (u8)GET_RX_RP_PKT_TX_STS(rp);
 		*wp_seq = (u16)GET_RX_RP_PKT_PCIE_SEQ(rp);
 		polluted = (u8)GET_RX_RP_PKT_POLLUTED(rp);
@@ -909,11 +903,11 @@ u16 hal_handle_rx_report_8852be(struct hal_info_t *hal, u8 *rp, u16 len,
 		tid_indic = (*wp_seq & WP_TID_INDIC_RESERVED_BIT) ? 1 : 0;
 		*wp_seq &= (WP_RESERVED_SEQ);
 		tid = hal_qsel_to_tid_8852be(hal, qsel_value, tid_indic);
-		*dma_ch = hal_mapping_hw_tx_chnl_8852be(macid, tid, band);
+		*dma_ch = hal_mapping_hw_tx_chnl_8852be(*macid, tid, band);
 
 		PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "Get recycle report: qsel = %d, macid = %d, wp_seq = 0x%x, tid_indic = %d,"
 			" tid = %d, band = %d, dma_ch = %d\n",
-			qsel_value, macid, *wp_seq, tid_indic, tid, band, *dma_ch);
+			qsel_value, *macid, *wp_seq, tid_indic, tid, band, *dma_ch);
 
 		if (TX_STATUS_TX_DONE != *txsts) {
 			*sw_retry = true;

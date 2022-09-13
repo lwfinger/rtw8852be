@@ -48,6 +48,8 @@ static void _hal_bus_cap_pre_decision(struct rtw_phl_com_t *phl_com,
 		((bus_sw->txbd_num > bus_hw->max_txbd_num) ?
 		 bus_hw->max_txbd_num : bus_sw->txbd_num) :
 		bus_hw->max_txbd_num;
+	bus_cap->read_txbd_th = bus_cap->txbd_num >> bus_sw->read_txbd_lvl;
+
 	bus_cap->rxbd_num = (bus_sw->rxbd_num) ?
 		((bus_sw->rxbd_num > bus_hw->max_rxbd_num) ?
 		 bus_hw->max_rxbd_num : bus_sw->rxbd_num) :
@@ -152,6 +154,8 @@ static void _hal_bus_final_cap_decision(struct rtw_phl_com_t *phl_com,
 		((bus_sw->txbd_num > bus_hw->max_txbd_num) ?
 		 bus_hw->max_txbd_num : bus_sw->txbd_num) :
 		bus_hw->max_txbd_num;
+	bus_cap->read_txbd_th = bus_cap->txbd_num >> bus_sw->read_txbd_lvl;
+
 	bus_cap->rxbd_num = (bus_sw->rxbd_num) ?
 		((bus_sw->rxbd_num > bus_hw->max_rxbd_num) ?
 		 bus_hw->max_rxbd_num : bus_sw->rxbd_num) :
@@ -170,6 +174,10 @@ static void _hal_bus_final_cap_decision(struct rtw_phl_com_t *phl_com,
 		(bus_sw->ltr_sw_ctrl ? true : false) : false;
 	bus_cap->ltr_hw_ctrl = bus_hw->ltr_hw_ctrl ?
 		(bus_sw->ltr_hw_ctrl ? true : false) : false;
+
+	#ifdef RTW_WKARD_GET_PROCESSOR_ID
+	bus_cap->proc_id = bus_sw->proc_id;
+	#endif
 }
 #endif
 
@@ -201,7 +209,7 @@ static void _hal_ps_final_cap_decision(struct rtw_phl_com_t *phl_com,
 	ps_cap->lps_pause_tx = ps_hw_cap->lps_pause_tx;
 	/* sw & hw */
 	ps_cap->ips_cap = (ps_sw_cap->ips_cap & ps_hw_cap->ips_cap);
-	ps_cap->lps_wow_cap = (ps_sw_cap->lps_wow_cap & ps_hw_cap->lps_wow_cap);
+	ps_cap->ips_wow_cap = (ps_sw_cap->ips_wow_cap & ps_hw_cap->ips_wow_cap);
 	ps_cap->lps_cap = (ps_sw_cap->lps_cap & ps_hw_cap->lps_cap);
 	ps_cap->lps_wow_cap = (ps_sw_cap->lps_wow_cap & ps_hw_cap->lps_wow_cap);
 }
@@ -318,6 +326,7 @@ void rtw_hal_final_cap_decision(struct rtw_phl_com_t *phl_com, void *hal)
 	dev_cap->wow_cap.ns_oflod_sup = dev_sw_cap->wow_cap.ns_oflod_sup;
 	dev_cap->wow_cap.gtk_ofld_sup = dev_sw_cap->wow_cap.gtk_ofld_sup;
 	dev_cap->wow_cap.ping_pattern_wake_sup = dev_sw_cap->wow_cap.ping_pattern_wake_sup;
+	dev_cap->wow_cap.nlo_sup = dev_sw_cap->wow_cap.nlo_sup;
 
 	if (dev_sw_cap->pkg_type != 0xFF)
 		dev_cap->pkg_type = dev_sw_cap->pkg_type;
@@ -417,6 +426,9 @@ void rtw_hal_final_cap_decision(struct rtw_phl_com_t *phl_com, void *hal)
 
 	dev_cap->rpq_agg_num = dev_sw_cap->rpq_agg_num ?
 		dev_sw_cap->rpq_agg_num : dev_hw_cap->rpq_agg_num;
+
+	/* MAC_AX_QTA_SCC_TURBO, decide by sw, need to be refined after we have hw cap */
+	dev_cap->quota_turbo = dev_sw_cap->quota_turbo;
 }
 
 /**

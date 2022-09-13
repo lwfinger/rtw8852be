@@ -37,6 +37,8 @@ _phl_pkt_ofld_get_txt(u8 type)
 			return "EAPOL-KEY";
 		case PKT_TYPE_SA_QUERY:
 			return "SA QUERY";
+		case PKT_TYPE_PROBE_REQ:
+			return "PROBE REQ";
 		default:
 			return "Unknown?!";
 	}
@@ -529,6 +531,56 @@ _phl_pkt_ofld_construct_realwow_wp(struct pkt_ofld_obj *ofld_obj, u8 **pkt_buf,
 }
 
 static enum rtw_phl_status
+_phl_pkt_ofld_construct_probe_req(struct pkt_ofld_obj *ofld_obj, u8 **pkt_buf,
+	u16 *len, struct rtw_pkt_ofld_probe_req_info *probe_req_info)
+{
+	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	u8 wild_card[MAC_ADDRESS_LENGTH] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	u8 *tmp_buf = NULL;
+
+	if (probe_req_info->construct_pbreq == NULL) {
+
+		*len = MAC_HDR_LEN;
+		*pkt_buf = _os_mem_alloc(d, MAC_HDR_LEN);
+		if (*pkt_buf == NULL) {
+			return RTW_PHL_STATUS_RESOURCE;
+		}
+
+		_os_mem_set(d, *pkt_buf, 0, MAC_HDR_LEN);
+
+		SET_80211_PKT_HDR_FRAME_CONTROL(*pkt_buf, 0);
+		SET_80211_PKT_HDR_TYPE_AND_SUBTYPE(*pkt_buf, TYPE_PROBE_REQ_FRAME);
+		SET_80211_PKT_HDR_ADDRESS1(d, *pkt_buf, &wild_card);
+		SET_80211_PKT_HDR_ADDRESS2(d, *pkt_buf, probe_req_info->a2);
+		SET_80211_PKT_HDR_ADDRESS3(d, *pkt_buf, &wild_card);
+		SET_80211_PKT_HDR_DURATION(*pkt_buf, 0);
+		SET_80211_PKT_HDR_FRAGMENT_SEQUENCE(*pkt_buf, 0);
+
+	} else {
+
+		tmp_buf = _os_mem_alloc(d, MAX_MSDU_LEN + MAC_HDR_LEN + FCS_LEN);
+
+		if (tmp_buf == NULL)
+			return RTW_PHL_STATUS_RESOURCE;
+
+		probe_req_info->construct_pbreq(d, tmp_buf, len);
+
+		*pkt_buf = _os_mem_alloc(d, *len);
+		if (*pkt_buf == NULL) {
+			_os_mem_free(d, tmp_buf, MAX_MSDU_LEN + MAC_HDR_LEN + FCS_LEN);
+			return RTW_PHL_STATUS_RESOURCE;
+		}
+
+		_os_mem_set(d, *pkt_buf, 0, *len);
+		_os_mem_cpy(d, *pkt_buf, tmp_buf, *len);
+
+		_os_mem_free(d, tmp_buf, MAX_MSDU_LEN + MAC_HDR_LEN + FCS_LEN);
+	}
+
+	return RTW_PHL_STATUS_SUCCESS;
+}
+
+static enum rtw_phl_status
 _phl_pkt_ofld_construct_packet(struct pkt_ofld_obj *ofld_obj, u16 macid,
 			u8 type, u8 **pkt_buf, u16 *len, void *buf)
 {
@@ -568,6 +620,10 @@ _phl_pkt_ofld_construct_packet(struct pkt_ofld_obj *ofld_obj, u16 macid,
 	case PKT_TYPE_REALWOW_WP:
 		status = _phl_pkt_ofld_construct_realwow_wp(ofld_obj, pkt_buf,
 			len, phl_sta, (struct rtw_pkt_ofld_realwow_wp_info *) buf);
+		break;
+	case PKT_TYPE_PROBE_REQ:
+		status = _phl_pkt_ofld_construct_probe_req(ofld_obj, pkt_buf,
+			len, (struct rtw_pkt_ofld_probe_req_info *) buf);
 		break;
 	case PKT_TYPE_PROBE_RSP:
 	case PKT_TYPE_PS_POLL:
@@ -1100,6 +1156,8 @@ const char *phl_get_pkt_ofld_str(enum pkt_ofld_type type)
 		return "PKT_TYPE_EAPOL_KEY";
 	case PKT_TYPE_SA_QUERY:
 		return "PKT_TYPE_SA_QUERY";
+	case PKT_TYPE_PROBE_REQ:
+		return "PKT_TYPE_PROBE_REQ";
 	default:
 		return "UNKNOWN_PKT_TYPE";
 	}

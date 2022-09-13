@@ -120,6 +120,7 @@ void halrf_deinit(struct rtw_phl_com_t *phl_com,
 /**************halrf_hw_cfg.c**************/
 bool halrf_init_reg_by_hdr(void *rf_void);
 bool halrf_nctl_init_reg_by_hdr(void *rf_void);
+bool halrf_config_radio(void *rf_void, enum phl_phy_idx phy);
 bool halrf_config_radio_a_reg(void *rf_void, bool is_form_folder,
 				u32 folder_len, u32 *folder_array);
 bool halrf_config_radio_b_reg(void *rf_void, bool is_form_folder,
@@ -225,6 +226,7 @@ void halrf_ctrl_bw_ch(void *rf_void, enum phl_phy_idx phy, u8 central_ch,
 void  halrf_fw_ntfy(void *rf_void, enum phl_phy_idx phy_idx);
 u32 halrf_get_nctl_reg_ver(struct rf_info *rf);
 u32 halrf_get_radio_reg_ver(struct rf_info *rf);
+u32 halrf_get_radio_ver_from_reg(struct rf_info *rf);
 void halrf_config_nctl_reg(struct rf_info *rf);
 void halrf_set_gpio(void *rf_void, enum phl_phy_idx phy, u8 band);
 bool halrf_check_efem(void *rf_void, enum phl_phy_idx phy_idx);
@@ -262,5 +264,8 @@ u32 halrf_tssi_get_final(void *rf_void, enum phl_phy_idx phy_idx, u8 path);
 void halrf_tssi_backup_txagc(struct rf_info *rf, enum phl_phy_idx phy, bool enable);
 void halrf_reload_pwr_limit_tbl_and_set(struct rf_info *rf,
 	enum phl_phy_idx phy, enum phl_pwr_table pwr_table);
+
+u32 halrf_test_event_trigger(void *rf_void,
+	enum phl_phy_idx phy, enum halrf_event_idx idx, enum halrf_event_func func);
 
 #endif

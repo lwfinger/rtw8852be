@@ -336,6 +336,46 @@ rtw_hal_bb_ra_update(struct hal_info_t *hal_info,
 		return RTW_HAL_STATUS_FAILURE;
 }
 
+#ifdef CONFIG_BTCOEX
+enum rtw_hal_status rtw_hal_btc_cfg_tx_1ss(struct rtw_hal_com_t *hal_com,
+			struct rtw_phl_com_t *phl_com, u8 rid, bool enable)
+{
+	enum rtw_hal_status hstats = RTW_HAL_STATUS_FAILURE;
+	struct hal_info_t *hal_i = (struct hal_info_t *)hal_com->hal_priv;
+	void *drv = halcom_to_drvpriv(hal_com);
+	struct rtw_wifi_role_t *wrole = rtw_phl_get_wrole_by_ridx(phl_com, rid);
+	struct phl_queue *sta_queue = NULL;
+	struct rtw_phl_stainfo_t *sta = NULL;
+	u8 ra_nss_limit = enable ? 1 : 0;
+
+	PHL_PRINT("%s: rid(%d), enable(%d)\n", __FUNCTION__, rid, enable);
+	if (wrole == NULL) {
+		PHL_ERR("%s: Get role failed\n", __FUNCTION__);
+		goto exit;
+	}
+	sta_queue = &wrole->assoc_sta_queue;
+	_os_spinlock(drv, &sta_queue->lock, _bh, NULL);
+	phl_list_for_loop(sta, struct rtw_phl_stainfo_t,
+				&sta_queue->queue, list) {
+		if (!sta)
+			continue;
+		sta->hal_sta->ra_info.ra_nss_limit = ra_nss_limit;
+		hstats = rtw_hal_bb_ra_update(hal_i, sta);
+		if (RTW_HAL_STATUS_SUCCESS != hstats) {
+			PHL_ERR("%s: macid(%d), Fail to cfg ra_nss_limit(%d)\n",
+				__FUNCTION__, sta->macid, ra_nss_limit);
+			break;
+		} else {
+			PHL_PRINT("%s: macid(%d), succee to cfg ra_nss_limit(%d)\n",
+				__FUNCTION__, sta->macid, ra_nss_limit);
+		}
+	}
+	_os_spinunlock(drv, &sta_queue->lock, _bh, NULL);
+exit:
+	return hstats;
+}
+#endif /* CONFIG_BTCOEX */
+
 enum rtw_hal_status
 rtw_hal_bb_query_txsts_rpt(struct hal_info_t *hal_info,
 				u16 macid0, u16 macid1)
@@ -798,7 +838,7 @@ rtw_hal_bb_parse_phy_sts(void *hal, void *ppdu_sts,
 	struct physts_rxd rxdesc = {0};
 	struct physts_result bb_rpt = {0};
 	u8 i = 0;
-
+	bool valid = false;
 
 	rxdesc.data_rate = mdata->rx_rate;
 	rxdesc.gi_ltf = mdata->rx_gi_ltf;
@@ -816,9 +856,14 @@ rtw_hal_bb_parse_phy_sts(void *hal, void *ppdu_sts,
 		rxdesc.user_i[i].is_bcn = hal_ppdu->usr[i].has_bcn;
 	}
 
-	halbb_physts_parsing(hal_info->bb, hal_ppdu->phy_st_ptr,
+	valid = halbb_physts_parsing(hal_info->bb, hal_ppdu->phy_st_ptr,
 			     (u16)hal_ppdu->phy_st_size,
 			     &rxdesc, &bb_rpt);
+	if (valid != true) {
+		PHL_TRACE(COMP_PHL_PSTS, _PHL_DEBUG_,
+						"halbb_physts_parsing Fail!\n");
+		hstutus = RTW_HAL_STATUS_FAILURE;
+	}
 
 	if ((bb_rpt.rssi_avg != 0) || (bb_rpt.physts_rpt_valid == 1)) {
 		phy_info->is_valid = true;
@@ -1512,6 +1557,7 @@ void rtw_hal_bb_env_rpt(struct rtw_hal_com_t *hal_com, struct rtw_env_report *en
 		env_rpt->clm_ratio = bg_rpt.clm_ratio;
 		env_rpt->nhm_pwr = bg_rpt.nhm_pwr;
 		env_rpt->nhm_ratio = bg_rpt.nhm_ratio;
+		env_rpt->nhm_tx_ratio = bg_rpt.nhm_tx_ratio;
 		env_rpt->nhm_cca_ratio = bg_rpt.nhm_cca_ratio;
 		env_rpt->rpt_status = 1;
 	} else {
@@ -1531,6 +1577,64 @@ rtw_hal_bb_set_tb_pwr_ofst(struct hal_info_t *hal_info,
 	else
 		return RTW_HAL_STATUS_FAILURE;
 }
+
+#ifdef CONFIG_MCC_SUPPORT
+enum rtw_hal_status
+rtw_hal_bb_upd_mcc_macid(struct hal_info_t *hal_info,
+                         struct rtw_phl_mcc_role *mrole)
+{
+	bool ret = false;
+	struct bb_mcc_i mi = {0};
+
+	mi.type = mrole->wrole->type;
+	mi.self_macid = (u8)mrole->macid;
+	mi.chandef = mrole->chandef;
+	mi.macid_bitmap = mrole->used_macid.bitmap;
+	mi.macid_map_len = mrole->used_macid.len;
+
+	ret = halbb_upd_mcc_macid(hal_info->bb, &mi);
+
+	if (ret == true)
+		return RTW_HAL_STATUS_SUCCESS;
+	else
+		return RTW_HAL_STATUS_FAILURE;
+}
+
+void
+rtw_hal_bb_mcc_stop(struct hal_info_t *hal_info)
+{
+	halbb_mcc_stop(hal_info->bb);
+}
+
+enum rtw_hal_status
+rtw_hal_bb_mcc_start(struct hal_info_t *hal_info,
+                     struct rtw_phl_mcc_role *m_role1,
+                     struct rtw_phl_mcc_role *m_role2)
+{
+	bool ret = false;
+	struct bb_mcc_i mi_1 = {0}, mi_2 = {0};
+
+	mi_1.type = m_role1->wrole->type;
+	mi_1.self_macid = (u8)m_role1->macid;
+	mi_1.chandef = m_role1->chandef;
+	mi_1.macid_bitmap = m_role1->used_macid.bitmap;
+	mi_1.macid_map_len = m_role1->used_macid.len;
+
+	mi_2.type = m_role2->wrole->type;
+	mi_2.self_macid = (u8)m_role2->macid;
+	mi_2.chandef = m_role2->chandef;
+	mi_2.macid_bitmap = m_role2->used_macid.bitmap;
+	mi_2.macid_map_len = m_role2->used_macid.len;
+
+	ret = halbb_mcc_start(hal_info->bb, &mi_1, &mi_2);
+
+	if (ret == true)
+		return RTW_HAL_STATUS_SUCCESS;
+	else
+		return RTW_HAL_STATUS_FAILURE;
+}
+#endif
+
 
 #else /*ifndef USE_TRUE_PHY*/
 enum phl_phy_idx rtw_hal_bb_band_to_phy_idx(struct rtw_hal_com_t *hal_com, u8 band_idx)
@@ -2119,4 +2223,26 @@ rtw_hal_bb_set_tb_pwr_ofst(struct hal_info_t *hal_info,
 	return RTW_HAL_STATUS_SUCCESS;
 }
 
+#ifdef CONFIG_MCC_SUPPORT
+enum rtw_hal_status
+rtw_hal_bb_upd_mcc_macid(struct hal_info_t *hal_info,
+                         struct rtw_phl_mcc_role *mrole)
+{
+	return RTW_HAL_STATUS_SUCCESS;
+}
+
+void
+rtw_hal_bb_mcc_stop(struct hal_info_t *hal_info)
+{
+
+}
+
+enum rtw_hal_status
+rtw_hal_bb_mcc_start(struct hal_info_t *hal_info,
+                     struct rtw_phl_mcc_role *m_role1,
+                     struct rtw_phl_mcc_role *m_role2)
+{
+	return RTW_HAL_STATUS_SUCCESS;
+}
+#endif
 #endif /*ifdef USE_TRUE_PHY*/

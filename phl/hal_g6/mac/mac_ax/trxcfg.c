@@ -1089,6 +1089,12 @@ static u32 trxptcl_init(struct mac_ax_adapter *adapter, u8 band,
 	val32 |= B_AX_RXTRIG_FCSCHK_EN;
 	MAC_REG_W32(reg, val32);
 
+	/*disable 5.5M CCK rate response for PHY performance consideration*/
+	val32 = MAC_REG_R32(R_AX_TRXPTCL_RRSR_CTL_0);
+	val32 = SET_CLR_WORD(val32, WMAC_CCK_EN_1M, B_AX_WMAC_RRSB_AX_CCK);
+	val32 = SET_CLR_WORD(val32, WMAC_RRSR_RATE_LEGACY_EN, B_AX_WMAC_RESP_RATE_EN);
+	MAC_REG_W32(R_AX_TRXPTCL_RRSR_CTL_0, val32);
+
 	return MACSUCCESS;
 }
 
@@ -1566,135 +1572,6 @@ u32 cmac_init(struct mac_ax_adapter *adapter, struct mac_ax_trx_info *info,
 	return ret;
 }
 
-static u32 band1_enable(struct mac_ax_adapter *adapter,
-			struct mac_ax_trx_info *info)
-{
-	u32 ret;
-	u32 sleep_bak[4] = {0};
-	u32 pause_bak[4] = {0};
-	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	struct mac_ax_sch_tx_en_cfg txen_bak;
-
-	txen_bak.band = 0;
-	ret = stop_sch_tx(adapter, SCH_TX_SEL_ALL, &txen_bak);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]stop sch tx %d\n", ret);
-		return ret;
-	}
-
-	sleep_bak[0] = MAC_REG_R32(R_AX_MACID_SLEEP_0);
-	sleep_bak[1] = MAC_REG_R32(R_AX_MACID_SLEEP_1);
-	sleep_bak[2] = MAC_REG_R32(R_AX_MACID_SLEEP_2);
-	sleep_bak[3] = MAC_REG_R32(R_AX_MACID_SLEEP_3);
-	pause_bak[0] = MAC_REG_R32(R_AX_SS_MACID_PAUSE_0);
-	pause_bak[1] = MAC_REG_R32(R_AX_SS_MACID_PAUSE_1);
-	pause_bak[2] = MAC_REG_R32(R_AX_SS_MACID_PAUSE_2);
-	pause_bak[3] = MAC_REG_R32(R_AX_SS_MACID_PAUSE_3);
-
-	MAC_REG_W32(R_AX_MACID_SLEEP_0, 0xFFFFFFFF);
-	MAC_REG_W32(R_AX_MACID_SLEEP_1, 0xFFFFFFFF);
-	MAC_REG_W32(R_AX_MACID_SLEEP_2, 0xFFFFFFFF);
-	MAC_REG_W32(R_AX_MACID_SLEEP_3, 0xFFFFFFFF);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_0, 0xFFFFFFFF);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_1, 0xFFFFFFFF);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_2, 0xFFFFFFFF);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_3, 0xFFFFFFFF);
-
-	ret = tx_idle_poll_band(adapter, 0, 0);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]tx idle poll %d\n", ret);
-		return ret;
-	}
-
-	ret = dle_quota_change(adapter, info->qta_mode);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]DLE quota change %d\n", ret);
-		return ret;
-	}
-
-	MAC_REG_W32(R_AX_MACID_SLEEP_0, sleep_bak[0]);
-	MAC_REG_W32(R_AX_MACID_SLEEP_1, sleep_bak[1]);
-	MAC_REG_W32(R_AX_MACID_SLEEP_2, sleep_bak[2]);
-	MAC_REG_W32(R_AX_MACID_SLEEP_3, sleep_bak[3]);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_0, pause_bak[0]);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_1, pause_bak[1]);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_2, pause_bak[2]);
-	MAC_REG_W32(R_AX_SS_MACID_PAUSE_3, pause_bak[3]);
-
-	ret = resume_sch_tx(adapter, &txen_bak);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]CMAC%d resume sch tx %d\n",
-			      txen_bak.band, ret);
-		return ret;
-	}
-
-	ret = cmac_func_en(adapter, MAC_AX_BAND_1, MAC_AX_FUNC_EN);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]CMAC%d func en %d\n", MAC_AX_BAND_1, ret);
-		return ret;
-	}
-
-	ret = cmac_init(adapter, info, MAC_AX_BAND_1);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]CMAC%d init %d\n", MAC_AX_BAND_1, ret);
-		return ret;
-	}
-
-	MAC_REG_W32(R_AX_SYS_ISO_CTRL_EXTEND,
-		    MAC_REG_R32(R_AX_SYS_ISO_CTRL_EXTEND) |
-		    (B_AX_R_SYM_FEN_WLBBFUN_1 | B_AX_R_SYM_FEN_WLBBGLB_1));
-
-	adapter->sm.bb1_func = MAC_AX_FUNC_ON;
-
-	ret = mac_enable_imr(adapter, MAC_AX_BAND_1, MAC_AX_CMAC_SEL);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR] enable CMAC1 IMR %d\n", ret);
-		return ret;
-	}
-
-	return MACSUCCESS;
-}
-
-static u32 band1_disable(struct mac_ax_adapter *adapter,
-			 struct mac_ax_trx_info *info)
-{
-	u32 ret;
-	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-	struct mac_ax_pkt_drop_info drop_info;
-
-	MAC_REG_W32(R_AX_SYS_ISO_CTRL_EXTEND,
-		    MAC_REG_R32(R_AX_SYS_ISO_CTRL_EXTEND) &
-		    ~B_AX_R_SYM_FEN_WLBBFUN_1);
-
-	drop_info.band = MAC_AX_BAND_1;
-	drop_info.sel = MAC_AX_PKT_DROP_SEL_BAND;
-	ret = adapter->ops->pkt_drop(adapter, &drop_info);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]CMAC%d pkt drop %d\n", drop_info.band, ret);
-		return ret;
-	}
-
-	ret = mac_remove_role_by_band(adapter, MAC_AX_BAND_1, 0);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]Remove Address CAM %d\n", ret);
-		return ret;
-	}
-
-	ret = cmac_func_en(adapter, MAC_AX_BAND_1, MAC_AX_FUNC_DIS);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]CMAC%d func dis %d\n", MAC_AX_BAND_1, ret);
-		return ret;
-	}
-
-	ret = dle_quota_change(adapter, info->qta_mode);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]DLE quota change %d\n", ret);
-		return ret;
-	}
-
-	return 0;
-}
-
 u32 mac_check_access(struct mac_ax_adapter *adapter, u32 offset)
 {
 	if (offset >= CMAC1_START_ADDR && offset <= CMAC1_END_ADDR) {
@@ -1928,40 +1805,6 @@ u32 mac_trx_init(struct mac_ax_adapter *adapter, struct mac_ax_trx_info *info)
 	if (ret) {
 		PLTFM_MSG_ERR("[ERR]%s %d\n", __func__, ret);
 		return ret;
-	}
-
-	return MACSUCCESS;
-}
-
-u32 mac_dbcc_enable(struct mac_ax_adapter *adapter,
-		    struct mac_ax_trx_info *info, u8 dbcc_en)
-{
-	u32 ret;
-
-	if (dbcc_en) {
-		ret = band1_enable(adapter, info);
-		if (ret != MACSUCCESS) {
-			PLTFM_MSG_ERR("[ERR] band1_enable %d\n", ret);
-			return ret;
-		}
-		ret = mac_notify_fw_dbcc(adapter, 1);
-		if (ret != MACSUCCESS) {
-			PLTFM_MSG_ERR("%s: [ERR] notfify dbcc fail %d\n",
-				      __func__, ret);
-			return ret;
-		}
-	} else {
-		ret = mac_notify_fw_dbcc(adapter, 0);
-		if (ret != MACSUCCESS) {
-			PLTFM_MSG_ERR("%s: [ERR] notfify dbcc fail %d\n",
-				      __func__, ret);
-			return ret;
-		}
-		ret = band1_disable(adapter, info);
-		if (ret != MACSUCCESS) {
-			PLTFM_MSG_ERR("[ERR] band1_disable %d\n", ret);
-			return ret;
-		}
 	}
 
 	return MACSUCCESS;

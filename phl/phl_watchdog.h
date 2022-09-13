@@ -17,8 +17,15 @@
 
 #define WDOG_PERIOD 2000
 
+enum watchdog_state{
+	WD_STATE_INIT,
+	WD_STATE_STARTED,
+	WD_STATE_STOP,
+};
+
 struct phl_watchdog {
 	_os_timer wdog_timer;
+	enum watchdog_state state;
 
 	/* Only sw statistics or sw behavior or trigger FG cmd */
 	void (*core_sw_wdog)(void *drv_priv);
@@ -27,9 +34,14 @@ struct phl_watchdog {
 	void (*core_hw_wdog)(void *drv_priv);
 	u16 period;
 };
-
+void
+phl_watchdog_cmd_complete_hdl(struct phl_info_t *phl_info);
 enum rtw_phl_status
-phl_watchdog_cmd_hdl(struct phl_info_t *phl_info, enum rtw_phl_status psts);
+phl_watchdog_hw_cmd_hdl(struct phl_info_t *phl_info, enum rtw_phl_status psts);
+enum rtw_phl_status
+phl_watchdog_sw_cmd_hdl(struct phl_info_t *phl_info, enum rtw_phl_status psts);
+void rtw_phl_watchdog_stop(void *phl);
+
 
 #ifdef CONFIG_FSM
 void rtw_phl_watchdog_callback(void *phl);

@@ -22,4 +22,6 @@ bool rtw_hal_get_pwr_lmt_en(void *hal, u8 band_idx);
 enum rtw_hal_status rtw_hal_set_tx_power(void *hal, u8 band_idx,
 					enum phl_pwr_table pwr_table);
 
+enum rtw_hal_status rtw_hal_get_txinfo_power(void *hal,
+					s16 *txinfo_power_dbm);
 #endif

@@ -22,6 +22,7 @@
 #include "mac_ax/security_cam.h"
 #include "mac_ax/efuse.h"
 #include "mac_ax/p2p.h"
+#include "mac_ax/dbcc.h"
 #if MAC_AX_SDIO_SUPPORT
 #include "mac_ax/_sdio.h"
 #endif
@@ -36,7 +37,7 @@
 
 #define MAC_AX_MAJOR_VER	0	/*Software Architcture Modify*/
 #define MAC_AX_PROTOTYPE_VER	25	/*New Feature;Regular Release*/
-#define MAC_AX_SUB_VER		34	/*for bug fix*/
+#define MAC_AX_SUB_VER		47	/*for bug fix*/
 #define MAC_AX_SUB_INDEX	0	/*for special used*/
 
 #define MAC_AX_SRC_VER(a, b, c, d)                                             \

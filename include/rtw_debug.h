@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2019 Realtek Corporation.
+ * Copyright(c) 2007 - 2021 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -55,16 +55,44 @@ enum {
 #undef _seqdump
 
 #if defined(PLATFORM_LINUX)
-	#define _dbgdump printk
+	#ifdef DBG_THREAD_PID
+	#define T_PID_FMT	"(%5u) "
+	#define T_PID_ARG	current->pid
+	#else /* !DBG_THREAD_PID */
+	#define T_PID_FMT	"%s"
+	#define T_PID_ARG	""
+	#endif /* !DBG_THREAD_PID */
+
+	#ifdef DBG_CPU_INFO
+	#define CPU_INFO_FMT	"[%u] "
+	#define CPU_INFO_ARG	task_cpu(current)
+	#else /* !DBG_CPU_INFO */
+	#define CPU_INFO_FMT	"%s"
+	#define CPU_INFO_ARG	""
+	#endif /* !DBG_CPU_INFO */
+
+	/* Extra information in prefix */
+	#define EX_INFO_FMT	T_PID_FMT CPU_INFO_FMT
+	#define EX_INFO_ARG	T_PID_ARG, CPU_INFO_ARG
+
+	#define _dbgdump(fmt, arg...)	printk(EX_INFO_FMT fmt, EX_INFO_ARG, ##arg)
+
 	#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
 	#define KERN_CONT
 	#endif
+	/*
+	 * _dbgdump_c() default use KERN_CONT flag, so it would not print
+	 * messages with a new line. Usually use it if you want to continue
+	 * a line.
+	 */
+	#define _dbgdump_c(fmt, arg...)	printk(KERN_CONT fmt, ##arg)
 	#define _seqdump seq_printf
 #elif defined(PLATFORM_FREEBSD)
 	#define _dbgdump printf
 	#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
 	#define KERN_CONT
 	#endif
+	#define _dbgdump_c(fmt, arg...)	printf(KERN_CONT fmt, ##arg)
 	#define _seqdump(sel, fmt, arg...) _dbgdump(fmt, ##arg)
 #endif
 
@@ -81,40 +109,12 @@ extern uint rtw_drv_log_level;
 
 #if defined(_dbgdump)
 
-#ifdef PLATFORM_LINUX
-#ifdef DBG_THREAD_PID
-#define T_PID_FMT	"(%5u) "
-#define T_PID_ARG	current->pid
-#else /* !DBG_THREAD_PID */
-#define T_PID_FMT	"%s"
-#define T_PID_ARG	""
-#endif /* !DBG_THREAD_PID */
-
-#ifdef DBG_CPU_INFO
-#define CPU_INFO_FMT	"[%u] "
-#define CPU_INFO_ARG	get_cpu()
-#else /* !DBG_CPU_INFO */
-#define CPU_INFO_FMT	"%s"
-#define CPU_INFO_ARG	""
-#endif /* !DBG_CPU_INFO */
-
-/* Extra information in prefix */
-#define EX_INFO_FMT	T_PID_FMT CPU_INFO_FMT
-#define EX_INFO_ARG	T_PID_ARG, CPU_INFO_ARG
-#else /* !PLATFORM_LINUX */
-#define EX_INFO_FMT	"%s"
-#define EX_INFO_ARG	""
-#endif /* !PLATFORM_LINUX */
-
-#define DBG_PREFIX	EX_INFO_FMT DRIVER_PREFIX
-#define DBG_PREFIX_ARG	EX_INFO_ARG
-
 /* with driver-defined prefix */
 #undef RTW_PRINT
 #define RTW_PRINT(fmt, arg...)     \
 	do {\
 		if (_DRV_ALWAYS_ <= rtw_drv_log_level) {\
-			_dbgdump(DBG_PREFIX fmt, DBG_PREFIX_ARG, ##arg);\
+			_dbgdump(DRIVER_PREFIX fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -122,8 +122,7 @@ extern uint rtw_drv_log_level;
 #define RTW_ERR(fmt, arg...)     \
 	do {\
 		if (_DRV_ERR_ <= rtw_drv_log_level) {\
-			_dbgdump(DBG_PREFIX "ERROR " fmt, \
-				 DBG_PREFIX_ARG, ##arg);\
+			_dbgdump(DRIVER_PREFIX "ERROR " fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -132,8 +131,7 @@ extern uint rtw_drv_log_level;
 #define RTW_WARN(fmt, arg...)     \
 	do {\
 		if (_DRV_WARNING_ <= rtw_drv_log_level) {\
-			_dbgdump(DBG_PREFIX "WARN " fmt, \
-				 DBG_PREFIX_ARG, ##arg);\
+			_dbgdump(DRIVER_PREFIX "WARN " fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -141,7 +139,7 @@ extern uint rtw_drv_log_level;
 #define RTW_INFO(fmt, arg...)     \
 	do {\
 		if (_DRV_INFO_ <= rtw_drv_log_level) {\
-			_dbgdump(DBG_PREFIX fmt, DBG_PREFIX_ARG, ##arg);\
+			_dbgdump(DRIVER_PREFIX fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -150,7 +148,7 @@ extern uint rtw_drv_log_level;
 #define RTW_DBG(fmt, arg...)     \
 	do {\
 		if (_DRV_DEBUG_ <= rtw_drv_log_level) {\
-			_dbgdump(DBG_PREFIX fmt, DBG_PREFIX_ARG, ##arg);\
+			_dbgdump(DRIVER_PREFIX fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -172,7 +170,7 @@ extern uint rtw_drv_log_level;
 #define _RTW_PRINT(fmt, arg...)     \
 	do {\
 		if (_DRV_ALWAYS_ <= rtw_drv_log_level) {\
-			_dbgdump(KERN_CONT fmt, ##arg);\
+			_dbgdump_c(fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -180,7 +178,7 @@ extern uint rtw_drv_log_level;
 #define _RTW_ERR(fmt, arg...)     \
 	do {\
 		if (_DRV_ERR_ <= rtw_drv_log_level) {\
-			_dbgdump(KERN_CONT fmt, ##arg);\
+			_dbgdump_c(fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -189,7 +187,7 @@ extern uint rtw_drv_log_level;
 #define _RTW_WARN(fmt, arg...)     \
 	do {\
 		if (_DRV_WARNING_ <= rtw_drv_log_level) {\
-			_dbgdump(KERN_CONT fmt, ##arg);\
+			_dbgdump_c(fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -197,7 +195,7 @@ extern uint rtw_drv_log_level;
 #define _RTW_INFO(fmt, arg...)     \
 	do {\
 		if (_DRV_INFO_ <= rtw_drv_log_level) {\
-			_dbgdump(KERN_CONT fmt, ##arg);\
+			_dbgdump_c(fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -205,7 +203,7 @@ extern uint rtw_drv_log_level;
 #define _RTW_DBG(fmt, arg...)     \
 	do {\
 		if (_DRV_DEBUG_ <= rtw_drv_log_level) {\
-			_dbgdump(KERN_CONT fmt, ##arg);\
+			_dbgdump_c(fmt, ##arg);\
 		} \
 	} while (0)
 
@@ -357,8 +355,12 @@ ssize_t proc_set_sta_linking_test(struct file *file, const char __user *buffer, 
 ssize_t proc_set_ap_linking_test(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 #endif
 
+struct sta_info;
+int update_sta_stats(_adapter *adapter, struct sta_info *psta);
 int proc_get_rx_stat(struct seq_file *m, void *v);
 int proc_get_tx_stat(struct seq_file *m, void *v);
+int proc_get_sta_tx_stat(struct seq_file *m, void *v);
+ssize_t proc_set_sta_tx_stat(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 #ifdef CONFIG_AP_MODE
 int proc_get_all_sta_info(struct seq_file *m, void *v);
 #endif /* CONFIG_AP_MODE */
@@ -591,6 +593,14 @@ int proc_get_smps(struct seq_file *m, void *v);
 
 int proc_get_defs_param(struct seq_file *m, void *v);
 ssize_t proc_set_defs_param(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+
+#ifdef RTW_DETECT_HANG
+int proc_get_hang_info(struct seq_file *m, void *v);
+#endif
+
+int proc_get_disconnect_info(struct seq_file *m, void *v);
+ssize_t proc_set_disconnect_info(struct file *file, const char __user *buffer,
+				 size_t count, loff_t *pos, void *data);
 
 int proc_get_chan(struct seq_file *m, void *v);
 ssize_t proc_set_chan(struct file *file, const char __user *buffer,

@@ -1011,15 +1011,28 @@ bool halbb_ldpc_chk(struct bb_info *bb,  struct rtw_phl_stainfo_t *phl_sta_i, u8
 	return ldpc_en;
 }
 
-u8 halbb_nss_mapping(struct bb_info *bb,  u8 nss)
+u8 halbb_nss_mapping(struct bb_info *bb, u8 nss_cap, u8 nss_limit)
 {
 	u8 mapping_nss = 0;
 
-	if (nss != 0)
-		mapping_nss = nss - 1;
 	/* Driver tx_nss mapping */
-	if (mapping_nss > (bb->hal_com->rfpath_tx_num - 1))
+	if (nss_cap != 0)
+		mapping_nss = nss_cap - 1;
+
+	/*nss_limit. e.g. BTC_1ss feature*/
+	if (nss_limit != 0) { /*nss_limit = 0 means no limit*/
+		if (mapping_nss > nss_limit - 1)
+			mapping_nss = nss_limit - 1;
+	}
+
+	/*protection when AP/NIC is connected to a device whose rx_nss > 2*/
+	if (mapping_nss > (bb->hal_com->rfpath_tx_num - 1)) {
 		mapping_nss = bb->hal_com->rfpath_tx_num - 1;
+	}
+
+	BB_DBG(bb, DBG_RA, "nss_mapping:{nss_cap,nss_limit,rfpath_tx} = {%d,%d,%d}\n",
+	       nss_cap, nss_limit, bb->hal_com->rfpath_tx_num);
+
 	return mapping_nss;
 }
 
@@ -1266,7 +1279,7 @@ bool rtw_halbb_raregistered(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_st
 	mode = phl_sta_i->wmode;
 	init_lv = halbb_init_ra_by_rssi(bb, rssi_assoc);
 	/*@Becareful RA use our "Tx" capability which means the capability of their "Rx"*/
-	tx_nss = halbb_nss_mapping(bb, asoc_cap_i->nss_rx);
+	tx_nss = halbb_nss_mapping(bb, asoc_cap_i->nss_rx, hal_sta_i->ra_info.ra_nss_limit);
 	if (asoc_cap_i->dcm_max_const_rx)
 		ra_cfg->dcm_cap = 1;
 	else
@@ -1278,15 +1291,23 @@ bool rtw_halbb_raregistered(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_st
 	giltf_cap = halbb_get_opt_giltf(bb, asoc_cap_i->ltf_gi);
 	ra_cfg->giltf_cap = halbb_ax_giltf_chk(bb, mode, giltf_cap);
 
-	/* giltf assigned by driver or trained by FW*/
-	hal_sta_i->ra_info.cal_giltf = (u8)RTW_GILTF_2XHE08; /*value from driver, temporarily set here, no work until bool fixed_giltf_en assign at hal layer;*/
-	if (bb->ic_type == BB_RTL8852B)
-		ra_cfg->fix_giltf_en = true; /* Need to move to hal layer*/
-	else
-		ra_cfg->fix_giltf_en = false; /* Need to move to hal layer*/
-	ra_cfg->fix_giltf = halbb_giltf_trans(bb, asoc_cap_i->ltf_gi, hal_sta_i->ra_info.cal_giltf);
-	BB_DBG(bb, DBG_RA, "fix_giltf_en=%d, fix_giltf=%d\n", ra_cfg->fix_giltf_en,
-	       ra_cfg->fix_giltf);
+	/* giltf assigned by phl/halbb or trained by FW*/
+	if (hal_sta_i->ra_info.fix_giltf_en == false) { /*giltf from halbb*/
+		if (bb->ic_type & (BB_RTL8852A | BB_RTL8852B | BB_RTL8852C)) { /*Disable FW train GI_LTF*/
+			ra_cfg->fix_giltf_en = true;
+			ra_cfg->fix_giltf = RTW_GILTF_2XHE08;
+			/* gi_ltf is decided by delay spread. This is not ready.
+			if (is_giltf_decided_by_delay_sp)
+				ra_cfg->fix_giltf = halbb_ra_giltf_ctrl(bb, macid, delay_sp, asoc_cap_i->ltf_gi);
+			*/
+		} else { /*Enable FW train GI_LTF*/
+			ra_cfg->fix_giltf_en = false;
+		}
+	} else { /*giltf from phl*/
+		ra_cfg->fix_giltf = halbb_giltf_trans(bb, asoc_cap_i->ltf_gi, hal_sta_i->ra_info.cal_giltf);
+	}
+	BB_DBG(bb, DBG_RA, "fix_giltf_en(phl)=%d, fix_giltf_en(Final)=%d, fix_giltf=%d\n",
+	       hal_sta_i->ra_info.fix_giltf_en, ra_cfg->fix_giltf_en, ra_cfg->fix_giltf);
 
 	ra_cfg->is_dis_ra = hal_sta_i->ra_info.dis_ra;
 	mod_mask = hal_sta_i->ra_info.cur_ra_mask;
@@ -1370,7 +1391,7 @@ bool rtw_halbb_raupdate(struct bb_info *bb,
 	asoc_cap_i = &phl_sta_i->asoc_cap;
 	rssi = hal_sta_i->rssi_stat.rssi >> 1;
 	/*@Becareful RA use our "Tx" capability which means the capability of their "Rx"*/
-	tx_nss = halbb_nss_mapping(bb, asoc_cap_i->nss_rx);
+	tx_nss = halbb_nss_mapping(bb, asoc_cap_i->nss_rx, hal_sta_i->ra_info.ra_nss_limit);
 	ra_cfg->is_dis_ra = hal_sta_i->ra_info.dis_ra;
 	mod_mask = hal_sta_i->ra_info.cur_ra_mask;
 	ra_cfg->upd_all= false;
@@ -1386,15 +1407,23 @@ bool rtw_halbb_raupdate(struct bb_info *bb,
 	giltf_cap = halbb_get_opt_giltf(bb, asoc_cap_i->ltf_gi);
 	ra_cfg->giltf_cap = halbb_ax_giltf_chk(bb, mode, giltf_cap);
 
-	/* giltf assigned by driver or trained by FW*/
-	hal_sta_i->ra_info.cal_giltf = (u8)RTW_GILTF_2XHE08; /*value from driver, temporarily set here, no work until bool fixed_giltf_en assign at hal layer;*/
-	if (bb->ic_type == BB_RTL8852B)
-		ra_cfg->fix_giltf_en = true; /* Need to move to hal layer*/
-	else
-		ra_cfg->fix_giltf_en = false; /* Need to move to hal layer*/
-	ra_cfg->fix_giltf = halbb_giltf_trans(bb, asoc_cap_i->ltf_gi, hal_sta_i->ra_info.cal_giltf);
-	BB_DBG(bb, DBG_RA, "fix_giltf_en=%d, fix_giltf=%d\n", ra_cfg->fix_giltf_en,
-	       ra_cfg->fix_giltf);
+	/* giltf assigned by phl/halbb or trained by FW*/
+	if (hal_sta_i->ra_info.fix_giltf_en == false) { /*giltf from halbb*/
+		if (bb->ic_type & (BB_RTL8852A | BB_RTL8852B | BB_RTL8852C)) { /*Disable FW train GI_LTF*/
+			ra_cfg->fix_giltf_en = true;
+			ra_cfg->fix_giltf = RTW_GILTF_2XHE08;
+			/* gi_ltf is decided by delay spread. This is not ready.
+			if (is_giltf_decided_by_delay_sp)
+				ra_cfg->fix_giltf = halbb_ra_giltf_ctrl(bb, macid, delay_sp, asoc_cap_i->ltf_gi);
+			*/
+		} else { /*Enable FW train GI_LTF*/
+			ra_cfg->fix_giltf_en = false;
+		}
+	} else { /*giltf from phl*/
+		ra_cfg->fix_giltf = halbb_giltf_trans(bb, asoc_cap_i->ltf_gi, hal_sta_i->ra_info.cal_giltf);
+	}
+	BB_DBG(bb, DBG_RA, "fix_giltf_en(phl)=%d, fix_giltf_en(Final)=%d, fix_giltf=%d\n",
+	       hal_sta_i->ra_info.fix_giltf_en, ra_cfg->fix_giltf_en, ra_cfg->fix_giltf);
 
 	ra_cfg->bw_cap = halbb_hw_bw_mapping(bb, phl_sta_i->chandef.bw, mode);
 	ra_cfg->init_rate_lv = 0;
@@ -1407,7 +1436,7 @@ bool rtw_halbb_raupdate(struct bb_info *bb,
 	return ret_val;
 }
 
-bool halbb_raupdate_mask(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
+bool halbb_ra_update_mask_watchdog(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i)
 {
 	u8 macid;
 	struct bb_h2c_ra_cfg_info *ra_cfg;
@@ -1433,7 +1462,7 @@ bool halbb_raupdate_mask(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i
 	asoc_cap_i = &phl_sta_i->asoc_cap;
 	rssi = hal_sta_i->rssi_stat.rssi >> 1;
 	/*@Becareful RA use our "Tx" capability which means the capability of their "Rx"*/
-	tx_nss = halbb_nss_mapping(bb, asoc_cap_i->nss_rx);
+	tx_nss = halbb_nss_mapping(bb, asoc_cap_i->nss_rx, hal_sta_i->ra_info.ra_nss_limit);
 	ra_cfg->is_dis_ra = hal_sta_i->ra_info.dis_ra;
 	mod_mask = hal_sta_i->ra_info.cur_ra_mask;
 	ra_cfg->upd_all= false;
@@ -1450,18 +1479,23 @@ bool halbb_raupdate_mask(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i
 	giltf_cap = halbb_get_opt_giltf(bb, asoc_cap_i->ltf_gi);
 	ra_cfg->giltf_cap = halbb_ax_giltf_chk(bb, mode, giltf_cap);
 
-	/* giltf assigned by driver or trained by FW*/
-	hal_sta_i->ra_info.cal_giltf = (u8)RTW_GILTF_2XHE08; /*value from driver, temporarily set here, no work until bool fixed_giltf_en assign at hal layer;*/
-	if (bb->ic_type == BB_RTL8852B)
-		ra_cfg->fix_giltf_en = true; /* Need to move to hal layer*/
-	else
-		ra_cfg->fix_giltf_en = false; /* Need to move to hal layer*/
-	ra_cfg->fix_giltf = halbb_giltf_trans(bb, asoc_cap_i->ltf_gi, hal_sta_i->ra_info.cal_giltf);
-	/* Need to verfy GI LTF flow
-	ra_cfg->fix_giltf = halbb_ra_giltf_ctrl(bb, macid, delay_sp, asoc_cap_i->ltf_gi);
-	*/
-	BB_DBG(bb, DBG_RA, "fix_giltf_en=%d, fix_giltf=%d\n", ra_cfg->fix_giltf_en,
-	       ra_cfg->fix_giltf);
+	/* giltf assigned by phl/halbb or trained by FW*/
+	if (hal_sta_i->ra_info.fix_giltf_en == false) { /*giltf from halbb*/
+		if (bb->ic_type & (BB_RTL8852A | BB_RTL8852B | BB_RTL8852C)) { /*Disable FW train GI_LTF*/
+			ra_cfg->fix_giltf_en = true;
+			ra_cfg->fix_giltf = RTW_GILTF_2XHE08;
+			/* gi_ltf is decided by delay spread. This is not ready.
+			if (is_giltf_decided_by_delay_sp)
+				ra_cfg->fix_giltf = halbb_ra_giltf_ctrl(bb, macid, delay_sp, asoc_cap_i->ltf_gi);
+			*/
+		} else { /*Enable FW train GI_LTF*/
+			ra_cfg->fix_giltf_en = false;
+		}
+	} else { /*giltf from phl*/
+		ra_cfg->fix_giltf = halbb_giltf_trans(bb, asoc_cap_i->ltf_gi, hal_sta_i->ra_info.cal_giltf);
+	}
+	BB_DBG(bb, DBG_RA, "fix_giltf_en(phl)=%d, fix_giltf_en(Final)=%d, fix_giltf=%d\n",
+	       hal_sta_i->ra_info.fix_giltf_en, ra_cfg->fix_giltf_en, ra_cfg->fix_giltf);
 
 	mod_mask = halbb_ramask_mod(bb, macid, mod_mask, rssi, mode, tx_nss);
 	halbb_ramask_trans(bb, macid, mod_mask);
@@ -1610,7 +1644,7 @@ u32 halbb_get_txsts_rpt(struct bb_info *bb, u16 len, u8 *c2h)
 	return 0;
 }
 
-void halbb_ra_rssisetting(struct bb_info *bb)
+void halbb_ra_rssi_setting_watchdog(struct bb_info *bb)
 {
 	u8 macid = 0;
 	u8 i = 0, sta_cnt = 0;
@@ -1622,8 +1656,7 @@ void halbb_ra_rssisetting(struct bb_info *bb)
 	struct bb_link_info *bb_link = &bb->bb_link_i;
 	u16 rssi_len = 0;
 	u32 *bb_h2c;
-	u8 rssi_a = 0;
-	u8 rssi_b = 0;
+	u8 rssi_a = 0, rssi_b = 0, bcn_rssi_a = 0, bcn_rssi_b = 0;
 
 	rssi_len = sizeof(struct bb_h2c_rssi_setting) * PHL_MAX_STA_NUM;
 	rssi_i = hal_mem_alloc(bb->hal_com, rssi_len);
@@ -1649,20 +1682,26 @@ void halbb_ra_rssisetting(struct bb_info *bb)
 		BB_DBG(bb, DBG_RA, "Add BB rssi info[%d], macid=%d\n", i, macid);
 		/* Need modify for Nss > 2 */
 		rssi_a = (hal_sta_i->rssi_stat.rssi_ma_path[0] >> 5) & 0x7f;
-		if (!bb->hal_com->dbcc_en) 
+		bcn_rssi_a = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[0] >> 5) & 0x7f;
+		if (!bb->hal_com->dbcc_en) {
 			rssi_b = (hal_sta_i->rssi_stat.rssi_ma_path[1] >> 5) & 0x7f;
+			bcn_rssi_b = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[1] >> 5) & 0x7f;
+		}
 		rssi_i[sta_cnt].macid = macid;
-		rssi_i[sta_cnt].rssi = rssi_a | BIT(7);
-		rssi_i[sta_cnt].rainfo1 = 0;
-		rssi_i[sta_cnt].rainfo2 = 0; /* RSVD */
+		rssi_i[sta_cnt].rssi_a = rssi_a | BIT(7);
+		rssi_i[sta_cnt].rssi_b = rssi_b;
+		rssi_i[sta_cnt].bcn_rssi_a = bcn_rssi_a | BIT(7);
+		rssi_i[sta_cnt].bcn_rssi_b = bcn_rssi_b;
 		rssi_i[sta_cnt].drv_ractrl = 0; /* RSVD */
 		rssi_i[sta_cnt].is_fixed_rate = bb_ra->fixed_rt_en;
 		rssi_i[sta_cnt].fixed_rate = bb_ra->fixed_rt_i.mcs_ss_idx;
 		rssi_i[sta_cnt].fixed_rate_md = bb_ra->fixed_rt_i.mode;
 		rssi_i[sta_cnt].fixed_giltf = bb_ra->fixed_rt_i.gi_ltf;
 		rssi_i[sta_cnt].fixed_bw = bb_ra->fixed_rt_i.bw;
-		rssi_i[sta_cnt].rsvd2_rssi_b = rssi_b;
 		sta_cnt++;
+
+		BB_DBG(bb, DBG_RA, "bcn_rssi{a,b}={%d,%d}, data_rssi{a,b}={%d,%d}\n",
+		       bcn_rssi_a, bcn_rssi_b, rssi_a, rssi_b);
 
 		if (sta_cnt == bb_link->num_linked_client)
 			break;
@@ -1691,7 +1730,6 @@ void halbb_ra_rssisetting(struct bb_info *bb)
 
 	if (rssi_i)
 		hal_mem_free(bb->hal_com, rssi_i, rssi_len);
-
 }
 
 void halbb_ra_giltf_ctrl(struct bb_info *bb, u8 macid, u8 delay_sp, u8 assoc_giltf)
@@ -1720,7 +1758,7 @@ void halbb_ra_watchdog(struct bb_info *bb)
 		return;
 #endif
 
-	halbb_ra_rssisetting(bb);
+	halbb_ra_rssi_setting_watchdog(bb);
 	for (i = 0; i < PHL_MAX_STA_NUM; i++) {
 		if (!(bb->sta_exist[i]))
 			continue;
@@ -1740,7 +1778,7 @@ void halbb_ra_watchdog(struct bb_info *bb)
 
 		macid = (u8)(bb->phl_sta_info[i]->macid);
 		BB_DBG(bb, DBG_RA, "====>ra update mask[%d], macid=%d\n", i, macid);
-		halbb_raupdate_mask(bb, bb->phl_sta_info[i]);
+		halbb_ra_update_mask_watchdog(bb, bb->phl_sta_info[i]);
 
 		sta_cnt++;
 
@@ -1882,15 +1920,14 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u32 val[10] = {0};
 	u32 used = *_used;
 	u32 out_len = *_out_len;
+	u32 tmp1 = 0, tmp2 = 0, tmp3 = 0, tmp4 = 0;
 	u8 i;
-	u8 rssi_assoc = 60;
 	bool ret_val = false;
 	struct rtw_ra_sta_info *bb_ra;
 	struct rtw_hal_stainfo_t *hal_sta_i;
 	//struct bb_h2c_rssi_setting *rssi_i;
 	u16 rssi_len = 0;
-	u8 rssi_a = 0;
-	u8 rssi_b = 0;
+	u8 rssi_a = 0, rssi_b = 0, bcn_rssi_a = 0, bcn_rssi_b = 0;
 
 	if (_os_strcmp(input[1], help) == 0) {
 		//BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -1898,7 +1935,7 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "{Fix rate} [ra] [1] [macid] [mode] [giltf] [ss_mcs] [bw])\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "{Auto rate}: [ra] [2] [macid] [mode] [giltf] [ss_mcs] [bw]\n");
+			 "{Auto rate}: [ra] [2] [macid]\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "=============Notes=============>\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
@@ -1913,12 +1950,19 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			 "==============================>\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "{Drvier shift rate up/down threshold}: [ra] [3] [macid] [0: Increase th. (Tend to RU) 1: Decrease th (Tend to RD)] [percent]\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			 "{Manually adjust RA mask}: [ra] [4] [macid] [0: dis. manual adj. RA mask; 1: en. manual adj. RA mask] [0: mask; 1: reveal] [rate_mode] [ss_mcs]\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			 "{d_o_timer}: [ra] [5] [macid] [en] [timer (FW default 20)]\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			 "{debug bb reg}: [ra] [dbgreg]\n");
 		//BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 		//	 "{Fix rate & ra mask}: ra (3 [macid] [mode] [giltf] [ss_mcs] [mask1] [mask0])}\n");
 		goto out;
 	}
 	for (i = 0; i < 8; i++) {
-		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
+		if (input[i + 1])
+			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
 	}
 	//rssi_len = sizeof(struct bb_h2c_rssi_setting);
 	//rssi_i = hal_mem_alloc(bb->hal_com, rssi_len);
@@ -1958,16 +2002,21 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			BB_DBG(bb, DBG_RA, "RA fix rate macid=[%d]\n", (u8)val[1]);
 			/* Need modify for Nss > 2 */
 			rssi_a = (hal_sta_i->rssi_stat.rssi_ma_path[0] >> 5) & 0x7f;
-			if (!bb->hal_com->dbcc_en) 
+			bcn_rssi_a = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[0] >> 5) & 0x7f;
+			if (!bb->hal_com->dbcc_en) {
 				rssi_b = (hal_sta_i->rssi_stat.rssi_ma_path[1] >> 5) & 0x7f;
+				bcn_rssi_b = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[1] >> 5) & 0x7f;
+			}
 			rssi_i.macid = (u8)val[1];
-			rssi_i.rssi = rssi_a | BIT(7);
+			rssi_i.rssi_a = rssi_a | BIT(7);
+			rssi_i.rssi_b = rssi_b;
+			rssi_i.bcn_rssi_a = bcn_rssi_a | BIT(7);
+			rssi_i.bcn_rssi_b = bcn_rssi_b;
 			rssi_i.is_fixed_rate = true;
 			rssi_i.fixed_rate = (u8)val[4];
 			rssi_i.fixed_giltf = (u8)val[3];
 			rssi_i.fixed_bw = (u8)val[5];
 			rssi_i.fixed_rate_md = (u8)val[2];
-			rssi_i.rsvd2_rssi_b = rssi_b;
 			rssi_i.endcmd = 1;
 
 			bb_ra->fixed_rt_en = rssi_i.is_fixed_rate;
@@ -1992,14 +2041,18 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			BB_DBG(bb, DBG_RA, "RA auto rate macid=[%d]\n", (u8)val[1]);
 			/* Need modify for Nss > 2 */
 			rssi_a = (hal_sta_i->rssi_stat.rssi_ma_path[0] >> 5) & 0x7f;
-			if (!bb->hal_com->dbcc_en) 
+			bcn_rssi_a = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[0] >> 5) & 0x7f;
+			if (!bb->hal_com->dbcc_en) {
 				rssi_b = (hal_sta_i->rssi_stat.rssi_ma_path[1] >> 5) & 0x7f;
+				bcn_rssi_b = (hal_sta_i->rssi_stat.rssi_bcn_ma_path[1] >> 5) & 0x7f;
+			}
 			rssi_i.macid = (u8)val[1];
-			rssi_i.rssi = rssi_a | BIT(7);
+			rssi_i.rssi_a = rssi_a | BIT(7);
+			rssi_i.rssi_b = rssi_b;
+			rssi_i.bcn_rssi_a = bcn_rssi_a | BIT(7);
+			rssi_i.bcn_rssi_b = bcn_rssi_b;
 			rssi_i.is_fixed_rate = false;
-			rssi_i.rsvd2_rssi_b = rssi_b;
 			rssi_i.endcmd = 1;
-
 			bb_ra->fixed_rt_en = rssi_i.is_fixed_rate;
 			BB_DBG(bb, DBG_RA, "RA auto rate H2C: %x %x\n", bb_h2c[0], bb_h2c[1]);
 			
@@ -2029,6 +2082,108 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		} else {
 			BB_DBG(bb, DBG_RA, "No Link ! RA rssi cmd fail!\n");
 		}
+	} else if (val[0] == 4) {
+		struct bb_h2c_ra_mask ra_mask_i;
+		u32 *bb_h2c = (u32 *) &ra_mask_i;
+		u8 cmdlen = sizeof(struct bb_h2c_ra_mask);
+		
+		hal_sta_i = bb->phl_sta_info[(u8)val[1]]->hal_sta;
+		bb_ra = &hal_sta_i->ra_info;
+
+		if (bb_ra->ra_registered) {
+			BB_DBG(bb, DBG_RA, "macid=[%d]\n", (u8)val[1]);
+
+			ra_mask_i.macid = (u8)val[1];
+			ra_mask_i.is_manual_adjust_ra_mask = (u8)val[2] & 0x01;
+			ra_mask_i.mask_or_reveal = (u8)val[3] & 0x01;
+			ra_mask_i.mask_rate_md= (u8)val[4];
+			ra_mask_i.mask_rate= (u8)val[5];
+
+			BB_DBG(bb, DBG_RA, "Manual adjust RA mask = %d\n",
+			       ra_mask_i.is_manual_adjust_ra_mask);
+			BB_DBG(bb, DBG_RA, "Adjust mode=%d, rate(d')=%d\n",
+			       ra_mask_i.mask_rate_md, ra_mask_i.mask_rate);
+			BB_DBG(bb, DBG_RA, "[%s] this rate in RA mask\n",
+			       ra_mask_i.mask_or_reveal ? "Reveal": "Mask");
+			BB_DBG(bb, DBG_RA, "RA adjust th H2C: %x %x\n",
+			       bb_h2c[0], bb_h2c[1]);
+
+			ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_ADJUST_RA_MASK, HALBB_H2C_RA, bb_h2c);
+		} else {
+			BB_DBG(bb, DBG_RA, "No Link ! RA rssi cmd fail!\n");
+		}
+	} else if (val[0] == 5) {
+		struct bb_h2c_ra_d_o_timer ra_d_o_timer_i;
+		u32 *bb_h2c = (u32 *) &ra_d_o_timer_i;
+		u8 cmdlen = sizeof(struct bb_h2c_ra_d_o_timer);
+		
+		hal_sta_i = bb->phl_sta_info[(u8)val[1]]->hal_sta;
+		bb_ra = &hal_sta_i->ra_info;
+		if (bb_ra->ra_registered) {
+			BB_DBG(bb, DBG_RA, "RA d_o_timer macid=[%d]\n", (u8)val[1]);
+			ra_d_o_timer_i.macid = (u8)val[1];
+			ra_d_o_timer_i.d_o_timer_en = (u8)val[2] & 0x01;
+			ra_d_o_timer_i.d_o_timer_value= (u8)val[3] & 0x7f;
+
+			BB_DBG(bb, DBG_RA, "RA d_o_timer {en,value} = {%d,%d}\n", 
+			ra_d_o_timer_i.d_o_timer_en , ra_d_o_timer_i.d_o_timer_value);
+			
+			BB_DBG(bb, DBG_RA, "RA d_o_timer H2C: %x\n", bb_h2c[0]);
+			
+			ret_val = halbb_fill_h2c_cmd(bb, cmdlen, RA_H2C_RA_D_O_TIMER, HALBB_H2C_RA, bb_h2c);
+		} else {
+			BB_DBG(bb, DBG_RA, "No Link ! RA d_o_timer cmd fail!\n");
+		}
+	} else if (_os_strcmp(input[1], "dbgreg") == 0) {
+		tmp1 = halbb_get_reg(bb, 0x160, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x164, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "CMAC_table DWORD0{macid0,macid1}={0x%x,0x%x}\n", tmp1, tmp2);
+		tmp1 = halbb_get_reg(bb, 0x184, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x188, MASKDWORD);
+		tmp3 = halbb_get_reg(bb, 0x18c, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "{PER,RDR,R4}={%d,%d,%d}\n", tmp1, tmp2, tmp3);
+		tmp1 = halbb_get_reg(bb, 0x168, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x16c, MASKDWORD);
+		tmp3 = halbb_get_reg(bb, 0x170, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "{rate_up_lmt_cnt,PER_ma,VAR}={%d,%d,%d}\n", tmp1, tmp2, tmp3);
+		tmp1 = halbb_get_reg(bb, 0x17c, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x180, MASKDWORD);
+		tmp3 = halbb_get_reg(bb, 0x174, MASKDWORD);
+		tmp4 = halbb_get_reg(bb, 0x178, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "decision_offset:{n,p}={%d,%d},TH:{RD,RU}={%d,%d}\n",
+			   tmp1, tmp2, tmp3, tmp4);
+		tmp1 = halbb_get_reg(bb, 0x1b0, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x1b4, MASKDWORD);
+		tmp3 = halbb_get_reg(bb, 0x1b8, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "try:{PER,RDR,R4}={%d,%d,%d}\n", tmp1, tmp2, tmp3);
+		tmp1 = halbb_get_reg(bb, 0x1bc, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x19c, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "TxRPT.total_tmp=%d,RA_timer=%d\n", tmp1, tmp2);
+		tmp1 = halbb_get_reg(bb, 0x190, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x194, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "rate decision early return:{total=0/disra/trying, R4}={%d,%d}\n",
+			   tmp1, tmp2);
+		tmp1 = halbb_get_reg(bb, 0x1c4, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x1c0, MASKDWORD);
+		tmp3 = halbb_get_reg(bb, 0x1c8, MASKDWORD);
+		tmp4 = halbb_get_reg(bb, 0x1cc, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "RA mask[H->L]={0x%x,0x%x}, highest_rate=0x%x, lowest_rate=0x%x\n",
+			   tmp1, tmp2, tmp3, tmp4);
+		tmp1 = halbb_get_reg(bb, 0x1d0, MASKDWORD);
+		tmp2 = halbb_get_reg(bb, 0x1d4, MASKDWORD);
+		tmp3 = halbb_get_reg(bb, 0x1d8, MASKDWORD);
+		tmp4 = halbb_get_reg(bb, 0x1dc, MASKDWORD);
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			   "RA registered, H2C Byte[0->3]={0x%x,0x%x,0x%x,0x%x}\n",
+			   tmp1, tmp2, tmp3, tmp4);
 	}
 	//if (rssi_i)
 	//	hal_mem_free(bb->hal_com, rssi_i, rssi_len);

@@ -1460,16 +1460,20 @@ rtw_hal_watchdog(void *hal)
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
 
 	hal_status = rtw_hal_bb_watchdog(hal_info, false);
-	if(hal_status != RTW_HAL_STATUS_SUCCESS){
-		PHL_INFO("%s fail (%x)\n",
-			 __FUNCTION__, hal_status);
+	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_ERR("%s rtw_hal_bb_watchdog fail (%x)\n", __FUNCTION__, hal_status);
 		goto exit;
 	}
 
 	hal_status = rtw_hal_rf_watchdog(hal_info);
-	if(hal_status != RTW_HAL_STATUS_SUCCESS){
-		PHL_INFO("%s fail (%x)\n",
-			 __FUNCTION__, hal_status);
+	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_ERR("%s rtw_hal_rf_watchdog fail (%x)\n", __FUNCTION__, hal_status);
+		goto exit;
+	}
+
+	hal_status = rtw_hal_mac_watchdog(hal_info);
+	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_ERR("%s rtw_hal_mac_watchdog fail (%x)\n", __FUNCTION__, hal_status);
 		goto exit;
 	}
 

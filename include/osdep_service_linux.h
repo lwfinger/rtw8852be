@@ -488,10 +488,10 @@ static inline void rtw_thread_enter(char *name)
 
 static inline void rtw_thread_exit(_completion *comp)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
-	complete_and_exit(comp, 0);
-#else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
 	kthread_complete_and_exit(comp, 0);
+#else
+	complete_and_exit(comp, 0);
 #endif
 }
 
@@ -1037,5 +1037,18 @@ static inline void rtw_dump_stack(void)
 
 #define STRUCT_PACKED __attribute__ ((packed))
 
+#ifndef fallthrough
+#if __GNUC__ >= 5 || defined(__clang__)
+#ifndef __has_attribute
+#define __has_attribute(x) 0
+#endif
+#if __has_attribute(__fallthrough__)
+#define fallthrough __attribute__((__fallthrough__))
+#endif
+#endif
+#ifndef fallthrough
+#define fallthrough do {} while (0) /* fallthrough */
+#endif
+#endif
 
 #endif /* __OSDEP_LINUX_SERVICE_H_ */

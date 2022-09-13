@@ -24,10 +24,15 @@ void _chk_btc_err(struct btc_t *btc, u8 type, u32 cnt)
 {
 	struct btc_cx *cx = &btc->cx;
 	struct btc_dm *dm = &btc->dm;
+	struct btc_wl_info *wl = &cx->wl;
 	struct btc_bt_info *bt = &cx->bt;
 
 	switch (type) {
 	case BTC_DCNT_RPT_FREEZE:
+		if (wl->status.map.lps == BTC_LPS_RF_OFF ||
+		    wl->status.map.rf_off)
+			return;
+
 		if (dm->cnt_dm[BTC_DCNT_RPT] == cnt && btc->fwinfo.rpt_en_map)
 			dm->cnt_dm[BTC_DCNT_RPT_FREEZE]++;
 		else
@@ -193,7 +198,7 @@ static u32 _chk_btc_report(struct btc_t *btc, struct btf_fwinfo *pfwinfo,
 	struct fbtc_rpt_ctrl *prpt = NULL;
 	struct fbtc_cysta *pcysta = NULL;
 	u8 rpt_type = 0, *rpt_content = NULL, *pfinfo = NULL;
-	u16 wl_slot_set = 0;
+	u16 wl_slot_set = 0, polt_cnt = 0;
 	u32 rpt_len = 0, diff_t, bt_slot_real = 0;
 
 	if (!prptbuf) {
@@ -367,6 +372,10 @@ static u32 _chk_btc_report(struct btc_t *btc, struct btf_fwinfo *pfwinfo,
 			}
 
 		}
+
+		_chk_btc_err(btc, BTC_DCNT_W1_FREEZE, pcysta->slot_cnt[CXST_W1]);
+		_chk_btc_err(btc, BTC_DCNT_B1_FREEZE, pcysta->slot_cnt[CXST_B1]);
+		_chk_btc_err(btc, BTC_DCNT_CYCLE_FREEZE, (u32)pcysta->cycles);
 	}
 
 	if (rpt_type == BTC_RPT_TYPE_CTRL) {
@@ -387,6 +396,19 @@ static u32 _chk_btc_report(struct btc_t *btc, struct btf_fwinfo *pfwinfo,
 			bt->rfk_info.map.timeout = 0;
 
 		dm->error.map.bt_rfk_timeout = bt->rfk_info.map.timeout;
+
+		_chk_btc_err(btc, BTC_DCNT_RPT_FREEZE,
+			     pfwinfo->event[BTF_EVNT_RPT]);
+
+		/* To avoid I/O if WL LPS or power-off  */
+		if (wl->status.map.lps != BTC_LPS_RF_OFF &&
+		    !wl->status.map.rf_off) {
+			btc->chip->ops->update_bt_cnt(btc);
+			_chk_btc_err(btc, BTC_DCNT_BTCNT_FREEZE, 0);
+			rtw_hal_mac_get_bt_polt_cnt(btc->hal, HW_PHY_0,
+						    &polt_cnt);
+			btc->cx.cnt_bt[BTC_BCNT_POLUT] = polt_cnt;
+		}
 	}
 
 	if (rpt_type >= BTC_RPT_TYPE_BT_VER &&

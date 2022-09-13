@@ -35,6 +35,7 @@
 #define BTC_PHY_MAX 2
 #define BTC_NON_SHARED_ANT_FREERUN 0
 
+#define BTC_SCBD_REWRITE_DELAY 1000
 #define BTC_MSG_MAXLEN 200
 #define BTC_POLICY_MAXLEN 512
 #define BTC_HUBMSG_MAXLEN 512
@@ -104,6 +105,8 @@ struct btc_t;
 
 #define BTC_WL_RSSI_THMAX 4
 #define BTC_BT_RSSI_THMAX 4
+
+#define BTC_WL_RSSI_MAX_BTG 70 /* for BTG co-rx Hi-RSSI thres */
 
 #define BTC_TDMA_WLROLE_MAX 2
 #define BTC_TDMA_BTHID_MAX 2
@@ -240,6 +243,12 @@ enum btc_wl_rfk_state {
 enum btc_wl_rfk_result {
 	BTC_WRFK_REJECT = 0,
 	BTC_WRFK_ALLOW = 1
+};
+
+enum {
+	BTC_LPS_OFF = 0,
+	BTC_LPS_RF_OFF = 1,
+	BTC_LPS_RF_ON = 2
 };
 
 enum {
@@ -458,6 +467,7 @@ enum btc_bt_state_cnt {
 	BTC_BCNT_HIPRI_RX,
 	BTC_BCNT_LOPRI_TX,
 	BTC_BCNT_LOPRI_RX,
+	BTC_BCNT_POLUT,
 	BTC_BCNT_RATECHG,
 	BTC_BCNT_MAX
 };
@@ -666,7 +676,8 @@ enum btc_wl_max_tx_retry {
 };
 
 struct btc_wl_tx_limit_para {
-	u16 enable;
+	u8 en;
+	u8 tx_1ss;
 	u32 tx_time;	/* unit: us */
 	u16 tx_retry;
 };
@@ -850,6 +861,7 @@ struct btc_traffic {
 	enum rtw_tfc_sts rx_sts;
 	u16 tx_rate;
 	u16 rx_rate;
+	u8 tx_1ss_limit;
 };
 
 struct btc_wl_scan_info {
@@ -964,6 +976,9 @@ struct btc_wl_link_info {
 	u32 noa: 1; /* Todo: for P2P */
 	u32 client_ps: 1; /* Todo: for soft-AP */
 	u32 connected: 2;
+	u32 stbc_ht_tx:1;
+	u32 stbc_vht_tx:1;
+	u32 stbc_he_tx:1;
 };
 
 struct btc_wl_rfk_info {
@@ -1001,13 +1016,15 @@ struct btc_ops {
 	void (*ntfy_switch_band)(struct btc_t *btc, u8 band_idx, u8 band);
 	void (*ntfy_specific_packet)(struct btc_t *btc, u8 pkt_type);
 	void (*ntfy_role_info)(struct btc_t *btc, u8 rid,
-			      struct btc_wl_link_info *info,
+			      struct rtw_wifi_role_t *wrole,
+			      struct rtw_phl_stainfo_t *sta,
 			      enum role_state reason);
 	void (*ntfy_radio_state)(struct btc_t *btc, u8 rf_state);
 	void (*ntfy_customerize)(struct btc_t *btc, u8 type, u16 len, u8 *buf);
 	u8  (*ntfy_wl_rfk)(struct btc_t *btc, u8 phy, u8 type, u8 state);
-	void (*ntfy_wl_sta)(struct btc_t *btc, u8 ntfy_num,
-			struct btc_wl_stat_info stat_info[], u8 reason);
+	void (*ntfy_wl_sta)(struct btc_t *btc, struct rtw_stats *phl_stats,
+			u8 ntfy_num, struct rtw_phl_stainfo_t *sta[],
+			u8 reason);
 	void (*ntfy_fwinfo)(struct btc_t *btc, u8 *buf, u32 len, u8 cls,
 			   u8 func);
 	void (*ntfy_timer)(struct btc_t *btc, u16 tmr_id);
@@ -1301,13 +1318,15 @@ static void _ntfy_scan_finish(struct btc_t *btc, u8 pyh_idx);
 static void _ntfy_switch_band(struct btc_t *btc, u8 phy_idx, u8 band);
 static void _ntfy_specific_packet(struct btc_t *btc, u8 pkt_type);
 static void _ntfy_role_info(struct btc_t *btc, u8 rid,
-			    struct btc_wl_link_info *info,
+			    struct rtw_wifi_role_t *wrole,
+			    struct rtw_phl_stainfo_t *sta,
 			    enum role_state reason);
 static void _ntfy_radio_state(struct btc_t *btc, u8 rf_state);
 static void _ntfy_customerize(struct btc_t *btc, u8 type, u16 len, u8 *buf);
 static u8 _ntfy_wl_rfk(struct btc_t *btc, u8 phy_path, u8 type, u8 state);
-static void _ntfy_wl_sta(struct btc_t *btc, u8 ntfy_num,
-			struct btc_wl_stat_info stat_info[], u8 reason);
+static void _ntfy_wl_sta(struct btc_t *btc, struct rtw_stats *phl_stats,
+			u8 ntfy_num, struct rtw_phl_stainfo_t *sta[],
+			u8 reason);
 static void _ntfy_fwinfo(struct btc_t *btc, u8 *buf, u32 len, u8 cls, u8 func);
 static void _ntfy_timer(struct btc_t *btc, u16 tmr_id);
 

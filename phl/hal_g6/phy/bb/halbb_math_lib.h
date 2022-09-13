@@ -67,7 +67,18 @@
 	(((B3) & 0xf) << 12) | (((B2) & 0xf) << 8) | \
 	(((B1) & 0xf) << 4) | ((B0) & 0xf))
 
+#if PLATFOM_IS_LITTLE_ENDIAN
+#define SWAP4BYTE(x) ((u32)(x))
+#else
+#define SWAP4BYTE(x)                                       \
+		((u32)((((u32)(x) & (u32)0x000000ff) << 24) |  \
+		       (((u32)(x) & (u32)0x0000ff00) << 8) |	 \
+		       (((u32)(x) & (u32)0x00ff0000) >> 8) |	 \
+		       (((u32)(x) & (u32)0xff000000) >> 24)))
+#endif
+
 #define HALBB_DIV(a, b) ((b) ? ((a) / (b)) : 0)
+#define HALBB_CEIL(a, b) ((b) ? ((a) / (b) + (a > (a / b) * b)) : 0)
 #define ABS_32(X) (((X) & BIT(31)) ? (0 - (X)) : (X))
 #define ABS_16(X) (((X) & BIT(15)) ? (0 - (X)) : (X))
 #define ABS_8(X) (((X) & BIT(7)) ? (0 - (X)) : (X))

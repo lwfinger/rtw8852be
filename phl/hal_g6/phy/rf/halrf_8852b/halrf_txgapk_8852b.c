@@ -1917,16 +1917,16 @@ void _halrf_do_non_dbcc_txgapk_8852b(struct rf_info *rf,
 		_halrf_txgapk_iqk_preset_by_mode_8852b(rf, phy, i, false);
 		_halrf_txgapk_clk_setting_dac960mhz_by_mode_8852b(rf, phy, i, false);
 
-		halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_START);
-		halrf_tmac_tx_pause(rf, phy, true);
+		/*halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_START);*/
+		/*halrf_tmac_tx_pause(rf, phy, true);*/
 
 		_halrf_txgapk_track_table_nctl_8852b(rf, phy, i);
 		_halrf_txgapk_write_track_table_8852b(rf, phy, i);
 		_halrf_txgapk_power_table_nctl_8852b(rf, phy, i);
 		_halrf_txgapk_write_power_table_8852b(rf, phy, i);
 
-		halrf_tmac_tx_pause(rf, phy, false);
-		halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_STOP);
+		/*halrf_tmac_tx_pause(rf, phy, false);*/
+		/*halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_STOP);*/
 
 		_halrf_txgapk_iqk_bk_reg_by_mode_8852b(rf, phy, i, false);
 		_halrf_txgapk_afe_bk_reg_by_mode_8852b(rf, phy, i, false);
@@ -1984,8 +1984,8 @@ void _halrf_do_dbcc_txgapk_8852b(struct rf_info *rf,
 	_halrf_txgapk_iqk_preset_by_mode_8852b(rf, phy, path, true);
 	_halrf_txgapk_clk_setting_dac960mhz_by_mode_8852b(rf, phy, path, true);
 
-	halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_START);
-	halrf_tmac_tx_pause(rf, phy, true);
+	/*halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_START);*/
+	/*halrf_tmac_tx_pause(rf, phy, true);*/
 	
 	_halrf_txgapk_track_table_nctl_8852b(rf, phy, path);
 	_halrf_txgapk_write_track_table_8852b(rf, phy, path);
@@ -1994,8 +1994,8 @@ void _halrf_do_dbcc_txgapk_8852b(struct rf_info *rf,
 	_halrf_txgapk_power_table_nctl_8852b(rf, phy, path);
 	_halrf_txgapk_write_power_table_8852b(rf, phy, path);
   
-	halrf_tmac_tx_pause(rf, phy, true);
-	halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_STOP);
+	/*halrf_tmac_tx_pause(rf, phy, true);*/
+	/*halrf_btc_rfk_ntfy(rf, (BIT(phy) << 4), RF_BTC_TSSI, RFK_STOP);*/
 
 	_halrf_txgapk_iqk_bk_reg_by_mode_8852b(rf, phy, path, true);
 	_halrf_txgapk_afe_bk_reg_by_mode_8852b(rf, phy, path, true);

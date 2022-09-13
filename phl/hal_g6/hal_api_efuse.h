@@ -50,6 +50,8 @@ enum rtw_hal_status rtw_hal_efuse_get_shadowmap_from(struct hal_info_t *hal_info
 	u8 *val);
 enum rtw_hal_status rtw_hal_efuse_get_offset_mask(struct hal_info_t *hal_info,
 	u16 offset, u8 *mask);
+enum rtw_hal_status rtw_hal_efuse_get_mask_buf(struct hal_info_t *hal_info,
+	u8 *mask, u32 *buflen);
 
 
 /* BT EFUSE */
@@ -86,6 +88,9 @@ enum rtw_hal_status rtw_hal_efuse_bt_get_avl(struct hal_info_t *hal_info,
 
 enum rtw_hal_status rtw_hal_efuse_bt_get_offset_mask(struct hal_info_t *hal_info,
 	u16 offset, u8 *mask);
+
+enum rtw_hal_status rtw_hal_efuse_bt_get_mask_buf(struct hal_info_t *hal_info,
+	u8 *mask, u32 *buflen);
 
 enum rtw_hal_status rtw_hal_efuse_bt_read_hidden(
 	struct hal_info_t *hal_info, u32 addr, u32 size, u8 *val);

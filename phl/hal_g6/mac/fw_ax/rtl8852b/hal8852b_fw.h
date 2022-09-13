@@ -17,13 +17,23 @@
 
 #ifdef PHL_FEATURE_NIC
 #ifdef MAC_FW_8852B_U2
-extern u8 array_8852b_u2_nic[273880];
+extern u8 array_8852b_u2_nic[271848];
 extern u32 array_length_8852b_u2_nic;
+#endif /*MAC_FW_8852B_U2*/
+#ifdef MAC_FW_8852B_U2
+extern u8 array_8852b_u2_nic_bplus[271848];
+extern u32 array_length_8852b_u2_nic_bplus;
 #endif /*MAC_FW_8852B_U2*/
 #ifdef CONFIG_WOWLAN
 #ifdef MAC_FW_8852B_U2
-extern u8 array_8852b_u2_wowlan[225064];
+extern u8 array_8852b_u2_wowlan[228984];
 extern u32 array_length_8852b_u2_wowlan;
+#endif /*MAC_FW_8852B_U2*/
+#endif /*CONFIG_WOWLAN*/
+#ifdef CONFIG_WOWLAN
+#ifdef MAC_FW_8852B_U2
+extern u8 array_8852b_u2_wowlan_bplus[228984];
+extern u32 array_length_8852b_u2_wowlan_bplus;
 #endif /*MAC_FW_8852B_U2*/
 #endif /*CONFIG_WOWLAN*/
 #endif /*PHL_FEATURE_NIC*/

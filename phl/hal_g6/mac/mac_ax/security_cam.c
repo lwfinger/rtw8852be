@@ -754,6 +754,14 @@ u32 mac_sta_add_key(struct mac_ax_adapter *adapter,
 	sec_cam_info->sec_cam_idx = sec_cam_idx;
 	sec_cam_info->offset = 0x00;
 	sec_cam_info->len = SEC_CAM_ENTRY_SIZE;
+
+	/* For WAPI Support */
+	if (sec_cam_info->type == HW_SUPPORT_ENC_TYPE_WAPI ||
+	    sec_cam_info->type == HW_SUPPORT_ENC_TYPE_GCMSMS4)
+		role->info.a_info.wapi = 1;
+	else
+		role->info.a_info.wapi = 0;
+
 	ret = insert_key_to_addr_cam(adapter, role, key_type, key_id,
 				     sec_cam_info->sec_cam_idx);
 	if (ret != MACSUCCESS)

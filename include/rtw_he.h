@@ -948,6 +948,38 @@ struct he_priv {
 	struct rtw_he_actrl_om om_info;
 };
 
+/*trigger frame*/
+#define TRIGGER_FRAME_USER_INFO_SZ 5 /* byte */
+#define TRIGGER_FRAME_MIN_LENGTH 24 + TRIGGER_FRAME_USER_INFO_SZ /* byte , aleast one user info !!! */
+/*basic tigger frame with 1 byte trigger dependent info */
+#define TRIGGER_FRAME_BASIC_USER_INFO_SZ TRIGGER_FRAME_USER_INFO_SZ + 1
+
+/*trigger frame User Info*/
+#define GET_TRIGGER_FRAME_TYPE(_pEleStart) \
+	LE_BITS_TO_1BYTE((_pEleStart + 16), 0, 4)
+
+#define GET_TRIGGER_FRAME_USER_INFO_AID12(_user_info) \
+	LE_BITS_TO_2BYTE(_user_info, 0, 12)
+
+#define GET_TRIGGER_FRAME_USER_INFO_RUA(_user_info) \
+	LE_BITS_TO_2BYTE((_user_info + 1), 4, 8)
+
+#define GET_TRIGGER_FRAME_USER_INFO_UL_MCS(_user_info) \
+	LE_BITS_TO_2BYTE((_user_info + 2), 5, 4)
+
+
+enum rtw_he_trigger_frame_type {
+	TRIGGER_FRAME_T_BASIC = 0,
+	TRIGGER_FRAME_T_BFRP,
+	TRIGGER_FRAME_T_MUBAR,
+	TRIGGER_FRAME_T_MURTS,
+	TRIGGER_FRAME_T_BSRP,
+	TRIGGER_FRAME_T_GCR_MUBAR,
+	TRIGGER_FRAME_T_BQRP,
+	TRIGGER_FRAME_T_NFRP = 7,
+	TRIGGER_FRAME_T_RSVD = 8,
+};
+
 u16 rtw_he_mcs_to_data_rate(u8 bw, u8 gi, u8 he_mcs_rate);
 void	rtw_he_use_default_setting(_adapter *padapter);
 void	update_sta_he_info_apmode(_adapter *padapter, void *sta);
@@ -970,6 +1002,7 @@ u8 rtw_he_htc_en(_adapter *padapter, struct sta_info *psta);
 void rtw_he_fill_htc(_adapter *padapter, struct pkt_attrib *pattrib, u32 *phtc_buf);
 void rtw_he_set_om_info(_adapter *padapter, u8 om_mask, struct rtw_he_actrl_om *om_info);
 void rtw_he_init_om_info(_adapter *padapter);
-
+void rtw_process_he_triggerframe(_adapter *padapter,union recv_frame *precv_frame);
+void rtw_update_he_ies(_adapter *padapter, WLAN_BSSID_EX *pnetwork);
 #endif /* _RTW_HE_H_ */
 

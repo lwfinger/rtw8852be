@@ -80,6 +80,7 @@
 	#define RTW_WKARD_BFEE_SET_AID
 	#define CONFIG_PHL_THERMAL_PROTECT
 	#define CONFIG_PHL_TX_DBG
+	#define CONFIG_PHL_RELEASE_RPT_ENABLE
 #endif /* PHL_FEATURE_NONE */
 
 #ifdef PHL_PLATFORM_WINDOWS
@@ -120,6 +121,8 @@
 #define RTW_WKARD_WOW_L2_PWR
 #define DBG_RST_BDRAM_TIME
 #endif
+
+#define DBG_PHY_ON_TIME
 
 /*CONFIG_IFACE_NUMBER*/
 #ifdef CONFIG_IFACE_NUMBER
@@ -184,6 +187,10 @@
 #endif
 
 #define CONFIG_PHL_CMD_BTC
+
+#ifdef CONFIG_MSG_NUM
+	#define CONFIG_PHL_MSG_NUM CONFIG_MSG_NUM
+#endif
 #endif /**** CONFIG_CMD_DISP ***/
 
 #define CONFIG_GEN_GIT_INFO 1
@@ -203,7 +210,7 @@
 #define CONFIG_PHL_USB_RX_AGGREGATION
 #endif
 
-#if CONFIG_DFS
+#ifdef CONFIG_DFS_MASTER
 #define CONFIG_PHL_DFS
 #endif
 
@@ -249,8 +256,12 @@
 #define CONFIG_PHL_RA_TXSTS_DBG
 #endif
 
-#ifdef CONFIG_USB_RELEASE_RPT
-#define CONFIG_PHL_USB_RELEASE_RPT_ENABLE
+#ifdef CONFIG_RELEASE_RPT
+#define CONFIG_PHL_RELEASE_RPT_ENABLE
+#endif
+
+#ifdef CONFIG_PS_FW_DBG
+#define CONFIG_PHL_PS_FW_DBG
 #endif
 
 #ifdef CONFIG_P2PPS
@@ -279,6 +290,9 @@
 
 #ifdef CONFIG_SDIO_HCI
 /* For SDIO TX TP TST - START */
+#ifdef CONFIG_SDIO_TX_AGG_NUM_MAX
+#define PHL_SDIO_TX_AGG_MAX	CONFIG_SDIO_TX_AGG_NUM_MAX
+#endif /* CONFIG_SDIO_TX_AGG_NUM_MAX */
 #define SDIO_TX_THREAD			/* Use dedicate thread for SDIO TX */
 /* For SDIO TX TP TST - ENDT */
 #endif /* CONFIG_SDIO_HCI */
@@ -302,9 +316,12 @@
 #define RTW_WKARD_MP_MODE_CHANGE
 #define RTW_WKARD_WIN_TRX_BALANCE
 #define RTW_WKARD_DYNAMIC_LTR
+#define RTW_WKARD_GET_PROCESSOR_ID
 #endif
 
 #define RTW_WKARD_PHY_CAP
+
+#define RTW_WKARD_BTC_STBC_CAP
 
 #define RTW_WKARD_LAMODE
 
@@ -370,9 +387,6 @@
 #define CONFIG_PHY_INFO_NTFY
 #endif
 
-/* LPS should disable other role */
-#define RTW_WKARD_LPS_ROLE_CONFIG
-
 #ifdef PHL_PLATFORM_WINDOWS
 #define CONFIG_WOW_WITH_SER
 #endif
@@ -425,5 +439,7 @@
 #ifdef RTW_WKARD_DISABLE_2G40M_ULOFDMA
 #define RTW_WKARD_BB_DISABLE_STA_2G40M_ULOFDMA
 #endif
+
+#define RTW_WKARD_CHECK_STAINFO_DOUBLE_DEL
 
 #endif /*_PHL_CONFIG_H_*/

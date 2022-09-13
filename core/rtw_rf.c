@@ -846,16 +846,16 @@ static void dump_op_class_ch_title(void *sel)
 static void dump_global_op_class_ch_single(void *sel, u8 gid)
 {
 	u8 i;
-	char buf[100];
-	char *pos = buf;
 
-	for (i = 0; i < OPC_CH_LIST_LEN(global_op_class[gid]); i++)
-		pos += snprintf(pos, 100 - (pos - buf), " %u", OPC_CH_LIST_CH(global_op_class[gid], i));
-
-	RTW_PRINT_SEL(sel, "%5u %4s %7s%s\n"
+	RTW_PRINT_SEL(sel, "%5u %4s %7s"
 		, global_op_class[gid].class_id
 		, band_str(global_op_class[gid].band)
-		, opc_bw_str(global_op_class[gid].bw), buf);
+		, opc_bw_str(global_op_class[gid].bw));
+
+	for (i = 0; i < OPC_CH_LIST_LEN(global_op_class[gid]); i++)
+		_RTW_PRINT_SEL(sel, " %u", OPC_CH_LIST_CH(global_op_class[gid], i));
+
+	_RTW_PRINT_SEL(sel, "\n");
 }
 
 #ifdef CONFIG_RTW_DEBUG
@@ -1030,6 +1030,7 @@ static struct op_class_pref_t *opc_pref_alloc(u8 class_id)
 {
 	int i, j;
 	struct op_class_pref_t *opc_pref = NULL;
+	u8 ch_num;
 
 	for (i = 0; i < global_op_class_num; i++)
 		if (global_op_class[i].class_id == class_id)
@@ -1038,7 +1039,8 @@ static struct op_class_pref_t *opc_pref_alloc(u8 class_id)
 	if (i >= global_op_class_num)
 		goto exit;
 
-	opc_pref = rtw_zmalloc(sizeof(*opc_pref));
+	ch_num = OPC_CH_LIST_LEN(global_op_class[i]);
+	opc_pref = rtw_zmalloc(sizeof(*opc_pref) + (sizeof(struct op_ch_t) * ch_num));
 	if (!opc_pref)
 		goto exit;
 
@@ -1052,7 +1054,7 @@ static struct op_class_pref_t *opc_pref_alloc(u8 class_id)
 		opc_pref->chs[j].no_ir = 1;
 		opc_pref->chs[j].max_txpwr = UNSPECIFIED_MBM;
 	}
-	opc_pref->ch_num = OPC_CH_LIST_LEN(global_op_class[i]);
+	opc_pref->ch_num = ch_num;
 
 exit:
 	return opc_pref;
@@ -1060,7 +1062,7 @@ exit:
 
 static void opc_pref_free(struct op_class_pref_t *opc_pref)
 {
-	rtw_mfree(opc_pref, sizeof(*opc_pref));
+	rtw_mfree(opc_pref, sizeof(*opc_pref) + (sizeof(struct op_ch_t) * opc_pref->ch_num));
 }
 
 int op_class_pref_init(_adapter *adapter)
@@ -1082,9 +1084,9 @@ int op_class_pref_init(_adapter *adapter)
 		goto exit;
 	}
 
-	if (is_supported_24g(regsty->wireless_mode) && rtw_hw_chk_band_cap(dvobj, BAND_CAP_2G))
+	if (is_supported_24g(regsty->band_type) && rtw_hw_chk_band_cap(dvobj, BAND_CAP_2G))
 		band_bmp |= BAND_CAP_2G;
-	if (is_supported_5g(regsty->wireless_mode) && rtw_hw_chk_band_cap(dvobj, BAND_CAP_5G))
+	if (is_supported_5g(regsty->band_type) && rtw_hw_chk_band_cap(dvobj, BAND_CAP_5G))
 		band_bmp |= BAND_CAP_5G;
 
 	bw_bmp[BAND_ON_24G] = (ch_width_to_bw_cap(REGSTY_BW_2G(regsty) + 1) - 1) & (GET_HAL_SPEC(dvobj)->bw_cap);
@@ -1176,7 +1178,7 @@ void op_class_pref_apply_regulatory(_adapter *adapter, u8 reason)
 		opc_pref = rfctl->spt_op_class_ch[i];
 
 		/* reset all channel */
-		for (j = 0; j < MAX_CHANNEL_NUM_OF_BAND && opc_pref->chs[j].ch != 0; j++) {
+		for (j = 0; j < opc_pref->ch_num; j++) {
 			if (reason >= REG_CHANGE)
 				opc_pref->chs[j].static_non_op = 1;
 			if (reason != REG_TXPWR_CHANGE)
@@ -1219,7 +1221,7 @@ void op_class_pref_apply_regulatory(_adapter *adapter, u8 reason)
 			&& (bw == CHANNEL_WIDTH_80 || bw == CHANNEL_WIDTH_160))
 			continue;
 
-		for (j = 0; j < MAX_CHANNEL_NUM_OF_BAND && opc_pref->chs[j].ch != 0; j++) {
+		for (j = 0; j < opc_pref->ch_num; j++) {
 			u8 *op_chs;
 			u8 op_ch_num;
 			u8 k, l;
@@ -1288,58 +1290,56 @@ static void dump_opc_pref_single(void *sel, struct op_class_pref_t *opc_pref, bo
 {
 	u8 i;
 	u8 ch_num = 0;
-	char buf[256];
-	char *pos = buf;
 
 	if (!show_snon_ocp && !opc_pref->op_ch_num)
 		return;
 	if (!show_no_ir && !opc_pref->ir_ch_num)
 		return;
 
-	for (i = 0; i < MAX_CHANNEL_NUM_OF_BAND && opc_pref->chs[i].ch != 0; i++) {
+	RTW_PRINT_SEL(sel, "%5u %4s %7s"
+		, opc_pref->class_id
+		, band_str(opc_pref->band)
+		, opc_bw_str(opc_pref->bw));
+	for (i = 0; i < opc_pref->ch_num; i++) {
 		if ((show_snon_ocp || !opc_pref->chs[i].static_non_op)
 			&& (show_no_ir || !opc_pref->chs[i].no_ir)
 		) {
 			if (detail)
-				pos += snprintf(pos, 256 - (pos - buf), " %4u", opc_pref->chs[i].ch);
+				_RTW_PRINT_SEL(sel, " %4u", opc_pref->chs[i].ch);
 			else
-				pos += snprintf(pos, 256 - (pos - buf), " %u", opc_pref->chs[i].ch);
+				_RTW_PRINT_SEL(sel, " %u", opc_pref->chs[i].ch);
 		}
 	}
-
-	RTW_PRINT_SEL(sel, "%5u %4s %7s%s\n"
-		, opc_pref->class_id
-		, band_str(opc_pref->band)
-		, opc_bw_str(opc_pref->bw), buf);
+	_RTW_PRINT_SEL(sel, "\n");
 
 	if (!detail)
 		return;
 
-	pos = buf;
-	for (i = 0; i < MAX_CHANNEL_NUM_OF_BAND && opc_pref->chs[i].ch != 0; i++) {
+	RTW_PRINT_SEL(sel, "                  ");
+	for (i = 0; i < opc_pref->ch_num; i++) {
 		if ((show_snon_ocp || !opc_pref->chs[i].static_non_op)
 			&& (show_no_ir || !opc_pref->chs[i].no_ir)
 		) {
-			pos += snprintf(pos, 256 - (pos - buf), "   %c%c"
+			_RTW_PRINT_SEL(sel, "   %c%c"
 				, opc_pref->chs[i].no_ir ? ' ' : 'I'
 				, opc_pref->chs[i].static_non_op ? ' ' : 'E'
 			);
 		}
 	}
-	RTW_PRINT_SEL(sel, "                  %s\n", buf);
+	_RTW_PRINT_SEL(sel, "\n");
 
-	pos = buf;
-	for (i = 0; i < MAX_CHANNEL_NUM_OF_BAND && opc_pref->chs[i].ch != 0; i++) {
+	RTW_PRINT_SEL(sel, "                  ");
+	for (i = 0; i < opc_pref->ch_num; i++) {
 		if ((show_snon_ocp || !opc_pref->chs[i].static_non_op)
 			&& (show_no_ir || !opc_pref->chs[i].no_ir)
 		) {
 			if (opc_pref->chs[i].max_txpwr == UNSPECIFIED_MBM)
-				pos += snprintf(pos, 256 - (pos - buf), "     ");
+				_RTW_PRINT_SEL(sel, "     ");
 			else
-				pos += snprintf(pos, 256 - (pos - buf), " %4d", opc_pref->chs[i].max_txpwr);
+				_RTW_PRINT_SEL(sel, " %4d", opc_pref->chs[i].max_txpwr);
 		}
 	}
-	RTW_PRINT_SEL(sel, "                  %s\n", buf);
+	_RTW_PRINT_SEL(sel, "\n");
 }
 
 void dump_cap_spt_op_class_ch(void *sel, struct rf_ctl_t *rfctl, bool detail)

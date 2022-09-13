@@ -55,6 +55,22 @@ static struct mac_ax_hfc_ch_cfg hfc_chcfg_pcie_8852a[] = {
 #endif
 
 static struct mac_ax_hfc_ch_cfg hfc_chcfg_pcie_8852b[] = {
+	{5, 343, grp_0}, /* ACH 0 */
+	{5, 343, grp_0}, /* ACH 1 */
+	{5, 343, grp_0}, /* ACH 2 */
+	{5, 343, grp_0}, /* ACH 3 */
+	{0, 0, grp_0}, /* ACH 4 */
+	{0, 0, grp_0}, /* ACH 5 */
+	{0, 0, grp_0}, /* ACH 6 */
+	{0, 0, grp_0}, /* ACH 7 */
+	{4, 344, grp_0}, /* B0MGQ */
+	{4, 344, grp_0}, /* B0HIQ */
+	{0, 0, grp_0}, /* B1MGQ */
+	{0, 0, grp_0}, /* B1HIQ */
+	{40, 0, 0} /* FWCMDQ */
+};
+
+static struct mac_ax_hfc_ch_cfg hfc_chcfg_pcie_8852b_turbo[] = {
 	{16, 744, grp_0}, /* ACH 0 */
 	{16, 744, grp_0}, /* ACH 1 */
 	{16, 744, grp_0}, /* ACH 2 */
@@ -279,6 +295,13 @@ static struct mac_ax_hfc_pub_cfg hfc_pubcfg_pcie_8852a = {
 #endif
 
 static struct mac_ax_hfc_pub_cfg hfc_pubcfg_pcie_8852b = {
+	448, /* Group 0 */
+	0, /* Group 1 */
+	448, /* Public Max */
+	0 /* WP threshold */
+};
+
+static struct mac_ax_hfc_pub_cfg hfc_pubcfg_pcie_8852b_turbo = {
 	960, /* Group 0 */
 	0, /* Group 1 */
 	960, /* Public Max */
@@ -477,16 +500,32 @@ static struct mac_ax_hfc_ch_cfg hfc_chcfg_usb_scc_8852a[] = {
 };
 
 static struct mac_ax_hfc_ch_cfg hfc_chcfg_usb_scc_8852b[] = {
-	{18, 204, grp_0}, /* ACH 0 */
-	{18, 204, grp_0}, /* ACH 1 */
-	{18, 204, grp_0}, /* ACH 2 */
-	{18, 204, grp_0}, /* ACH 3 */
+	{18, 152, grp_0}, /* ACH 0 */
+	{18, 152, grp_0}, /* ACH 1 */
+	{18, 152, grp_0}, /* ACH 2 */
+	{18, 152, grp_0}, /* ACH 3 */
 	{0, 0, grp_0}, /* ACH 4 */
 	{0, 0, grp_0}, /* ACH 5 */
 	{0, 0, grp_0}, /* ACH 6 */
 	{0, 0, grp_0}, /* ACH 7 */
-	{18, 204, grp_0}, /* B0MGQ */
-	{18, 204, grp_0}, /* B0HIQ */
+	{18, 152, grp_0}, /* B0MGQ */
+	{18, 152, grp_0}, /* B0HIQ */
+	{0, 0, grp_0}, /* B1MGQ */
+	{0, 0, grp_0}, /* B1HIQ */
+	{0, 0, 0} /* FWCMDQ */
+};
+
+static struct mac_ax_hfc_ch_cfg hfc_chcfg_usb_scc_turbo_8852b[] = {
+	{18, 210, grp_0}, /* ACH 0 */
+	{18, 210, grp_0}, /* ACH 1 */
+	{18, 210, grp_0}, /* ACH 2 */
+	{18, 210, grp_0}, /* ACH 3 */
+	{0, 0, grp_0}, /* ACH 4 */
+	{0, 0, grp_0}, /* ACH 5 */
+	{0, 0, grp_0}, /* ACH 6 */
+	{0, 0, grp_0}, /* ACH 7 */
+	{18, 210, grp_0}, /* B0MGQ */
+	{18, 210, grp_0}, /* B0HIQ */
 	{0, 0, grp_0}, /* B1MGQ */
 	{0, 0, grp_0}, /* B1HIQ */
 	{0, 0, 0} /* FWCMDQ */
@@ -500,10 +539,17 @@ static struct mac_ax_hfc_pub_cfg hfc_pubcfg_usb_scc_8852a = {
 };
 
 static struct mac_ax_hfc_pub_cfg hfc_pubcfg_usb_scc_8852b = {
-	204, /* Group 0 */
+	152, /* Group 0 */
 	0, /* Group 1 */
-	204, /* Public Max */
-	104 /* WP threshold */
+	152, /* Public Max */
+	0 /* WP threshold */
+};
+
+static struct mac_ax_hfc_pub_cfg hfc_pubcfg_usb_scc_turbo_8852b = {
+	210, /* Group 0 */
+	0, /* Group 1 */
+	210, /* Public Max */
+	0 /* WP threshold */
 };
 
 static struct mac_ax_hfc_prec_cfg hfc_preccfg_usb_8852a = {
@@ -520,7 +566,7 @@ static struct mac_ax_hfc_prec_cfg hfc_preccfg_usb_8852a = {
 static struct mac_ax_hfc_prec_cfg hfc_preccfg_usb_8852b = {
 	9, /*CH 0-11 pre-cost */
 	32, /*H2C pre-cost */
-	76, /* WP CH 0-7 pre-cost */
+	64, /* WP CH 0-7 pre-cost */
 	24, /* WP CH 8-11 pre-cost */
 	MAC_AX_HFC_FULL_COND_X2, /* CH 0-11 full condition */
 	MAC_AX_HFC_FULL_COND_X2, /* H2C full condition */
@@ -728,6 +774,7 @@ u32 hfc_reset_param(struct mac_ax_adapter *adapter)
 		} else if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
 			switch (adapter->dle_info.qta_mode) {
 			case MAC_AX_QTA_SCC:
+			case MAC_AX_QTA_SCC_TURBO:
 				ch_cfg_ini = hfc_chcfg_sdio_8852b;
 				pub_cfg_ini = &hfc_pubcfg_sdio_8852b;
 				break;
@@ -782,6 +829,11 @@ u32 hfc_reset_param(struct mac_ax_adapter *adapter)
 			case MAC_AX_QTA_SCC:
 				ch_cfg_ini = hfc_chcfg_usb_scc_8852b;
 				pub_cfg_ini = &hfc_pubcfg_usb_scc_8852b;
+				prec_cfg_ini = &hfc_preccfg_usb_8852b;
+				break;
+			case MAC_AX_QTA_SCC_TURBO:
+				ch_cfg_ini = hfc_chcfg_usb_scc_turbo_8852b;
+				pub_cfg_ini = &hfc_pubcfg_usb_scc_turbo_8852b;
 				prec_cfg_ini = &hfc_preccfg_usb_8852b;
 				break;
 			case MAC_AX_QTA_DLFW:
@@ -894,6 +946,12 @@ u32 hfc_reset_param(struct mac_ax_adapter *adapter)
 				param->mode = MAC_AX_HCIFC_POH;
 				ch_cfg_ini = hfc_chcfg_pcie_8852b;
 				pub_cfg_ini = &hfc_pubcfg_pcie_8852b;
+				prec_cfg_ini = &hfc_preccfg_pcie;
+				break;
+			case MAC_AX_QTA_SCC_TURBO:
+				param->mode = MAC_AX_HCIFC_POH;
+				ch_cfg_ini = hfc_chcfg_pcie_8852b_turbo;
+				pub_cfg_ini = &hfc_pubcfg_pcie_8852b_turbo;
 				prec_cfg_ini = &hfc_preccfg_pcie;
 				break;
 			case MAC_AX_QTA_SCC_STF:

@@ -130,9 +130,6 @@ struct vht_bf_cap {
 };
 
 struct vht_priv {
-	/* VHT IE is configured by upper layer or not (hostapd or wpa_supplicant) */
-	u8 upper_layer_setting;
-
 	u8 vht_option;
 
 	u8 ldpc_cap;

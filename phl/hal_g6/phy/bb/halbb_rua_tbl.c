@@ -1547,7 +1547,8 @@ void halbb_rua_tbl_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		goto out;
 	}
 	for (i = 0; i < 5; i++) {
-		HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
+		if (input[i + 1])
+			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
 	}
 	if (val[0] < 6)
 		halbb_set_rua_tbl(bb, (u8)val[0]);

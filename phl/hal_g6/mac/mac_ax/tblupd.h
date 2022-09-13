@@ -297,8 +297,8 @@ u32 mac_upd_shcut_mhdr(struct mac_ax_adapter *adapter,
  * @retval u32
  */
 u32 mac_upd_cctl_info(struct mac_ax_adapter *adapter,
-		      struct mac_ax_cctl_info *info,
-		      struct mac_ax_cctl_info *mask, u8 macid, u8 operation);
+		      struct rtw_hal_mac_ax_cctl_info *info,
+		      struct rtw_hal_mac_ax_cctl_info *mask, u8 macid, u8 operation);
 /**
  * @}
  * @}

@@ -1072,6 +1072,18 @@ void halbb_rx_pkt_su_store_in_sta_info(struct bb_info *bb, struct physts_rxd *de
 			rssi_t->rssi_bcn_ma = MA_ACC(rssi_t->rssi_bcn_ma, (u16)psts_h->rssi_avg, ma_fac, RSSI_MA_H);
 			rssi_t->rssi_bcn = (u8)GET_MA_VAL(rssi_t->rssi_bcn_ma, RSSI_MA_H);
 		}
+
+		for (i = 0; i < HALBB_MAX_PATH; i++) {
+			if (!(physts->rx_path_en & BIT(i)))
+				continue;
+
+			if (rssi_t->rssi_bcn_ma_path[i] == 0) {
+				rssi_t->rssi_bcn_ma_path[i] = (u16)(psts_h->rssi[i] << RSSI_MA_H);
+			} else {
+				rssi_t->rssi_bcn_ma_path[i] = MA_ACC(rssi_t->rssi_bcn_ma_path[i], (u16)psts_h->rssi[i], ma_fac, RSSI_MA_H);
+			}
+		}
+
 		rssi_t->pkt_cnt_bcn++;
 	} else {
 		ma_fac = rssi_t->ma_factor;
@@ -1098,7 +1110,7 @@ void halbb_rx_pkt_su_store_in_sta_info(struct bb_info *bb, struct physts_rxd *de
 			if (rssi_t->rssi_ma_path[i] == 0) {
 				rssi_t->rssi_ma_path[i] = (u16)(psts_h->rssi[i] << RSSI_MA_H);
 			} else {
-				rssi_t->rssi_ma_path[i] =  MA_ACC(rssi_t->rssi_ma_path[i], (u16)psts_h->rssi[i], ma_fac, RSSI_MA_H);
+				rssi_t->rssi_ma_path[i] = MA_ACC(rssi_t->rssi_ma_path[i], (u16)psts_h->rssi[i], ma_fac, RSSI_MA_H);
 			}
 		}
 

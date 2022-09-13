@@ -465,6 +465,30 @@ u8 WapiCheckPnInSwDecrypt(
 {
 	u8				ret = false;
 
+#if 0
+	struct ieee80211_hdr_3addr_qos *header;
+	u16				fc;
+	u8				*pDaddr, *pTaddr, *pRaddr;
+
+	header = (struct ieee80211_hdr_3addr_qos *)pskb->data;
+	pTaddr = header->addr2;
+	pRaddr = header->addr1;
+	fc = le16_to_cpu(header->frame_ctl);
+
+	if (GetToDs(&fc))
+		pDaddr = header->addr3;
+	else
+		pDaddr = header->addr1;
+
+	if ((_rtw_memcmp(pRaddr, padapter->pnetdev->dev_addr, ETH_ALEN) == 0)
+	    &&	!(pDaddr)
+	    && (GetFrameType(&fc) == WIFI_QOS_DATA_TYPE))
+		/* && ieee->pHTInfo->bCurrentHTSupport && */
+		/* ieee->pHTInfo->bCurRxReorderEnable) */
+		ret = false;
+	else
+		ret = true;
+#endif
 	WAPI_TRACE(WAPI_RX, "%s: return %d\n", __FUNCTION__, ret);
 	return ret;
 }

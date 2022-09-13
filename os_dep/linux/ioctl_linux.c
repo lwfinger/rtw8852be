@@ -2854,10 +2854,10 @@ static int rtw_wx_set_auth(struct net_device *dev,
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct iw_param *param = (struct iw_param *)&(wrqu->param);
+	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 #ifdef CONFIG_WAPI_SUPPORT
 #ifndef CONFIG_IOCTL_CFG80211
-	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
-	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	u32 value = param->value;
 #endif
@@ -2961,6 +2961,9 @@ static int rtw_wx_set_auth(struct net_device *dev,
 			RTW_INFO("%s...call rtw_indicate_disconnect\n ", __FUNCTION__);
 			rtw_indicate_disconnect(padapter, 0, _FALSE);
 
+			pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+			pmlmeinfo->disconnect_code = DISCONNECTION_BY_SYSTEM_DUE_TO_HIGH_LAYER_COMMAND;
+			pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 		}
 #endif
 
@@ -3951,6 +3954,9 @@ static int rtw_dbg_port(struct net_device *dev,
 	case 0x7a:
 		receive_disconnect(padapter, pmlmeinfo->network.MacAddress
 				   , WLAN_REASON_EXPIRATION_CHK, _FALSE);
+		pmlmeinfo->disconnect_occurred_time = rtw_systime_to_ms(rtw_get_current_time());
+		pmlmeinfo->disconnect_code = DISCONNECTION_BY_DRIVER_DUE_TO_IOCTL_DBG_PORT;
+		pmlmeinfo->wifi_reason_code = WLAN_REASON_UNSPECIFIED;
 		break;
 	case 0x7F:
 		switch (minor_cmd) {
@@ -5810,6 +5816,7 @@ static int rtw_wowlan_ctrl(struct net_device *dev,
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
 	struct pwrctrl_priv *pwrctrlpriv = adapter_to_pwrctl(padapter);
+	struct wow_priv *wowpriv = adapter_to_wowlan(padapter);
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	int ret = 0;
 	systime start_time = rtw_get_current_time();
@@ -5820,11 +5827,15 @@ static int rtw_wowlan_ctrl(struct net_device *dev,
 		MLME_IS_STA(padapter) &&
 		!WOWLAN_IS_STA_MIX_MODE(padapter)) {
 #ifdef CONFIG_PNO_SUPPORT
-		pwrctrlpriv->wowlan_pno_enable = _TRUE;
-#else
-		RTW_INFO("[%s] WARNING: Please Connect With AP First!!\n", __func__);
-		goto _rtw_wowlan_ctrl_exit_free;
-#endif /* CONFIG_PNO_SUPPORT */
+		if (wowpriv->wow_nlo.nlo_en) {
+			pwrctrlpriv->wowlan_pno_enable = _TRUE;
+		} else
+#endif
+		{
+			RTW_INFO("[%s] WARNING: Please Connect With AP First!!\n",
+				 __func__);
+			goto _rtw_wowlan_ctrl_exit_free;
+		}
 	}
 
 	if (check_fwstate(pmlmepriv, WIFI_UNDER_SURVEY))
@@ -8438,7 +8449,8 @@ static const struct iw_priv_args rtw_mp_private_args[] = {
 	{ MP_CUSTOMER_STR, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK,
 				IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "customer_str" },
 #endif
-
+	{ MP_UUID , IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK,
+				IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_MASK, "mp_uuid"},
 #endif /* CONFIG_MP_INCLUDED */
 };
 

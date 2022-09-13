@@ -203,6 +203,8 @@ struct mac_ax_state_mach {
 #define MAC_AX_SER_CTRL_STOP 1
 #define MAC_AX_SER_CTRL_ERR 2
 	u8 ser_ctrl_st;
+#define MAC_AX_CH_SWITCH_GET_RPT 4
+	u8 ch_switch;
 };
 
 #define MAC_AX_DFLT_SM \

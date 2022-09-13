@@ -43,9 +43,6 @@ void init_hal_spec_8852b(struct rtw_phl_com_t *phl_com,
 	hal_com->phy_hw_cap[0].hw_rts_len_th = 0;
 	hal_com->phy_hw_cap[1].hw_rts_len_th = 0;
 	hal_spec->max_tx_cnt = 2;
-
-	hal_spec->tx_nss_num = 2;
-	hal_spec->rx_nss_num = 2;
 	hal_spec->band_cap = BAND_CAP_2G | BAND_CAP_5G | BAND_CAP_6G;
 	hal_spec->bw_cap = BW_CAP_20M | BW_CAP_40M | BW_CAP_80M;
 	hal_spec->port_num = 5;
@@ -158,8 +155,10 @@ void init_hal_spec_8852b(struct rtw_phl_com_t *phl_com,
 	hal_com->dev_hw_cap.twt_sup = 0;
 #endif /* CONFIG_PHL_TWT */
 
-	hal_com->dev_hw_cap.ps_cap.ips_cap = PS_CAP_PWR_OFF;
-	hal_com->dev_hw_cap.ps_cap.ips_wow_cap = 0;
+	hal_com->dev_hw_cap.ps_cap.ips_cap = PS_CAP_PWR_OFF |
+		PS_CAP_PWRON | PS_CAP_RF_OFF | PS_CAP_CLK_GATED | PS_CAP_PWR_GATED;
+	hal_com->dev_hw_cap.ps_cap.ips_wow_cap =
+		PS_CAP_PWRON | PS_CAP_RF_OFF | PS_CAP_CLK_GATED | PS_CAP_PWR_GATED;
 	hal_com->dev_hw_cap.ps_cap.lps_cap =
 		PS_CAP_PWRON | PS_CAP_RF_OFF | PS_CAP_CLK_GATED | PS_CAP_PWR_GATED;
 	hal_com->dev_hw_cap.ps_cap.lps_wow_cap =
@@ -521,6 +520,7 @@ hal_wow_init_8852b(struct rtw_phl_com_t *phl_com,
 {
 	struct hal_ops_t *hal_ops = hal_get_ops(hal_info);
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
+	bool linked = sta->wrole->mstate == MLME_LINKED ? true : false;
 
 	hal_status = hal_ops->hal_cfg_fw(phl_com, hal_info, init_info->ic_name, RTW_FW_WOWLAN);
 	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
@@ -534,7 +534,13 @@ hal_wow_init_8852b(struct rtw_phl_com_t *phl_com,
 		goto exit;
 	}
 
-	hal_status = rtw_hal_update_sta_entry(hal_info, sta, true);
+	hal_status = rtw_hal_mac_role_sync(hal_info, sta);
+	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_ERR("%s: role sync fail!\n", __func__);
+		goto exit;
+	}
+
+	hal_status = rtw_hal_update_sta_entry(hal_info, sta, linked);
 	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
 		PHL_ERR("%s: update sta entry fail(%d)!!\n", __func__, hal_status);
 		goto exit;
@@ -555,7 +561,7 @@ hal_wow_deinit_8852b(struct rtw_phl_com_t *phl_com,
 {
 	struct hal_ops_t *hal_ops = hal_get_ops(hal_info);
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
-
+	bool linked = sta->wrole->mstate == MLME_LINKED ? true : false;
 	/* AOAC Report */
 
 	hal_status = hal_ops->hal_cfg_fw(phl_com, hal_info, init_info->ic_name, RTW_FW_NIC);
@@ -570,7 +576,13 @@ hal_wow_deinit_8852b(struct rtw_phl_com_t *phl_com,
 		goto exit;
 	}
 
-	hal_status = rtw_hal_update_sta_entry(hal_info, sta, true);
+	hal_status = rtw_hal_mac_role_sync(hal_info, sta);
+	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
+		PHL_ERR("%s: role sync fail!\n", __func__);
+		goto exit;
+	}
+
+	hal_status = rtw_hal_update_sta_entry(hal_info, sta, linked);
 	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
 		PHL_ERR("%s: update sta entry fail(%d)!!\n", __func__, hal_status);
 		goto exit;

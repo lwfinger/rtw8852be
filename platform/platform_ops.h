@@ -40,6 +40,10 @@ void pci_free_cache_mem(struct pci_dev *pdev, void *vir_addr,
 	dma_addr_t *bus_addr, size_t size, int direction);
 void pci_free_noncache_mem(struct pci_dev *pdev, void *vir_addr,
 	dma_addr_t *bus_addr, size_t size);
+struct dma_pool *pci_create_dma_pool(struct pci_dev *pdev, char *name, size_t size);
+void pci_destory_dma_pool(struct pci_dev *pdev, struct dma_pool *pool);
+void *pci_zalloc_pool_mem(struct pci_dev *pdev, struct dma_pool *pool, dma_addr_t *bus_addr);
+void pci_free_pool_mem(struct pci_dev *pdev, struct dma_pool *pool, void *vir_addr, dma_addr_t *bus_addr);
 #else
 #define platform_wifi_power_on(void) 0
 #define platform_wifi_power_off(void)

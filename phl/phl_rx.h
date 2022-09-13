@@ -38,7 +38,11 @@ enum rtw_phl_status phl_rx_reorder(struct phl_info_t *phl_info,
 void phl_rx_deinit(struct phl_info_t *phl_info);
 void phl_recycle_rx_buf(struct phl_info_t *phl_info,
 				struct rtw_phl_rx_pkt *phl_rx);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
+void phl_event_indicator(unsigned long context);
+#else
 void phl_event_indicator(void *context);
+#endif
 
 enum rtw_phl_status rtw_phl_start_rx_process(void *phl);
 
@@ -62,6 +66,8 @@ phl_rx_proc_wait_phy_sts(struct phl_info_t *phl_info,
 
 void phl_rx_proc_ppdu_sts(struct phl_info_t *phl_info,
 			  struct rtw_phl_rx_pkt *phl_rx);
+void phl_rx_wp_report_record_sts(struct phl_info_t *phl_info,
+				 u8 macid, u16 ac_queue, u8 txsts);
 void phl_reset_rx_stats(struct rtw_stats *stats);
 void phl_dump_all_sta_rx_info(struct phl_info_t *phl_info);
 u16 rtw_phl_query_new_rx_num(void *phl);

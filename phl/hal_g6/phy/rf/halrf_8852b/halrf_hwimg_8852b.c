@@ -209,12 +209,14 @@ void halrf_config_8852b_nctl_reg(struct rf_info *rf)
 		if(halrf_rreg(rf, 0x8080, MASKDWORD) == 0x4)
 			break;		
 	}
+	halrf_write_fwofld_start(rf);
 	while ((i + 1) < array_len) {
 		v1 = array[i];
 		v2 = array[i + 1];
 		halrf_cfg_rf_nctl_8852b(rf, v1, MASKDWORD, v2);
 		i += 2;
 	}
+	halrf_write_fwofld_end(rf);
 
 }
 
@@ -290,7 +292,7 @@ bool halrf_sel_headline_8852b(struct rf_info *rf, u32 *array, u32 array_len,
 		rfe_para = (array[i] & 0x00ff0000) >> 16; 
 		cv_para = array[i] & 0x0ff;
 		if (rfe_para == rfe_drv) {
-			if (cv_para > cv_max) {
+			if (cv_para >= cv_max) {
 				cv_max = cv_para;
 				*headline_idx = (u8)(i >> 1);
 				RF_DBG(rf, DBG_RF_INIT, "cv_max:%d\n", cv_max);
@@ -492,6 +494,8 @@ halrf_config_8852b_radio_a_reg(struct rf_info *rf, bool is_form_folder,
 	u8 h_size = 0;
 	u8 h_idx = 0;
 
+	halrf_write_fwofld_start(rf);
+
 	RF_DBG(rf, DBG_RF_INIT, "======> %s   is_form_folder=%d   folder_len=%d\n", __func__, is_form_folder, folder_len);
 
 	radio->write_times_a = 0;
@@ -574,6 +578,8 @@ halrf_config_8852b_radio_a_reg(struct rf_info *rf, bool is_form_folder,
 			break;
 		}
 	}
+
+	halrf_write_fwofld_end(rf);
 	RF_DBG(rf, DBG_RF_INIT, "RFCR Init Success\n");
 	halrf_config_8852b_write_radio_a_reg_to_fw(rf);
 
@@ -737,6 +743,8 @@ halrf_config_8852b_radio_b_reg(struct rf_info *rf, bool is_form_folder,
 	u8 h_size = 0;
 	u8 h_idx = 0;
 
+	halrf_write_fwofld_start(rf);
+
 	RF_DBG(rf, DBG_RF_INIT, "======> %s   is_form_folder=%d   folder_len=%d\n", __func__, is_form_folder, folder_len);
 
 	radio->write_times_b = 0;
@@ -819,6 +827,8 @@ halrf_config_8852b_radio_b_reg(struct rf_info *rf, bool is_form_folder,
 			break;
 		}
 	}
+
+	halrf_write_fwofld_end(rf);
 	RF_DBG(rf, DBG_RF_INIT, "RFCR Init Success\n");
 	halrf_config_8852b_write_radio_b_reg_to_fw(rf);
 #endif

@@ -160,8 +160,8 @@ struct rx_pkt_attrib {
 	u8	ack_policy;
 
 	u8	key_index;
-
-	u8	data_rate;
+	u16	data_rate; /* enum rtw_data_rate */
+	u8	gi_ltf;
 	u8 ch; /* RX channel */
 	u8	bw;
 	u8	stbc;

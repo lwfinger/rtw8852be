@@ -66,6 +66,7 @@ enum habb_fun_t {
 	F_AUTO_DBG		= 9,
 	F_ANT_DIV		= 10,
 	F_DIG			= 11,
+	F_UL_TB_CTRL		= 13,
 	F_DCR			= 31,
 	F_DEFAULT		= 0xff
 };
@@ -94,6 +95,8 @@ static const struct halbb_func_info halbb_func_i[] = {
 	{"auto_dbg", F_AUTO_DBG},
 	{"ant_div", F_ANT_DIV},
 	{"dig", F_DIG},
+
+	{"ul_tb", F_UL_TB_CTRL},
 };
 
 /*@=[HALBB supportability]=======================================*/
@@ -110,6 +113,7 @@ enum habb_supportability_t {
 	BB_AUTO_DBG		= BIT(F_AUTO_DBG),
 	BB_ANT_DIV		= BIT(F_ANT_DIV),
 	BB_DIG			= BIT(F_DIG),
+	BB_UL_TB_CTRL		= BIT(F_UL_TB_CTRL),
 	BB_DCR			= BIT(F_DCR)
 };
 
@@ -128,6 +132,7 @@ enum halbb_dbg_comp_t {
 	DBG_AUTO_DBG		= BIT(F_AUTO_DBG),
 	DBG_ANT_DIV		= BIT(F_ANT_DIV),
 	DBG_DIG			= BIT(F_DIG),
+	DBG_UL_TB_CTRL		= BIT(F_UL_TB_CTRL),
 	/*=== [Non-DM Part] ======================*/
 	DBG_BIT12		= BIT(12),
 	DBG_BIT13		= BIT(13),

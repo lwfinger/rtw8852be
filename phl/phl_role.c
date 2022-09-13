@@ -188,10 +188,8 @@ phl_get_wrole_by_addr(struct phl_info_t *phl_info, u8 *mac_addr)
 }
 
 struct rtw_wifi_role_t *
-phl_get_wrole_by_ridx(struct phl_info_t *phl_info, u8 rold_idx)
+rtw_phl_get_wrole_by_ridx(struct rtw_phl_com_t *phl_com, u8 rold_idx)
 {
-	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
-
 	if (rold_idx < MAX_WIFI_ROLE_NUMBER)
 		return &(phl_com->wifi_roles[rold_idx]);
 
@@ -397,6 +395,8 @@ _phl_wifi_role_free_sw(struct phl_info_t *phl_info, struct rtw_wifi_role_t *wrol
 	mr_ctl->role_map &= ~BIT(wrole->id);
 	_os_spinunlock(phl_to_drvpriv(phl_info), &mr_ctl->lock, _ps, NULL);
 	wrole->active = false;
+	wrole->mstate = MLME_NO_LINK;
+	wrole->type = PHL_RTYPE_NONE;
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
@@ -812,6 +812,11 @@ phl_wifi_role_change(struct phl_info_t *phl_info,
 			pstate = RTW_PHL_STATUS_SUCCESS;
 	}
 	break;
+	case WR_CHG_STBC_CFG:
+	{
+		phl_init_proto_stbc_cap(wrole, phl_info, &wrole->proto_role_cap);
+	}
+	break;
 	case WR_CHG_MAX:
 		PHL_TRACE(COMP_PHL_DBG, _PHL_ERR_,
 				"%s: Unsupported case:%d, please check it\n",
@@ -1094,7 +1099,7 @@ phl_role_recover(struct phl_info_t *phl_info)
 	enum rtw_phl_status pstatus;
 
 	for (role_idx = 0; role_idx < MAX_WIFI_ROLE_NUMBER; role_idx++) {
-		wrole = phl_get_wrole_by_ridx(phl_info, role_idx);
+		wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, role_idx);
 		if(wrole == NULL)
 			continue;
 
@@ -1148,8 +1153,11 @@ phl_role_suspend(struct phl_info_t *phl_info)
 	enum rtw_phl_status pstatus;
 
 	for (role_idx = 0; role_idx < MAX_WIFI_ROLE_NUMBER; role_idx++) {
-		wrole = phl_get_wrole_by_ridx(phl_info, role_idx);
-		if(wrole == NULL)
+		wrole = rtw_phl_get_wrole_by_ridx(phl_info->phl_com, role_idx);
+		if (wrole == NULL)
+			continue;
+
+		if (wrole->active == false)
 			continue;
 
 		PHL_INFO("%s with role_idx %d\n", __func__, role_idx);
@@ -1181,71 +1189,6 @@ phl_cmd_role_suspend(struct phl_info_t *phl_info)
 	pstatus = phl_role_suspend(phl_info);
 #endif
 	return pstatus;
-}
-
-#ifdef RTW_WKARD_LPS_ROLE_CONFIG
-void phl_role_recover_unused_role(struct phl_info_t *phl_info,
-	struct rtw_wifi_role_t *cur_wrole)
-{
-	u8 role_idx;
-	struct rtw_wifi_role_t * wrole;
-	enum rtw_hal_status hstatus;
-
-	if (cur_wrole == NULL) {
-		PHL_ERR("%s cur role is NULL\n", __func__);
-		return;
-	}
-
-	for (role_idx = 0; role_idx < MAX_WIFI_ROLE_NUMBER; role_idx++) {
-		wrole = phl_get_wrole_by_ridx(phl_info, role_idx);
-		if(wrole == NULL || !wrole->active)
-			continue;
-
-		if (wrole == cur_wrole)
-			continue;
-
-		hstatus = rtw_hal_role_cfg(phl_info->hal, wrole);
-		if (hstatus != RTW_HAL_STATUS_SUCCESS) {
-			PHL_ERR("%s fail to role cfg with id %d\n", __func__, role_idx);
-		} else {
-			PHL_INFO("%s recover role with id %d\n", __func__, role_idx);
-		}
-	}
-}
-
-void phl_role_suspend_unused_role(struct phl_info_t *phl_info,
-	struct rtw_wifi_role_t *cur_wrole)
-{
-	u8 role_idx;
-	struct rtw_wifi_role_t *wrole;
-	u32 func_en = false;
-
-	if (cur_wrole == NULL) {
-		PHL_ERR("%s cur role is NULL\n", __func__);
-		return;
-	}
-
-	for (role_idx = 0; role_idx < MAX_WIFI_ROLE_NUMBER; role_idx++) {
-		wrole = phl_get_wrole_by_ridx(phl_info, role_idx);
-		if(wrole == NULL || !wrole->active)
-			continue;
-
-		if (wrole == cur_wrole)
-			continue;
-
-		PHL_INFO("%s suspend role with id %d\n", __func__, role_idx);
-		rtw_hal_role_cfg_ex(phl_info->hal, wrole, PCFG_FUNC_SW, &func_en);
-	}
-}
-#endif
-
-bool rtw_phl_role_is_client_category(struct rtw_wifi_role_t *wrole)
-{
-	bool ret = false;
-
-	if (wrole->type == PHL_RTYPE_STATION || wrole->type == PHL_RTYPE_P2P_GC)
-		ret = true;
-	return ret;
 }
 
 u16 phl_role_get_bcn_intvl(struct phl_info_t *phl, struct rtw_wifi_role_t *wrole)

@@ -151,6 +151,16 @@ enum rtw_hal_status rtw_hal_efuse_get_offset_mask(struct hal_info_t *hal_info,
 	return status;
 }
 
+enum rtw_hal_status rtw_hal_efuse_get_mask_buf(struct hal_info_t *hal_info, 
+							u8 *destbuf, u32 *buflen)
+{
+	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
+
+	status = rtw_efuse_get_mask_buf(hal_info->efuse, destbuf, buflen);
+
+	return status;
+}
+
 enum rtw_hal_status
 rtw_hal_efuse_get_info(struct rtw_hal_com_t *hal_com,
 		       enum rtw_efuse_info info_type,
@@ -330,6 +340,15 @@ enum rtw_hal_status rtw_hal_efuse_bt_get_offset_mask(struct hal_info_t *hal_info
 	return status;
 }
 
+enum rtw_hal_status rtw_hal_efuse_bt_get_mask_buf(struct hal_info_t *hal_info,
+							u8 *destbuf, u32 *buflen)
+{
+	enum rtw_hal_status status = RTW_HAL_STATUS_FAILURE;
+
+	status = rtw_efuse_bt_get_mask_buf(hal_info->efuse, destbuf, buflen);
+
+	return status;
+}
 enum rtw_hal_status rtw_hal_efuse_bt_read_hidden(
 	struct hal_info_t *hal_info, u32 addr, u32 size, u8 *val)
 {

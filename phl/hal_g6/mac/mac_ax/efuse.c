@@ -21,6 +21,129 @@ u16 read_efuse_cnt = EFUSE_WAIT_CNT;
 bool OTP_test;
 enum rtw_dv_sel dv_sel = DDV;
 
+static struct efuse_info_item offset_pcie = {
+	0x400, /* mac_addr */
+	0, /* pid */
+	0x408, /* did */
+	0x406, /* vid */
+	0x40A, /* svid */
+	0x40C, /* smid */
+};
+
+static struct efuse_info_item offset_usb_8852a = {
+	0x438, /* mac_addr */
+	0x432, /* pid */
+	0, /* did */
+	0x430, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info_item offset_usb_8852b = {
+	0x488, /* mac_addr */
+	0x482, /* pid */
+	0, /* did */
+	0x480, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info_item offset_sdio = {
+	0x41A, /* mac_addr */
+	0, /* pid */
+	0, /* did */
+	0, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info_item def_val_pcie = {
+	0x0, /* mac_addr */
+	0, /* pid */
+	0x52, /* did */
+	0xEC, /* vid */
+	0xEC, /* svid */
+	0x52, /* smid */
+};
+
+static struct efuse_info_item def_val_usb_8852a = {
+	0x0, /* mac_addr */
+	0x5A, /* pid */
+	0, /* did */
+	0xDA, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info_item def_val_usb_8852b = {
+	0x0, /* mac_addr */
+	0x5B, /* pid */
+	0, /* did */
+	0xDA, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info_item def_val_sdio = {
+	0x0, /* mac_addr */
+	0, /* pid */
+	0, /* did */
+	0, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info_item len_pcie = {
+	6, /* mac_addr */
+	0, /* pid */
+	2, /* did */
+	2, /* vid */
+	2, /* svid */
+	2, /* smid */
+};
+
+static struct efuse_info_item len_usb = {
+	6, /* mac_addr */
+	2, /* pid */
+	0, /* did */
+	2, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info_item len_sdio = {
+	6, /* mac_addr */
+	0, /* pid */
+	0, /* did */
+	0, /* vid */
+	0, /* svid */
+	0, /* smid */
+};
+
+static struct efuse_info efuse_info_pcie = {
+	&offset_pcie, /* offset */
+	&def_val_pcie, /* def_val */
+	&len_pcie, /* len */
+};
+
+static struct efuse_info efuse_info_usb_8852a = {
+	&offset_usb_8852a, /* offset */
+	&def_val_usb_8852a, /* def_val */
+	&len_usb, /* len */
+};
+
+static struct efuse_info efuse_info_usb_8852b = {
+	&offset_usb_8852b, /* offset */
+	&def_val_usb_8852b, /* def_val */
+	&len_usb, /* len */
+};
+
+static struct efuse_info efuse_info_sdio = {
+	&offset_sdio, /* offset */
+	&def_val_sdio, /* def_val */
+	&len_sdio, /* len */
+};
+
 static u32 efuse_map_init(struct mac_ax_adapter *adapter,
 			  enum efuse_map_sel map_sel);
 static u32 efuse_fwcmd_ck(struct mac_ax_adapter *adapter);
@@ -66,7 +189,7 @@ static u32 query_status_map(struct mac_ax_adapter *adapter,
 			    u8 *map, bool is_limit);
 static u32 adjust_mask(struct mac_ax_adapter *adapter,
 		       struct mac_ax_pg_efuse_info *info);
-static u32 compare_info_length(enum mac_ax_intf intf,
+static u32 compare_info_length(struct efuse_info *info,
 			       enum rtw_efuse_info id, u32 length);
 static u32 set_check_sum_val(struct mac_ax_adapter *adapter,
 			     u8 *map, u16 value);
@@ -1597,70 +1720,61 @@ u32 mac_get_efuse_info(struct mac_ax_adapter *adapter, u8 *efuse_map,
 		       enum rtw_efuse_info id, void *value, u32 length,
 		       u8 *autoload_status)
 {
-	u32 offset = 0;
+	u32 offset, def_val;
 	u32 ret;
 	enum mac_ax_intf intf = adapter->hw_info->intf;
-	u8 default_value = 0;
+	struct efuse_info info;
 
-	ret = compare_info_length(intf, id, length);
-	if (ret != 0)
+	switch (intf) {
+	case MAC_AX_INTF_USB:
+		info = (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A)) ?
+		       efuse_info_usb_8852a : efuse_info_usb_8852b;
+		break;
+	case MAC_AX_INTF_PCIE:
+		info = efuse_info_pcie;
+		break;
+	case MAC_AX_INTF_SDIO:
+		info = efuse_info_sdio;
+		break;
+	default:
+		return MACINTF;
+	}
+
+	ret = compare_info_length(&info, id, length);
+	if (ret != MACSUCCESS)
 		return ret;
 
-	if (intf == MAC_AX_INTF_USB) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			offset = OFS_ADDR_AU;
-			default_value = VAL_ADDR_AU;
-			break;
-		case EFUSE_INFO_MAC_PID:
-			offset = OFS_PID_AU;
-			default_value = VAL_PID_AU;
-			break;
-		case EFUSE_INFO_MAC_VID:
-			offset = OFS_VID_AU;
-			default_value = VAL_VID_AU;
-			break;
-		default:
-			return MACNOITEM;
-		}
-	} else if (intf == MAC_AX_INTF_PCIE) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			offset = OFS_ADDR_AE;
-			default_value = VAL_ADDR_AE;
-			break;
-		case EFUSE_INFO_MAC_DID:
-			offset = OFS_DID_AE;
-			default_value = VAL_DID_AE;
-			break;
-		case EFUSE_INFO_MAC_VID:
-			offset = OFS_VID_AE;
-			default_value = VAL_VID_AE;
-			break;
-		case EFUSE_INFO_MAC_SVID:
-			offset = OFS_SVID_AE;
-			default_value = VAL_SVID_AE;
-			break;
-		case EFUSE_INFO_MAC_SMID:
-			offset = OFS_SMID_AE;
-			default_value = VAL_SMID_AE;
-			break;
-		default:
-			return MACNOITEM;
-		}
-	} else if (intf == MAC_AX_INTF_SDIO) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			offset = OFS_ADDR_AS;
-			default_value = VAL_ADDR_AS;
-			break;
-		default:
-			return MACNOITEM;
-		}
+	switch (id) {
+	case EFUSE_INFO_MAC_ADDR:
+		offset = info.offset->mac_addr;
+		def_val = info.def_val->mac_addr;
+		break;
+	case EFUSE_INFO_MAC_PID:
+		offset = info.offset->pid;
+		def_val = info.def_val->pid;
+		break;
+	case EFUSE_INFO_MAC_DID:
+		offset = info.offset->did;
+		def_val = info.def_val->did;
+		break;
+	case EFUSE_INFO_MAC_VID:
+		offset = info.offset->vid;
+		def_val = info.def_val->vid;
+		break;
+	case EFUSE_INFO_MAC_SVID:
+		offset = info.offset->svid;
+		def_val = info.def_val->svid;
+		break;
+	case EFUSE_INFO_MAC_SMID:
+		offset = info.offset->smid;
+		def_val = info.def_val->smid;
+		break;
+	default:
+		return MACNOITEM;
 	}
 
 	if (*autoload_status == 0)
-		PLTFM_MEMCPY(value, &default_value, 1);
+		PLTFM_MEMCPY(value, &def_val, 1);
 	else
 		PLTFM_MEMCPY(value, efuse_map + offset, length);
 
@@ -1670,56 +1784,51 @@ u32 mac_get_efuse_info(struct mac_ax_adapter *adapter, u8 *efuse_map,
 u32 mac_set_efuse_info(struct mac_ax_adapter *adapter, u8 *efuse_map,
 		       enum rtw_efuse_info id, void *value, u32 length)
 {
-	u32 offset = 0;
+	u32 offset;
 	u32 ret;
 	enum mac_ax_intf intf = adapter->hw_info->intf;
+	struct efuse_info info;
 
-	ret = compare_info_length(intf, id, length);
-	if (ret != 0)
+	switch (intf) {
+	case MAC_AX_INTF_USB:
+		info = (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A)) ?
+		       efuse_info_usb_8852a : efuse_info_usb_8852b;
+		break;
+	case MAC_AX_INTF_PCIE:
+		info = efuse_info_pcie;
+		break;
+	case MAC_AX_INTF_SDIO:
+		info = efuse_info_sdio;
+		break;
+	default:
+		return MACINTF;
+	}
+
+	ret = compare_info_length(&info, id, length);
+	if (ret != MACSUCCESS)
 		return ret;
 
-	if (intf == MAC_AX_INTF_USB) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			offset = OFS_ADDR_AU;
-			break;
-		case EFUSE_INFO_MAC_PID:
-			offset = OFS_PID_AU;
-			break;
-		case EFUSE_INFO_MAC_VID:
-			offset = OFS_VID_AU;
-			break;
-		default:
-			return MACNOITEM;
-		}
-	} else if (intf == MAC_AX_INTF_PCIE) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			offset = OFS_ADDR_AE;
-			break;
-		case EFUSE_INFO_MAC_DID:
-			offset = OFS_DID_AE;
-			break;
-		case EFUSE_INFO_MAC_VID:
-			offset = OFS_VID_AE;
-			break;
-		case EFUSE_INFO_MAC_SVID:
-			offset = OFS_SVID_AE;
-			break;
-		case EFUSE_INFO_MAC_SMID:
-			offset = OFS_SMID_AE;
-			break;
-		default:
-			return MACNOITEM;
-		}
-	} else if (intf == MAC_AX_INTF_SDIO) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			offset = OFS_ADDR_AS;
-			break;
-		default:
-			return MACNOITEM;
-		}
+	switch (id) {
+	case EFUSE_INFO_MAC_ADDR:
+		offset = info.offset->mac_addr;
+		break;
+	case EFUSE_INFO_MAC_PID:
+		offset = info.offset->pid;
+		break;
+	case EFUSE_INFO_MAC_DID:
+		offset = info.offset->did;
+		break;
+	case EFUSE_INFO_MAC_VID:
+		offset = info.offset->vid;
+		break;
+	case EFUSE_INFO_MAC_SVID:
+		offset = info.offset->svid;
+		break;
+	case EFUSE_INFO_MAC_SMID:
+		offset = info.offset->smid;
+		break;
+	default:
+		return MACNOITEM;
 	}
 
 	PLTFM_MEMCPY(efuse_map + offset, value, length);
@@ -2181,7 +2290,6 @@ u32 mac_check_OTP(struct mac_ax_adapter *adapter, u8 is_start)
 {
 #define is_read 0
 #define secure 1
-	u32 ret;
 	u8 val8;
 
 	if (is_start == 1) {
@@ -2190,8 +2298,8 @@ u32 mac_check_OTP(struct mac_ax_adapter *adapter, u8 is_start)
 		mac_set_efuse_ctrl(adapter, secure);
 		read_efuse_cnt = CHK_OTP_WAIT_CNT;
 
-		ret = mac_read_efuse_plus(adapter, CHK_OTP_ADDR, 1, &val8,
-					  MAC_AX_EFUSE_BANK_WIFI);
+		mac_read_efuse_plus(adapter, CHK_OTP_ADDR, 1, &val8,
+				    MAC_AX_EFUSE_BANK_WIFI);
 
 		disable_efuse_sw_pwr_cut(adapter, is_read);
 
@@ -2512,6 +2620,11 @@ static u32 read_hw_efuse(struct mac_ax_adapter *adapter, u32 offset, u32 size,
 				    & ~B_AX_EF_RDY);
 
 			cnt = read_efuse_cnt;
+			if ((is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
+			     is_chip_id(adapter, MAC_AX_CHIP_ID_8852C)) &&
+			    efuse_ctrl == R_AX_EFUSE_CTRL)
+				cnt = EFUSE_WAIT_CNT_PLUS;
+
 			while (--cnt) {
 				tmp32 = MAC_REG_R32(efuse_ctrl);
 				if (tmp32 & B_AX_EF_RDY)
@@ -3427,59 +3540,38 @@ static u32 adjust_mask(struct mac_ax_adapter *adapter,
 	return MACSUCCESS;
 }
 
-static u32 compare_info_length(enum mac_ax_intf intf,
+static u32 compare_info_length(struct efuse_info *info,
 			       enum rtw_efuse_info id, u32 length)
 {
-	u32 idle_len = 0;
+	u32 idle_len;
 
-	if (intf == MAC_AX_INTF_USB) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			idle_len = LEN_ADDR_AU;
-			break;
-		case EFUSE_INFO_MAC_PID:
-			idle_len = LEN_PID_AU;
-			break;
-		case EFUSE_INFO_MAC_VID:
-			idle_len = LEN_VID_AU;
-			break;
-		default:
-			return MACNOITEM;
-		}
-	} else if (intf == MAC_AX_INTF_PCIE) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			idle_len = LEN_ADDR_AE;
-			break;
-		case EFUSE_INFO_MAC_DID:
-			idle_len = LEN_DID_AE;
-			break;
-		case EFUSE_INFO_MAC_VID:
-			idle_len = LEN_VID_AE;
-			break;
-		case EFUSE_INFO_MAC_SVID:
-			idle_len = LEN_SVID_AE;
-			break;
-		case EFUSE_INFO_MAC_SMID:
-			idle_len = LEN_SMID_AE;
-			break;
-		default:
-			return MACNOITEM;
-		}
-	} else if (intf == MAC_AX_INTF_SDIO) {
-		switch (id) {
-		case EFUSE_INFO_MAC_ADDR:
-			idle_len = LEN_ADDR_AS;
-			break;
-		default:
-			return MACNOITEM;
-		}
+	switch (id) {
+	case EFUSE_INFO_MAC_ADDR:
+		idle_len = info->len->mac_addr;
+		break;
+	case EFUSE_INFO_MAC_PID:
+		idle_len = info->len->pid;
+		break;
+	case EFUSE_INFO_MAC_DID:
+		idle_len = info->len->did;
+		break;
+	case EFUSE_INFO_MAC_VID:
+		idle_len = info->len->vid;
+		break;
+	case EFUSE_INFO_MAC_SVID:
+		idle_len = info->len->svid;
+		break;
+	case EFUSE_INFO_MAC_SMID:
+		idle_len = info->len->smid;
+		break;
+	default:
+		return MACNOITEM;
 	}
 
 	if (length != idle_len || idle_len == 0)
 		return MACLENCMP;
-	else
-		return MACSUCCESS;
+
+	return MACSUCCESS;
 }
 
 static u32 set_check_sum_val(struct mac_ax_adapter *adapter,

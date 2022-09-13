@@ -142,7 +142,7 @@ bool halrf_wl_tx_power_control_8852b(struct rf_info *rf, u32 tx_power_val)
 
 	if (pwr->coex_pwr_ctl_enable == false && pwr->dpk_pwr_ctl_enable == false) {
 		/*all-time control Disable*/
-		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd200, 0xfffffc00, 0x0);
+		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd200, 0x3ff, 0x0);
 
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd200) fail, error code=%d\n",
@@ -154,7 +154,7 @@ bool halrf_wl_tx_power_control_8852b(struct rf_info *rf, u32 tx_power_val)
 		}
 	} else {
 		/*all-time control*/
-		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd200, 0xfffffc00, ((tmp_pwr & 0x1ff) | BIT(9)));
+		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd200, 0x3ff, ((tmp_pwr & 0x1ff) | BIT(9)));
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd200) fail, error code=%d\n",
 				__func__, result);
@@ -172,7 +172,7 @@ bool halrf_wl_tx_power_control_8852b(struct rf_info *rf, u32 tx_power_val)
 			__func__, gnt_bt_control);
 
 		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd220, BIT(1), 0x0);
-		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd220, 0xfffff007, 0x0);
+		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd220, 0xff8, 0x0);
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd220) fail, error code=%d\n",
 				__func__, result);
@@ -188,7 +188,7 @@ bool halrf_wl_tx_power_control_8852b(struct rf_info *rf, u32 tx_power_val)
 			__func__, gnt_bt_control);
 
 		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd220, BIT(1), 0x1);
-		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd220, 0xfffff007, ((gnt_bt_control & 0x1ff) << 3));
+		result = halrf_mac_set_pwr_reg_8852b(rf, phy, 0xd220, 0xff8, gnt_bt_control & 0x1ff);
 		if (result) {
 			RF_WARNING("=======>%s Set MAC(0xd220) fail, error code=%d\n",
 				__func__, result);

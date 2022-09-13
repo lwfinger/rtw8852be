@@ -34,5 +34,5 @@ extern bool rtw_halbb_dft_mask(struct bb_info *bb, struct rtw_phl_stainfo_t *phl
 extern bool rtw_halbb_ra_deregistered(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i);
 extern bool rtw_halbb_query_txsts(struct bb_info *bb, u16 macid0, u16 macid1);
 void halbb_drv_cmac_rpt_parsing(struct bb_info *bb, u8 *rpt);
-
+bool halbb_ra_rssi_update_trigger(struct bb_info *bb, struct rtw_phl_stainfo_t *phl_sta_i);
 #endif

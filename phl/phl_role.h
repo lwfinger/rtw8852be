@@ -24,7 +24,7 @@ phl_register_mrc_module(struct phl_info_t *phl_info);
 #endif
 
 struct rtw_wifi_role_t *
-phl_get_wrole_by_ridx(struct phl_info_t *phl_info, u8 rold_idx);
+rtw_phl_get_wrole_by_ridx(struct rtw_phl_com_t *phl_com, u8 rold_idx);
 
 struct rtw_wifi_role_t *
 phl_get_wrole_by_addr(struct phl_info_t *phl_info, u8 *mac_addr);
@@ -47,13 +47,6 @@ phl_role_suspend(struct phl_info_t *phl_info);
 enum rtw_phl_status
 phl_cmd_role_suspend(struct phl_info_t *phl_info);
 
-#ifdef RTW_WKARD_LPS_ROLE_CONFIG
-void phl_role_recover_unused_role(struct phl_info_t *phl_info,
-	struct rtw_wifi_role_t *cur_wrole);
-void phl_role_suspend_unused_role(struct phl_info_t *phl_info,
-	struct rtw_wifi_role_t *cur_wrole);
-#endif
-
 #ifdef RTW_PHL_BCN
 enum rtw_phl_status
 rtw_phl_free_bcn_entry(void *phl, struct rtw_wifi_role_t *wrole);
@@ -64,8 +57,6 @@ enum rtw_phl_status
 phl_cmd_stop_bcn_hdl(struct phl_info_t *phl_info, u8 *param);
 #endif
 #endif
-
-bool rtw_phl_role_is_client_category(struct rtw_wifi_role_t *wrole);
 
 u16 phl_role_get_bcn_intvl(struct phl_info_t *phl, struct rtw_wifi_role_t *wrole);
 

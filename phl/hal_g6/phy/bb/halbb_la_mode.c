@@ -34,7 +34,6 @@
 #define SET_MAC_GET_BUF_RPT 1
 
 #if (SET_MAC_GET_BUF_RPT)
-
 u8 halbb_la_ptrn_chk(struct bb_info *bb)
 {
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
@@ -47,6 +46,11 @@ u8 halbb_la_ptrn_chk(struct bb_info *bb)
 	u32 mask_tmp = 0;
 	u32 val_tmp = 0;
 	u32 data_msb_tmp = 0;
+
+	if (!la->la_ptrn_chk_en) {
+		BB_TRACE("la_ptrn_chk_en=%d\n", la->la_ptrn_chk_en);
+		return 0;
+	}
 
 	for (i = 0; i < LA_CHK_PTRN_NUM; i++) {
 		BB_TRACE("[%d] point=%05d, chk_mask=0x%08x, chk_val=0x%x\n",
@@ -65,9 +69,10 @@ u8 halbb_la_ptrn_chk(struct bb_info *bb)
 		val_tmp = la->la_ptrn_chk_i[i].la_ptrn_chk_val;
 
 		idx = point_tmp << 1;
-		data_msb_tmp = buf->octet[idx + 1];
+		data_msb_tmp = SWAP4BYTE(buf->octet[idx + 1]);
 		BB_TRACE("[%d] [Point:%d] %08x | %08x\n",
-			 i, point_tmp, buf->octet[idx + 1], buf->octet[idx]);
+			 i, point_tmp, SWAP4BYTE(buf->octet[idx + 1]),
+			 SWAP4BYTE(buf->octet[idx]));
 
 		if (mask_tmp != MASKDWORD)
 			shift = halbb_cal_bit_shift(mask_tmp);
@@ -86,6 +91,9 @@ u8 halbb_la_ptrn_chk(struct bb_info *bb)
 
 	BB_TRACE("pattern_match=%d, ptrn_match_num=%d\n", ptrn_match, ptrn_match_num);
 
+	if (ptrn_match)
+		la->la_count = 0;
+
 	return ptrn_match;
 }
 
@@ -93,7 +101,7 @@ void halbb_la_rpt_buf_get(struct bb_info *bb, u16 finish_ofst, bool is_round_up)
 {
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
 	struct la_string_info *buf = &la->la_string_i;
-	bool la_ptrn_match;
+	u8 la_ptrn_match;
 	u32 i = 0;
 	u32 addr = 0, start_addr = 0, finish_addr = 0; /* @(unit: Byte)*/
 	u32 round_up_size = 0;
@@ -151,12 +159,12 @@ void halbb_la_rpt_buf_get(struct bb_info *bb, u16 finish_ofst, bool is_round_up)
 
 	la_ptrn_match = halbb_la_ptrn_chk(bb);
 
-	BB_TRACE("[Dump_End], la_ptrn_match=%d\n", la_ptrn_match);
+	BB_TRACE("[Dump_End], la_ptrn_match=%d, la_count=%d\n",
+		 la_ptrn_match, la->la_count);
 }
 #endif
 
 #if (SET_MAC_CFG)
-
 void halbb_la_set_mac_trig_time(struct bb_info *bb, u32 trig_time, u8 *unit, u8 *unit_num)
 {
 	u32 ref_time = 128;
@@ -192,7 +200,6 @@ bool halbb_la_mac_cfg_buf(struct bb_info *bb, enum la_buff_mode_t mode)
 	u32 buf_size_tmp = 0;
 
 	switch (bb->ic_type) {
-	case BB_RTL8852AA:
 	case BB_RTL8852A:
 		if (mode == LA_BUFF_256K)
 			buf->buffer_size = 0x40000; /*2^18=(2^8)*(2^10)=256K Byte*/
@@ -206,6 +213,20 @@ bool halbb_la_mac_cfg_buf(struct bb_info *bb, enum la_buff_mode_t mode)
 			buf->buffer_size = 0x20000; /*2^17=(2^7)*(2^10)=128K Byte*/
 		else if (mode == LA_BUFF_64K && bb->hal_com->cv >= CBV)
 			buf->buffer_size = 0x10000; /*2^16=(2^6)*(2^10)=64K Byte*/
+		else
+			buf->buffer_size = 0;
+		break;
+	case BB_RTL8852C:
+		if (mode == LA_BUFF_256K)
+			buf->buffer_size = 0x40000; /*2^18=(2^8)*(2^10)=256K Byte*/
+		else if (mode == LA_BUFF_128K)
+			buf->buffer_size = 0x20000; /*2^17=(2^7)*(2^10)=128K Byte*/
+		else
+			buf->buffer_size = 0;
+		break;
+	case BB_RTL8192XB:
+		if (mode == LA_BUFF_256K)
+			buf->buffer_size = 0x40000; /*2^18=(2^8)*(2^10)=256K Byte*/
 		else
 			buf->buffer_size = 0;
 		break;
@@ -239,31 +260,41 @@ bool halbb_la_mac_cfg_buf(struct bb_info *bb, enum la_buff_mode_t mode)
 	return true;
 }
 
-bool halbb_la_mac_cfg_buf_default(struct bb_info *bb)
+void halbb_la_mac_cfg_buf_default(struct bb_info *bb)
 {
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
-	enum la_buff_mode_t mode;
+	struct la_string_info *buf = &la->la_string_i;
+	enum la_buff_mode_t mode = LA_BUFF_192K;
 
 	switch (bb->ic_type) {
 	case BB_RTL8852A:
 		mode = LA_BUFF_256K;
+		buf->buffer_size = 0x40000; /*2^18=(2^8)*(2^10)=256K Byte*/
 		break;
 	case BB_RTL8852B:
-		if (bb->hal_com->cv == CAV)
+		if (bb->hal_com->cv == CAV) {
 			mode = LA_BUFF_128K;
-		else
+			buf->buffer_size = 0x20000; /*2^17=(2^7)*(2^10)=128K Byte*/
+		} else {
 			mode = LA_BUFF_64K;
+			buf->buffer_size = 0x10000; /*2^16=(2^6)*(2^10)=64K Byte*/
+		}
 		break;
 	case BB_RTL8852C:
-		mode = LA_BUFF_256K; /*TBD*/
+		mode = LA_BUFF_256K;
+		buf->buffer_size = 0x40000; /*2^18=(2^8)*(2^10)=256K Byte*/
+		break;
+	case BB_RTL8192XB:
+		mode = LA_BUFF_256K;
+		buf->buffer_size = 0x40000; /*2^18=(2^8)*(2^10)=256K Byte*/
 		break;
 	default:
-		return false;
+		BB_WARNING("[%s]\n", __func__);
 	}
 	la->la_mac_cfg_i.mac_la_buf_sel = mode;
-	BB_TRACE("Auto Init MAC BUF CR, mode=(%d)K\n", 64 * (mode + 1));
+	//BB_TRACE("Auto Init MAC BUF CR, mode=(%d)K\n", 64 * (mode + 1));
 
-	return halbb_la_mac_cfg_buf(bb, mode);
+	buf->smp_number_max = buf->buffer_size >> 3;
 }
 
 void halbb_la_mac_cfg_cmn(struct bb_info *bb)
@@ -339,12 +370,13 @@ void halbb_la_mac_set_trig(struct bb_info *bb, bool mac_trig_en)
 		      trig_mac->la_mac_and1_en);
 	halbb_set_reg(bb, cr->la_mac_and2_en, cr->la_mac_and2_en_m,
 		      trig_mac->la_mac_and2_en);
-	halbb_set_reg(bb, 0xd04, 0xf, trig_mac->la_mac_and2_frame_sel); /*HW error*/
+	halbb_set_reg(bb, cr->la_mac_and2_frame_sel,
+		      cr->la_mac_and2_frame_sel_m,
+		      trig_mac->la_mac_and2_frame_sel);
 }
 #endif
 
-#if (SET_BB_DMA_FMT)
-
+#if SET_BB_DMA_FMT
 void halbb_la_bb_set_dma_type(struct bb_info *bb)
 {
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
@@ -384,6 +416,11 @@ void halbb_la_bb_set_dma_type(struct bb_info *bb)
 		      dma->dma_c_src_sel);
 	halbb_set_reg(bb, cr->dma_d_src_sel, cr->dma_d_src_sel_m,
 		      dma->dma_d_src_sel);
+
+	BB_TRACE("DMA_hdr[63:60]=[%d, %d, %d, %d]\n",
+		 dma->dma_hdr_sel_63, dma->dma_hdr_sel_62,
+		 dma->dma_hdr_sel_61, dma->dma_hdr_sel_60);
+
 	halbb_set_reg(bb, cr->dma_hdr_sel_63, cr->dma_hdr_sel_63_m,
 		      dma->dma_hdr_sel_63);
 	halbb_set_reg(bb, cr->dma_hdr_sel_62, cr->dma_hdr_sel_62_m,
@@ -408,7 +445,7 @@ void halbb_la_bb_set_dma_type_reset(struct bb_info *bb)
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
 	struct la_dma_info	*dma = &la->la_dma_i;
 	
-	dma->dma_dbgport_base_n = 0;
+	dma->dma_dbgport_base_n = 31;
 	dma->dma_a_path_sel = 0;
 	dma->dma_b_path_sel = 1;
 	dma->dma_c_path_sel = 2;
@@ -418,11 +455,11 @@ void halbb_la_bb_set_dma_type_reset(struct bb_info *bb)
 	dma->dma_c_src_sel = 3;
 	dma->dma_d_src_sel = 3;
 	dma->dma_dbgport_phy_sel = 0;
-	dma->dma_hdr_sel_63 = 1;
-	dma->dma_hdr_sel_62 = 4;
-	dma->dma_hdr_sel_61 = 8;
-	dma->dma_hdr_sel_60 = 13;
-	dma->dma_data_type = 1;
+	dma->dma_hdr_sel_63 = LA_HDR_CCA;
+	dma->dma_hdr_sel_62 = LA_HDR_AGC_RDY;
+	dma->dma_hdr_sel_61 = LA_HDR_RXHE_FULLBAND;
+	dma->dma_hdr_sel_60 = LA_HDR_CRC_OK;
+	dma->dma_data_type = DMA01_NRML_2s_12b;
 }
 
 #endif
@@ -442,7 +479,7 @@ void halbb_la_bb_set_cmn_reset(struct bb_info *bb)
 
 	la->la_trigger_cnt = 0;
 	la->la_dbg_port = 0x10205;
-	la->la_trigger_edge = 0;
+	la->la_trigger_edge = LA_P_EDGE;
 	la->la_smp_rate = LA_SMP_CLK_80;
 	la->la_mac_cfg_i.la_trigger_time = 404;
 	la->la_polling_cnt = 20;
@@ -455,10 +492,6 @@ void halbb_la_bb_set_re_trig_reset(struct bb_info *bb)
 	struct la_re_trig_info *re_trig = &la->la_re_trig_i;
 
 	halbb_mem_set(bb, re_trig, 0, sizeof(struct la_re_trig_info));
-
-	if (bb->ic_type == BB_RTL8852AA)
-		re_trig->la_re_and0_sel = 2;
-
 }
 
 void halbb_la_bb_set_re_trig(struct bb_info *bb, bool re_trig_en)
@@ -468,15 +501,12 @@ void halbb_la_bb_set_re_trig(struct bb_info *bb, bool re_trig_en)
 	struct rtw_hal_com_t *hal_i = bb->hal_com;
 	struct bb_la_cr_info *cr = &la->bb_la_cr_i;
 
-	/*Since HW bug, 52A CAV use re-trigger to set LA mode stop condition*/
-	if (bb->ic_type != BB_RTL8852AA) {
-		if (!re_trig_en) {
-			halbb_set_reg(bb, cr->la_re_and1_sel,
-				      cr->la_re_and1_sel_m, 0);/*1b'1*/
-			halbb_set_reg(bb, cr->la_re_and1_inv,
-				      cr->la_re_and1_inv_m, 1);
-			return;
-		}
+	if (!re_trig_en) {
+		halbb_set_reg(bb, cr->la_re_and1_sel,
+			      cr->la_re_and1_sel_m, 0);/*1b'1*/
+		halbb_set_reg(bb, cr->la_re_and1_inv,
+			      cr->la_re_and1_inv_m, 1);
+		return;
 	}
 
 	halbb_set_reg(bb, cr->la_re_trig_edge, cr->la_re_trig_edge_m,
@@ -629,7 +659,7 @@ void halbb_la_bb_set_general(struct bb_info *bb)
 	u32 la_top_trig = 1;
 
 	BB_TRACE("3. [BB Setting] Edge=(%s), smp_rate=(%dM), Dma_type=(%d)\n",
-		 (la->la_trigger_edge == 0) ? "P" : "N",
+		 (la->la_trigger_edge == LA_P_EDGE) ? "P" : "N",
 		 80 >> la->la_smp_rate, dma->dma_data_type);
 
 	rdrdy_3_phase_en = (dma->dma_data_type == DMA13_MPHS_1s_3p_10b) ? 1 : 0;
@@ -645,7 +675,8 @@ void halbb_la_bb_set_general(struct bb_info *bb)
 }
 
 #endif
-#if (LAMODE_MAIN)
+
+#if LAMODE_MAIN
 void
 halbb_la_drv_buf_release(struct bb_info *bb)
 {
@@ -768,13 +799,15 @@ void halbb_la_main(struct bb_info *bb)
 	halbb_la_stop(bb);
 	
 	BB_TRACE("[LA mode] la_count = ((%d))\n", la->la_count);
-	if (la->la_count == 0) {
+	if (la->la_count <= 1) {
 		BB_TRACE("LA Dump finished ---------->\n\n\n");
 		halbb_release_bb_dbg_port(bb);
 	} else {
 		la->la_count--;
 		BB_TRACE("LA Dump more ---------->\n\n\n");
-		halbb_la_run(bb);
+
+		la->la_timer_i.cb_time = 500;
+		halbb_cfg_timers(bb, BB_SET_TIMER, &la->la_timer_i);
 	}
 }
 
@@ -798,10 +831,10 @@ void halbb_la_run(struct bb_info *bb)
 	struct la_string_info *buf = &la->la_string_i;
 	bool is_set_success = true;
 
-	BB_TRACE("[%s] LA_State=(%d)\n", __func__, la->la_mode_state);
+	BB_TRACE("[%s] LA_State=(%d), mode=%d\n", __func__, la->la_mode_state, la->la_run_mode);
 
 	if (!la->la_mac_cfg_i.mac_alloc_success) {
-		la->la_mac_cfg_i.mac_alloc_success = halbb_la_mac_cfg_buf_default(bb);
+		la->la_mac_cfg_i.mac_alloc_success = halbb_la_mac_cfg_buf(bb, la->la_mac_cfg_i.mac_la_buf_sel);
 		if (!la->la_mac_cfg_i.mac_alloc_success) {
 			BB_WARNING("MAC BUF CR set fail)\n");
 			return;
@@ -845,6 +878,7 @@ void halbb_la_reset(struct bb_info *bb)
 	la->la_mode_state = LA_STATE_IDLE;
 	la->la_print_i.is_la_print = false;
 	la->not_stop_trig = false;
+	la->la_and0_bit_sel = 0;
 
 	halbb_la_bb_set_cmn_reset(bb);
 	halbb_la_bb_set_dma_type_reset(bb);
@@ -860,10 +894,13 @@ void halbb_la_init(struct bb_info *bb)
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
 	struct la_string_info *buf = &la->la_string_i;
 
+	la->la_ptrn_chk_en = false;
 	la->la_mac_cfg_i.mac_alloc_success = false;
+	la->la_count_max = 1;
 	buf->length = 0;
 	halbb_la_reset(bb);
 	halbb_mem_set(bb, la->la_ptrn_chk_i, 0, sizeof(struct la_ptrn_chk_info) * LA_CHK_PTRN_NUM);
+	halbb_la_mac_cfg_buf_default(bb);
 }
 
 void halbb_cr_cfg_la_init(struct bb_info *bb)
@@ -872,129 +909,6 @@ void halbb_cr_cfg_la_init(struct bb_info *bb)
 
 	switch (bb->cr_type) {
 
-	#ifdef HALBB_52AA_SERIES
-	case BB_52AA:
-		cr->la_clk_en = LA_CKEN_52AA;
-		cr->la_clk_en_m = LA_CKEN_52AA_M;
-		cr->la_en = LA_EN_52AA;
-		cr->la_en_m = LA_EN_52AA_M;
-		cr->dma_dbgport_base_n = LA_DBGPORT_BASE_N_52AA;
-		cr->dma_dbgport_base_n_m = LA_DBGPORT_BASE_N_52AA_M;
-		cr->dma_a_path_sel = LA_TYPEA_PATH_SEL_52AA;
-		cr->dma_a_path_sel_m = LA_TYPEA_PATH_SEL_52AA_M;
-		cr->dma_b_path_sel = LA_TYPEB_PATH_SEL_52AA;
-		cr->dma_b_path_sel_m = LA_TYPEB_PATH_SEL_52AA_M;
-		cr->dma_c_path_sel = LA_TYPEC_PATH_SEL_52AA;
-		cr->dma_c_path_sel_m = LA_TYPEC_PATH_SEL_52AA_M;
-		cr->dma_d_path_sel = LA_TYPED_PATH_SEL_52AA;
-		cr->dma_d_path_sel_m = LA_TYPED_PATH_SEL_52AA_M;
-		cr->dma_a_src_sel = LA_TYPEA_SRC_SEL_52AA;
-		cr->dma_a_src_sel_m = LA_TYPEA_SRC_SEL_52AA_M;
-		cr->dma_b_src_sel = LA_TYPEB_SRC_SEL_52AA;
-		cr->dma_b_src_sel_m = LA_TYPEB_SRC_SEL_52AA_M;
-		cr->dma_c_src_sel = LA_TYPEC_SRC_SEL_52AA;
-		cr->dma_c_src_sel_m = LA_TYPEC_SRC_SEL_52AA_M;
-		cr->dma_d_src_sel = LA_TYPED_SRC_SEL_52AA;
-		cr->dma_d_src_sel_m = LA_TYPED_SRC_SEL_52AA_M;
-		cr->la_smp_rate = LA_SMP_RT_SEL_52AA;
-		cr->la_smp_rate_m = LA_SMP_RT_SEL_52AA_M;
-		cr->rdrdy_3_phase_en = LA_RDRDY_3PHASE_EN_52AA;
-		cr->rdrdy_3_phase_en_m = LA_RDRDY_3PHASE_EN_52AA_M;
-		cr->la_trigger_edge = LA_EDGE_SEL_52AA;
-		cr->la_trigger_edge_m = LA_EDGE_SEL_52AA_M;
-		cr->dma_hdr_sel_63 = LA_HDR_SEL_63_52AA;
-		cr->dma_hdr_sel_63_m = LA_HDR_SEL_63_52AA_M;
-		cr->dma_hdr_sel_62 = LA_HDR_SEL_62_52AA;
-		cr->dma_hdr_sel_62_m = LA_HDR_SEL_62_52AA_M;
-		cr->dma_hdr_sel_61 = LA_HDR_SEL_61_52AA;
-		cr->dma_hdr_sel_61_m = LA_HDR_SEL_61_52AA_M;
-		cr->dma_hdr_sel_60 = LA_HDR_SEL_60_52AA;
-		cr->dma_hdr_sel_60_m = LA_HDR_SEL_60_52AA_M;
-		cr->dma_a_ck160_dly_en = LA_TYPEA_CK160_DLY_EN_52AA;
-		cr->dma_a_ck160_dly_en_m = LA_TYPEA_CK160_DLY_EN_52AA_M;
-		cr->dma_b_ck160_dly_en = LA_TYPEB_CK160_DLY_EN_52AA;
-		cr->dma_b_ck160_dly_en_m = LA_TYPEB_CK160_DLY_EN_52AA_M;
-		cr->dma_dbgport_phy_sel = LA_DBGPORT_SRC_SEL_52AA;
-		cr->dma_dbgport_phy_sel_m = LA_DBGPORT_SRC_SEL_52AA_M;
-		cr->dma_data_type = LA_DATA_52AA;
-		cr->dma_data_type_m = LA_DATA_52AA_M;
-		cr->r_dma_rdrdy = LA_RDRDY_52AA;
-		cr->r_dma_rdrdy_m = LA_RDRDY_52AA_M;
-		cr->la_and0_bit_sel = LA_TRIG_52AA;
-		cr->la_and0_bit_sel_m = LA_TRIG_52AA_M;
-		cr->la_trigger_cnt = LA_TRIG_CNT_52AA;
-		cr->la_trigger_cnt_m = LA_TRIG_CNT_52AA_M;
-		cr->and0_trig_disable = LA_TRIG_NEW_ONLY_52AA;
-		cr->and0_trig_disable_m = LA_TRIG_NEW_ONLY_52AA_M;
-		cr->la_and1_inv = LA_TRIG_AND1_INV_52AA;
-		cr->la_and1_inv_m = LA_TRIG_AND1_INV_52AA_M;
-		cr->la_and2_en = LA_TRIG_AND2_EN_52AA;
-		cr->la_and2_en_m = LA_TRIG_AND2_EN_52AA_M;
-		cr->la_and2_inv = LA_TRIG_AND2_INV_52AA;
-		cr->la_and2_inv_m = LA_TRIG_AND2_INV_52AA_M;
-		cr->la_and3_en = LA_TRIG_AND3_EN_52AA;
-		cr->la_and3_en_m = LA_TRIG_AND3_EN_52AA_M;
-		cr->la_and3_inv = LA_TRIG_AND3_INV_52AA;
-		cr->la_and3_inv_m = LA_TRIG_AND3_INV_52AA_M;
-		cr->la_and4_en = LA_TRIG_AND4_EN_52AA;
-		cr->la_and4_en_m = LA_TRIG_AND4_EN_52AA_M;
-		cr->la_and4_rate = LA_TRIG_AND4_VAL_52AA;
-		cr->la_and4_rate_m = LA_TRIG_AND4_VAL_52AA_M;
-		cr->la_and4_inv = LA_TRIG_AND4_INV_52AA;
-		cr->la_and4_inv_m = LA_TRIG_AND4_INV_52AA_M;
-		cr->la_and1_mask = LA_TRIG_AND1_BIT_EN_52AA;
-		cr->la_and1_mask_m = LA_TRIG_AND1_BIT_EN_52AA_M;
-		cr->la_and1_val = LA_TRIG_AND1_VAL_52AA;
-		cr->la_and1_val_m = LA_TRIG_AND1_VAL_52AA_M;
-		cr->la_and2_mask = LA_TRIG_AND2_MASK_52AA;
-		cr->la_and2_mask_m = LA_TRIG_AND2_MASK_52AA_M;
-		cr->la_and2_val = LA_TRIG_AND2_VAL_52AA;
-		cr->la_and2_val_m = LA_TRIG_AND2_VAL_52AA_M;
-		cr->la_and3_mask = LA_TRIG_AND3_MASK_52AA;
-		cr->la_and3_mask_m = LA_TRIG_AND3_MASK_52AA_M;
-		cr->la_and3_val = LA_TRIG_AND3_VAL_52AA;
-		cr->la_and3_val_m = LA_TRIG_AND3_VAL_52AA_M;
-		cr->la_and5_sel = LA_TRIG_AND5_52AA;
-		cr->la_and5_sel_m = LA_TRIG_AND5_52AA_M;
-		cr->la_and5_val = LA_TRIG_AND5_VAL_52AA;
-		cr->la_and5_val_m = LA_TRIG_AND5_VAL_52AA_M;
-		cr->la_and5_inv = LA_TRIG_AND5_INV_52AA;
-		cr->la_and5_inv_m = LA_TRIG_AND5_INV_52AA_M;
-		cr->la_and6_sel = LA_TRIG_AND6_52AA;
-		cr->la_and6_sel_m = LA_TRIG_AND6_52AA_M;
-		cr->la_and6_val = LA_TRIG_AND6_VAL_52AA;
-		cr->la_and6_val_m = LA_TRIG_AND6_VAL_52AA_M;
-		cr->la_and6_inv = LA_TRIG_AND6_INV_52AA;
-		cr->la_and6_inv_m = LA_TRIG_AND6_INV_52AA_M;
-		cr->la_and7_sel = LA_TRIG_AND7_52AA;
-		cr->la_and7_sel_m = LA_TRIG_AND7_52AA_M;
-		cr->la_and7_val = LA_TRIG_AND7_VAL_52AA;
-		cr->la_and7_val_m = LA_TRIG_AND7_VAL_52AA_M;
-		cr->la_and7_inv = LA_TRIG_AND7_INV_52AA;
-		cr->la_and7_inv_m = LA_TRIG_AND7_INV_52AA_M;
-		cr->la_mac_and1_en = LA_M_AND1_EN_52AA;
-		cr->la_mac_and1_en_m = LA_M_AND1_EN_52AA_M;
-		cr->la_mac_and2_en = LA_M_AND2_EN_52AA;
-		cr->la_mac_and2_en_m = LA_M_AND2_EN_52AA_M;
-		cr->la_mac_and0_sel = LA_M_AND0_SEL_52AA;
-		cr->la_mac_and0_sel_m = LA_M_AND0_SEL_52AA_M;
-		cr->la_mac_and0_en = LA_M_AND0_EN_52AA;
-		cr->la_mac_and0_en_m = LA_M_AND0_EN_52AA_M;
-		cr->la_and2_sign = LA_SIGN2_52AA;
-		cr->la_and2_sign_m = LA_SIGN2_52AA_M;
-		cr->la_and3_sign = LA_SIGN3_52AA;
-		cr->la_and3_sign_m = LA_SIGN3_52AA_M;
-		cr->la_re_trig_edge = LA_RE_INIT_POLARITY_52AA;
-		cr->la_re_trig_edge_m = LA_RE_INIT_POLARITY_52AA_M;
-		cr->la_re_and1_sel = LA_RE_INIT_AND1_52AA;
-		cr->la_re_and1_sel_m = LA_RE_INIT_AND1_52AA_M;
-		cr->la_re_and1_val = LA_RE_INIT_AND1_VAL_52AA;
-		cr->la_re_and1_val_m = LA_RE_INIT_AND1_VAL_52AA_M;
-		cr->la_re_and1_inv = LA_RE_INIT_AND1_INV_52AA;
-		cr->la_re_and1_inv_m = LA_RE_INIT_AND1_INV_52AA_M;
-		break;
-
-	#endif
 	#ifdef HALBB_COMPILE_AP_SERIES
 	case BB_AP:
 		cr->la_clk_en = LA_CKEN_A;
@@ -1101,6 +1015,8 @@ void halbb_cr_cfg_la_init(struct bb_info *bb)
 		cr->la_mac_and1_en_m = LA_M_AND1_EN_A_M;
 		cr->la_mac_and2_en = LA_M_AND2_EN_A;
 		cr->la_mac_and2_en_m = LA_M_AND2_EN_A_M;
+		cr->la_mac_and2_frame_sel = TARGET_FRAME_TYPE_A;
+		cr->la_mac_and2_frame_sel_m =TARGET_FRAME_TYPE_A_M;
 		cr->la_mac_and0_sel = LA_M_AND0_SEL_A;
 		cr->la_mac_and0_sel_m = LA_M_AND0_SEL_A_M;
 		cr->la_mac_and0_en = LA_M_AND0_EN_A;
@@ -1228,6 +1144,8 @@ void halbb_cr_cfg_la_init(struct bb_info *bb)
 		cr->la_mac_and1_en_m = LA_M_AND1_EN_C_M;
 		cr->la_mac_and2_en = LA_M_AND2_EN_C;
 		cr->la_mac_and2_en_m = LA_M_AND2_EN_C_M;
+		cr->la_mac_and2_frame_sel = TARGET_FRAME_TYPE_C;
+		cr->la_mac_and2_frame_sel_m =TARGET_FRAME_TYPE_C_M;
 		cr->la_mac_and0_sel = LA_M_AND0_SEL_C;
 		cr->la_mac_and0_sel_m = LA_M_AND0_SEL_C_M;
 		cr->la_mac_and0_en = LA_M_AND0_EN_C;
@@ -1248,6 +1166,135 @@ void halbb_cr_cfg_la_init(struct bb_info *bb)
 		cr->la_re_and1_inv_m = LA_RE_INIT_AND1_INV_C_M;
 		break;
 	#endif
+	#ifdef HALBB_COMPILE_AP2_SERIES
+	case BB_AP2:
+		cr->la_clk_en = LA_CKEN_A2;
+		cr->la_clk_en_m = LA_CKEN_A2_M;
+		cr->la_en = LA_EN_A2;
+		cr->la_en_m = LA_EN_A2_M;
+		cr->dma_dbgport_base_n = LA_DBGPORT_BASE_N_A2;
+		cr->dma_dbgport_base_n_m = LA_DBGPORT_BASE_N_A2_M;
+		cr->dma_a_path_sel = LA_TYPEA_PATH_SEL_A2;
+		cr->dma_a_path_sel_m = LA_TYPEA_PATH_SEL_A2_M;
+		cr->dma_b_path_sel = LA_TYPEB_PATH_SEL_A2;
+		cr->dma_b_path_sel_m = LA_TYPEB_PATH_SEL_A2_M;
+		cr->dma_c_path_sel = LA_TYPEC_PATH_SEL_A2;
+		cr->dma_c_path_sel_m = LA_TYPEC_PATH_SEL_A2_M;
+		cr->dma_d_path_sel = LA_TYPED_PATH_SEL_A2;
+		cr->dma_d_path_sel_m = LA_TYPED_PATH_SEL_A2_M;
+		cr->dma_a_src_sel = LA_TYPEA_SRC_SEL_A2;
+		cr->dma_a_src_sel_m = LA_TYPEA_SRC_SEL_A2_M;
+		cr->dma_b_src_sel = LA_TYPEB_SRC_SEL_A2;
+		cr->dma_b_src_sel_m = LA_TYPEB_SRC_SEL_A2_M;
+		cr->dma_c_src_sel = LA_TYPEC_SRC_SEL_A2;
+		cr->dma_c_src_sel_m = LA_TYPEC_SRC_SEL_A2_M;
+		cr->dma_d_src_sel = LA_TYPED_SRC_SEL_A2;
+		cr->dma_d_src_sel_m = LA_TYPED_SRC_SEL_A2_M;
+		cr->la_smp_rate = LA_SMP_RT_SEL_A2;
+		cr->la_smp_rate_m = LA_SMP_RT_SEL_A2_M;
+		cr->rdrdy_3_phase_en = LA_RDRDY_3PHASE_EN_A2;
+		cr->rdrdy_3_phase_en_m = LA_RDRDY_3PHASE_EN_A2_M;
+		cr->la_trigger_edge = LA_EDGE_SEL_A2;
+		cr->la_trigger_edge_m = LA_EDGE_SEL_A2_M;
+		cr->dma_hdr_sel_63 = LA_HDR_SEL_63_A2;
+		cr->dma_hdr_sel_63_m = LA_HDR_SEL_63_A2_M;
+		cr->dma_hdr_sel_62 = LA_HDR_SEL_62_A2;
+		cr->dma_hdr_sel_62_m = LA_HDR_SEL_62_A2_M;
+		cr->dma_hdr_sel_61 = LA_HDR_SEL_61_A2;
+		cr->dma_hdr_sel_61_m = LA_HDR_SEL_61_A2_M;
+		cr->dma_hdr_sel_60 = LA_HDR_SEL_60_A2;
+		cr->dma_hdr_sel_60_m = LA_HDR_SEL_60_A2_M;
+		cr->dma_a_ck160_dly_en = LA_TYPEA_CK160_DLY_EN_A2;
+		cr->dma_a_ck160_dly_en_m = LA_TYPEA_CK160_DLY_EN_A2_M;
+		cr->dma_b_ck160_dly_en = LA_TYPEB_CK160_DLY_EN_A2;
+		cr->dma_b_ck160_dly_en_m = LA_TYPEB_CK160_DLY_EN_A2_M;
+		cr->dma_dbgport_phy_sel = LA_DBGPORT_SRC_SEL_A2;
+		cr->dma_dbgport_phy_sel_m = LA_DBGPORT_SRC_SEL_A2_M;
+		cr->dma_data_type = LA_DATA_A2;
+		cr->dma_data_type_m = LA_DATA_A2_M;
+		cr->r_dma_rdrdy = LA_RDRDY_A2;
+		cr->r_dma_rdrdy_m= LA_RDRDY_A2_M;
+		cr->la_and0_bit_sel = LA_TRIG_A2;
+		cr->la_and0_bit_sel_m = LA_TRIG_A2_M;
+		cr->la_trigger_cnt = LA_TRIG_CNT_A2;
+		cr->la_trigger_cnt_m = LA_TRIG_CNT_A2_M;
+		cr->and0_trig_disable = LA_TRIG_NEW_ONLY_A2;
+		cr->and0_trig_disable_m = LA_TRIG_NEW_ONLY_A2_M;
+		cr->la_and1_inv = LA_TRIG_AND1_INV_A2;
+		cr->la_and1_inv_m = LA_TRIG_AND1_INV_A2_M;
+		cr->la_and2_en = LA_TRIG_AND2_EN_A2;
+		cr->la_and2_en_m = LA_TRIG_AND2_EN_A2_M;
+		cr->la_and2_inv = LA_TRIG_AND2_INV_A2;
+		cr->la_and2_inv_m = LA_TRIG_AND2_INV_A2_M;
+		cr->la_and3_en = LA_TRIG_AND3_EN_A2;
+		cr->la_and3_en_m = LA_TRIG_AND3_EN_A2_M;
+		cr->la_and3_inv = LA_TRIG_AND3_INV_A2;
+		cr->la_and3_inv_m = LA_TRIG_AND3_INV_A2_M;
+		cr->la_and4_en = LA_TRIG_AND4_EN_A2;
+		cr->la_and4_en_m = LA_TRIG_AND4_EN_A2_M;
+		cr->la_and4_rate = LA_TRIG_AND4_VAL_A2;
+		cr->la_and4_rate_m = LA_TRIG_AND4_VAL_A2_M;
+		cr->la_and4_inv = LA_TRIG_AND4_INV_A2;
+		cr->la_and4_inv_m = LA_TRIG_AND4_INV_A2_M;
+		cr->la_and1_mask = LA_TRIG_AND1_BIT_EN_A2;
+		cr->la_and1_mask_m = LA_TRIG_AND1_BIT_EN_A2_M;
+		cr->la_and1_val = LA_TRIG_AND1_VAL_A2;
+		cr->la_and1_val_m = LA_TRIG_AND1_VAL_A2_M;
+		cr->la_and2_mask = LA_TRIG_AND2_MASK_A2;
+		cr->la_and2_mask_m = LA_TRIG_AND2_MASK_A2_M;
+		cr->la_and2_val = LA_TRIG_AND2_VAL_A2;
+		cr->la_and2_val_m = LA_TRIG_AND2_VAL_A2_M;
+		cr->la_and3_mask = LA_TRIG_AND3_MASK_A2;
+		cr->la_and3_mask_m = LA_TRIG_AND3_MASK_A2_M;
+		cr->la_and3_val = LA_TRIG_AND3_VAL_A2;
+		cr->la_and3_val_m = LA_TRIG_AND3_VAL_A2_M;
+		cr->la_and5_sel = LA_TRIG_AND5_A2;
+		cr->la_and5_sel_m = LA_TRIG_AND5_A2_M;
+		cr->la_and5_val = LA_TRIG_AND5_VAL_A2;
+		cr->la_and5_val_m = LA_TRIG_AND5_VAL_A2_M;
+		cr->la_and5_inv = LA_TRIG_AND5_INV_A2;
+		cr->la_and5_inv_m = LA_TRIG_AND5_INV_A2_M;
+		cr->la_and6_sel = LA_TRIG_AND6_A2;
+		cr->la_and6_sel_m = LA_TRIG_AND6_A2_M;
+		cr->la_and6_val = LA_TRIG_AND6_VAL_A2;
+		cr->la_and6_val_m = LA_TRIG_AND6_VAL_A2_M;
+		cr->la_and6_inv = LA_TRIG_AND6_INV_A2;
+		cr->la_and6_inv_m = LA_TRIG_AND6_INV_A2_M;
+		cr->la_and7_sel = LA_TRIG_AND7_A2;
+		cr->la_and7_sel_m = LA_TRIG_AND7_A2_M;
+		cr->la_and7_val = LA_TRIG_AND7_VAL_A2;
+		cr->la_and7_val_m = LA_TRIG_AND7_VAL_A2_M;
+		cr->la_and7_inv = LA_TRIG_AND7_INV_A2;
+		cr->la_and7_inv_m = LA_TRIG_AND7_INV_A2_M;
+		cr->la_brk_sel = BRK_R_BRK_SEL_FOR_CNT_A2;
+		cr->la_brk_sel_m =BRK_R_BRK_SEL_FOR_CNT_A2_M;
+		cr->la_mac_and1_en = LA_M_AND1_EN_A2;
+		cr->la_mac_and1_en_m = LA_M_AND1_EN_A2_M;
+		cr->la_mac_and2_en = LA_M_AND2_EN_A2;
+		cr->la_mac_and2_en_m = LA_M_AND2_EN_A2_M;
+		cr->la_mac_and2_frame_sel = TARGET_FRAME_TYPE_A2;
+		cr->la_mac_and2_frame_sel_m =TARGET_FRAME_TYPE_A2_M;
+		cr->la_mac_and0_sel = LA_M_AND0_SEL_A2;
+		cr->la_mac_and0_sel_m = LA_M_AND0_SEL_A2_M;
+		cr->la_mac_and0_en = LA_M_AND0_EN_A2;
+		cr->la_mac_and0_en_m = LA_M_AND0_EN_A2_M;
+		cr->la_mac_and0_mac_sel = INTF_R_MAC_SEL_A2;
+		cr->la_mac_and0_mac_sel_m = INTF_R_MAC_SEL_A2_M;
+		cr->la_and2_sign = LA_SIGN2_A2;
+		cr->la_and2_sign_m = LA_SIGN2_A2_M;
+		cr->la_and3_sign = LA_SIGN3_A2;
+		cr->la_and3_sign_m = LA_SIGN3_A2_M;
+		cr->la_re_trig_edge = LA_RE_INIT_POLARITY_A2;
+		cr->la_re_trig_edge_m = LA_RE_INIT_POLARITY_A2_M;
+		cr->la_re_and1_sel = LA_RE_INIT_AND1_A2;
+		cr->la_re_and1_sel_m = LA_RE_INIT_AND1_A2_M;
+		cr->la_re_and1_val = LA_RE_INIT_AND1_VAL_A2;
+		cr->la_re_and1_val_m = LA_RE_INIT_AND1_VAL_A2_M;
+		cr->la_re_and1_inv = LA_RE_INIT_AND1_INV_A2;
+		cr->la_re_and1_inv_m = LA_RE_INIT_AND1_INV_A2_M;
+		break;
+	#endif
+
 
 	default:
 		break;
@@ -1257,8 +1304,35 @@ void halbb_cr_cfg_la_init(struct bb_info *bb)
 #endif
 
 #if LAMODE_ECHO_CMD
-void
-halbb_la_buffer_print(struct bb_info *bb, char input[][16], u32 *_used,
+void halbb_la_cr_dump(struct bb_info *bb)
+{
+	struct bb_la_cr_info *cr = &bb->bb_cmn_hooker->bb_la_mode_i.bb_la_cr_i;
+	u32 cr_table[16];
+	u8 cr_len = sizeof(cr_table) / sizeof(u32);
+
+	BB_TRACE("[%s]\n", __func__);
+
+	cr_table[0] = cr->la_clk_en;
+	cr_table[1] = cr->la_en;
+	cr_table[2] = cr->dma_hdr_sel_63;
+	cr_table[3] = cr->la_and0_bit_sel;
+	cr_table[4] = cr->la_and1_mask;
+	cr_table[5] = cr->la_and1_val;
+	cr_table[6] = cr->la_and2_mask;
+	cr_table[7] = cr->la_and2_val;
+	cr_table[8] = cr->la_and3_mask;
+	cr_table[9] = cr->la_and3_val;
+	cr_table[10] = cr->la_and5_sel;
+	cr_table[11] = cr->la_brk_sel;
+	cr_table[12] = cr->la_mac_and2_frame_sel;
+	cr_table[13] = cr->la_mac_and0_sel;
+	cr_table[14] = cr->la_mac_and0_mac_sel;
+	cr_table[15] = cr->la_re_trig_edge;
+
+	halbb_cr_table_dump(bb, cr_table, cr_len);
+}
+
+void halbb_la_buffer_print(struct bb_info *bb, char input[][16], u32 *_used,
 		      char *output, u32 *_out_len)
 {
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
@@ -1295,8 +1369,8 @@ halbb_la_buffer_print(struct bb_info *bb, char input[][16], u32 *_used,
 	if (var[0] == 0) {
 		for (i = 0; i < la->smp_number; i++) {
 			idx = i << 1;
-			BB_TRACE("%08x%08x\n", buf->octet[idx + 1],
-				 buf->octet[idx]);
+			BB_TRACE("%08x%08x\n", SWAP4BYTE(buf->octet[idx + 1]),
+				 SWAP4BYTE(buf->octet[idx]));
 		}
 	} else if (var[0] == 1) {
 
@@ -1324,8 +1398,8 @@ halbb_la_buffer_print(struct bb_info *bb, char input[][16], u32 *_used,
 		/*------------------------*/
 		for (i = 0; i < la->smp_number; i++) {
 			idx = i << 1;
-			la_pattern_msb = (u64)buf->octet[idx + 1];
-			la_pattern_lsb = (u64)buf->octet[idx];
+			la_pattern_msb = (u64)SWAP4BYTE(buf->octet[idx + 1]);
+			la_pattern_lsb = (u64)SWAP4BYTE(buf->octet[idx + 1]);
 			la_pattern = (la_pattern_msb << 32) | la_pattern_lsb;
 			la_pattern_part = (la_pattern & mask) >> var[2];
 
@@ -1355,10 +1429,9 @@ void halbb_la_cmd_bb_show_cfg(struct bb_info *bb, char input[][16], u32 *_used,
 	struct la_mac_cfg_info	*cfg = &la->la_mac_cfg_i;
 
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "cmn {TrigTime:%d} {TrigCnt:%d} {DbgPort:%x} {Edge:P/N:%d} {f_smp:%d}\n", 
+		    "cmn {TrigTime:%d} {TrigCnt:%d} {DbgPort:0x%x} {Edge:P/N:%d} {f_smp:%d M(%d)}\n", 
 		    cfg->la_trigger_time, la->la_trigger_cnt,
-		    la->la_dbg_port, la->la_trigger_edge, la->la_smp_rate);
-#if 1
+		    la->la_dbg_port, la->la_trigger_edge, 80 >> la->la_smp_rate, la->la_smp_rate);
 	/*BB DMA*/
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 		    "dma {0:dbgPort_base_N} {N:%d}\n",
@@ -1382,34 +1455,37 @@ void halbb_la_cmd_bb_show_cfg(struct bb_info *bb, char input[][16], u32 *_used,
 
 	/*BB -Trig*/
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {0:And0} {disable:%d} {bit_num:%d}\n",
+		    "bb  {0:And0} {disable:%d} {bit_num:%d}\n",
 		    la->la_and0_disable, la->la_and0_bit_sel);
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {1:And1} {en_bitmap:%d} {inv:%d} {bitmap:%d}\n",
+		    "bb  {1:And1} {mask:0x%x} {inv:%d} {bitmap_val:0x%x}\n",
 		    adv->la_and1_mask, adv->la_and1_inv, adv->la_and1_val);
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {2:And2} {en:%d} {inv:%d} {val:%d} {mask(0x%x)} {sign:%d}\n", 
+		    "bb  {2:And2} {en:%d}  {inv:%d} {val:%d} {mask(0x%x)} {sign:%d}\n", 
 		    adv->la_and2_en, adv->la_and2_inv, adv->la_and2_val,
 		    adv->la_and2_mask, adv->la_and2_sign);
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {3:And3} {en:%d} {inv:%d} {val:%d} {mask(0x%x)} {sign:%d}\n", 
+		    "bb  {3:And3} {en:%d}  {inv:%d} {val:%d} {mask(0x%x)} {sign:%d}\n", 
 		    adv->la_and3_en, adv->la_and3_inv, adv->la_and3_val,
 		    adv->la_and3_mask, adv->la_and3_sign);
+
+	halbb_print_rate_2_buff(bb, adv->la_and4_rate, RTW_GILTF_LGI_4XHE32, bb->dbg_buf, HALBB_SNPRINT_SIZE);
+
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {4:And4} {en:%d} {inv:%d} {rate_idx:%d}\n",
-		    adv->la_and4_en, adv->la_and4_inv, adv->la_and4_rate);
+		    "bb  {4:And4} {en:%d}  {inv:%d} {rate_idx: %s (0x%x)}\n",
+		    adv->la_and4_en, adv->la_and4_inv, bb->dbg_buf, adv->la_and4_rate);
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {5:And5} {en/sel:%d} {inv:%d} {val:%d}\n",
+		    "bb  {5:And5} {sel:%d} {inv:%d} {val:%d}\n",
 		    adv->la_and5_sel, adv->la_and5_inv, adv->la_and5_val);
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {6:And6} {en/sel:%d} {inv:%d} {val:%d}\n",
+		    "bb  {6:And6} {sel:%d} {inv:%d} {val:%d}\n",
 		    adv->la_and6_sel, adv->la_and6_inv, adv->la_and6_val);
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "bb {7:And7} {en/sel:%d} {inv:%d} {val:%d}\n",
+		    "bb  {7:And7} {sel:%d} {inv:%d} {val:%d}\n",
 		    adv->la_and7_sel, adv->la_and7_inv, adv->la_and7_val);
 	/*MAC Adv-Trig*/
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "mac {0:And0} {en:%d} {0:cca,1:er,2:ok:%d} {0:tmac,1:pmac:%d}\n",
+		    "mac {0:And0} {en:%d}  {0:cca,1:er,2:ok:%d} {0:tmac,1:pmac:%d}\n",
 		    trig_mac->la_mac_and0_en, trig_mac->la_mac_and0_sel,
 		    trig_mac->la_mac_and0_mac_sel);
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
@@ -1419,7 +1495,7 @@ void halbb_la_cmd_bb_show_cfg(struct bb_info *bb, char input[][16], u32 *_used,
 		    trig_mac->la_mac_and2_en, trig_mac->la_mac_and2_frame_sel);
 	/*BB Re-Trig*/
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		    "re {mac_en:%d} {en/sel:%d} {inv:%d} {val:%d} {edge:%d}\n",
+		    "re  {mac_en:%d} {en/sel:%d} {inv:%d} {val:%d} {edge:%d}\n",
 		    cfg->mac_la_restart_en, re->la_re_and0_sel,
 		    re->la_re_and0_inv, re->la_re_and0_val,
 		    re->la_re_trig_edge);
@@ -1453,7 +1529,8 @@ void halbb_la_cmd_bb_show_cfg(struct bb_info *bb, char input[][16], u32 *_used,
 	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 		    "set {2:Auto Print} {en:%d}\n",
 		    print->is_la_print);
-#endif
+	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+		    "max_num {val:%d}: consective capture LA pattern number\n", la->la_count);
 }
 
 void halbb_la_cmd_bb_cmn(struct bb_info *bb, char input[][16], u32 *_used,
@@ -1471,7 +1548,7 @@ void halbb_la_cmd_bb_cmn(struct bb_info *bb, char input[][16], u32 *_used,
 	la->la_mac_cfg_i.la_trigger_time = val[0];
 	la->la_trigger_cnt = (u8)val[1];
 	la->la_dbg_port = val[2];
-	la->la_trigger_edge = (u8)val[3];
+	la->la_trigger_edge = (enum la_bb_trig_edge)val[3];
 	la->la_smp_rate = (enum la_bb_smp_clk)val[4];
 }
 
@@ -1501,10 +1578,10 @@ void halbb_la_cmd_bb_dma(struct bb_info *bb, char input[][16], u32 *_used,
 		dma->dma_c_src_sel = (u8)val[3];
 		dma->dma_d_src_sel = (u8)val[4];
 	} else if (val[0] == 3) {
-		dma->dma_hdr_sel_63 = (u8)val[1];
-		dma->dma_hdr_sel_62 = (u8)val[2];
-		dma->dma_hdr_sel_61 = (u8)val[3];
-		dma->dma_hdr_sel_60 = (u8)val[4];
+		dma->dma_hdr_sel_63 = (enum la_hdr_sel_t)val[1];
+		dma->dma_hdr_sel_62 = (enum la_hdr_sel_t)val[2];
+		dma->dma_hdr_sel_61 = (enum la_hdr_sel_t)val[3];
+		dma->dma_hdr_sel_60 = (enum la_hdr_sel_t)val[4];
 	} else if (val[0] == 4) {
 		dma->dma_dbgport_phy_sel = (bool)val[1];
 	} else if (val[0] == 5) {
@@ -1599,6 +1676,235 @@ void halbb_la_cmd_bb_re_trig(struct bb_info *bb, char input[][16], u32 *_used,
 	re->la_re_trig_edge = (bool)val[4];
 }
 
+void halbb_la_io_en(struct bb_info *bb)
+{
+	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
+
+	BB_TRACE("[%s]", __func__);
+	la->la_run_mode = LA_RUN_GET_MORE;
+	halbb_la_run(bb);
+}
+
+void halbb_la_callback(void *context)
+{
+	struct bb_info *bb = (struct bb_info *)context;
+	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
+	struct halbb_timer_info *timer = &la->la_timer_i;
+
+	BB_TRACE("[%s]===>\n", __func__);
+
+	timer->timer_state = BB_TIMER_IDLE;
+
+	if (bb->phl_com->hci_type == RTW_HCI_PCIE)
+		halbb_la_io_en(bb);
+	else
+		rtw_hal_cmd_notify(bb->phl_com, MSG_EVT_NOTIFY_BB, (void *)(&timer->event_idx), bb->bb_phy_idx);
+}
+
+void halbb_la_timer_init(struct bb_info *bb)
+{
+	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
+	struct halbb_timer_info *timer = &la->la_timer_i;
+
+	timer->event_idx = BB_EVENT_TIMER_LA;
+	timer->timer_state = BB_TIMER_IDLE;
+
+	halbb_init_timer(bb, &timer->timer_list, halbb_la_callback, bb, "halbb_la_timer");
+}
+
+void halbb_la_cmd_rtl_test(struct bb_info *bb, char input[][16], u32 *_used,
+			    char *output, u32 *_out_len)
+{
+	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
+	struct la_adv_trig_info *adv = &la->adv_trig_i;
+	struct la_re_trig_info *re_trig = &la->la_re_trig_i;
+	struct la_dma_info	*dma = &la->la_dma_i;
+	enum channel_width bw = bb->hal_com->band[0].cur_chandef.bw;
+	u32 trig_time_cca = 0;
+	s32 val_sign32_tmp = 0;
+	u32 var[10] = {0};
+	u32 test_case = 0;
+
+	HALBB_SCAN(input[2], DCMD_DECIMAL, &var[0]);
+	test_case = var[0];
+
+	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+		    "RTL_test_case=%d\n", test_case);
+
+	if (bw > CHANNEL_WIDTH_80) {
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			 "Not Support for BW > %dM\n", 20 << bw);
+		return;
+	}
+
+	halbb_la_reset(bb);
+
+	/*Trig Time*/
+	trig_time_cca = ((la->la_string_i.smp_number_max >> (bw + 1)) / 10)
+			- (2 << (2 - bw)) - (2 - bw);
+	
+	/*--- Basic Trigger Setting --------------------------------*/
+	la->la_mac_cfg_i.la_trigger_time = trig_time_cca;
+	la->la_trigger_edge = LA_P_EDGE;
+	la->la_smp_rate = LA_SMP_CLK_20 - bw;
+	la->la_trigger_cnt = 0;	
+
+	if (test_case == 0) {
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_CCA;
+		dma->dma_hdr_sel_62 = LA_HDR_AGC_RDY;
+		dma->dma_hdr_sel_61 = LA_HDR_RXHE_FULLBAND;
+		dma->dma_hdr_sel_60 = LA_HDR_CRC_OK;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		dma->dma_dbgport_base_n = 31;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x20002; /*dbg_rx_inner_state_2*/
+		la->la_and0_bit_sel = 31;
+		/*AND_0*/
+		la->la_and0_disable = false;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = false;
+
+	} else if (test_case == 1) {
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_CCA;
+		dma->dma_hdr_sel_62 = LA_HDR_ORI;
+		dma->dma_hdr_sel_61 = LA_HDR_ORI;
+		dma->dma_hdr_sel_60 = LA_HDR_ORI;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		dma->dma_dbgport_base_n = 31;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x20002; /*dbg_rx_inner_state_2*/
+		/*AND_0*/
+		la->la_and0_disable = true;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = true;
+		/*AND_1*/
+		adv->la_and1_mask = 0x7C000000;
+		adv->la_and1_val = 20;
+		adv->la_and1_inv = false;
+	} else if (test_case == 2) { /*EVM > 35*/
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_ORI;
+		dma->dma_hdr_sel_62 = LA_HDR_ORI;
+		dma->dma_hdr_sel_61 = LA_HDR_ORI;
+		dma->dma_hdr_sel_60 = LA_HDR_ORI;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x20011; /*dbg_rx_inner_state_2*/
+		dma->dma_dbgport_base_n = 31;
+		/*AND_0*/
+		la->la_and0_disable = true;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = true;
+		/*AND_2*/
+		adv->la_and2_en = true;
+		adv->la_and2_inv = false;
+		adv->la_and2_val = 35 << 2; /*u(8,2)*/
+		adv->la_and2_mask = 0xff0000; /*2-nd stream*/
+		adv->la_and2_sign = LA_UNSIGNED;
+	} else if (test_case == 3) { /*CFO < 1/32 carrier spacing*/
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_ORI;
+		dma->dma_hdr_sel_62 = LA_HDR_ORI;
+		dma->dma_hdr_sel_61 = LA_HDR_ORI;
+		dma->dma_hdr_sel_60 = LA_HDR_ORI;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		dma->dma_dbgport_base_n = 23;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x20003; /*dbg_rx_inner_state_2*/
+		/*AND_0*/
+		la->la_and0_disable = true;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = true;
+		/*AND_3*/
+		adv->la_and3_en = true;
+		adv->la_and3_inv = false;
+		adv->la_and3_val = 0x4; /*+1/32 carrier spacing, S(16,16)*/
+		adv->la_and3_mask = 0xffff00; /*phy0_rCFO_for_STO_update*/
+		adv->la_and3_sign = LA_SIGNED;
+	} else if (test_case == 4) { /*rx_rate = HE 2SS MCS7*/
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_ORI;
+		dma->dma_hdr_sel_62 = LA_HDR_ORI;
+		dma->dma_hdr_sel_61 = LA_HDR_ORI;
+		dma->dma_hdr_sel_60 = LA_HDR_ORI;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		dma->dma_dbgport_base_n = 31;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x20002; /*dbg_rx_inner_state_2*/
+		/*AND_0*/
+		la->la_and0_disable = true;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = true;
+		/*AND_4*/
+		adv->la_and4_en = true;
+		adv->la_and4_inv = false;
+		adv->la_and4_rate = 0x197; /*HE 2SS MCS7*/
+	} else if (test_case == 5) { /*state = CCK CCA*/
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_ORI;
+		dma->dma_hdr_sel_62 = LA_HDR_ORI;
+		dma->dma_hdr_sel_61 = LA_HDR_ORI;
+		dma->dma_hdr_sel_60 = LA_HDR_ORI;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		dma->dma_dbgport_base_n = 31;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x1029f; /*AGC(dbg_ctrl_3)*/
+		/*AND_0*/
+		la->la_and0_disable = true;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = true;
+		/*AND_5*/
+		adv->la_and5_sel = LA_CCK_CCA;
+		adv->la_and5_inv = false;
+	} else if (test_case == 6) { /*state = bfmx_csi_standby*/
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_ORI;
+		dma->dma_hdr_sel_62 = LA_HDR_ORI;
+		dma->dma_hdr_sel_61 = LA_HDR_ORI;
+		dma->dma_hdr_sel_60 = LA_HDR_ORI;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		dma->dma_dbgport_base_n = 19;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x70035; /*BFeeTop_phy0*/
+		/*AND_0*/
+		la->la_and0_disable = true;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = true;
+		/*AND_6*/
+		adv->la_and6_sel = LA_BFMX_CSI_STANDBY;
+		adv->la_and6_inv = false;
+	} else if (test_case == 7) { /*TD_STATE = HE_TB_STANDBY*/
+		/*DMA SEL*/
+		dma->dma_hdr_sel_63 = LA_HDR_ORI;
+		dma->dma_hdr_sel_62 = LA_HDR_ORI;
+		dma->dma_hdr_sel_61 = LA_HDR_ORI;
+		dma->dma_hdr_sel_60 = LA_HDR_ORI;
+		dma->dma_data_type = DMA01_NRML_2s_12b;
+		dma->dma_dbgport_base_n = 31;
+		/*DBG_PORT*/
+		la->la_dbg_port = 0x10202; /*HE_TB*/
+		/*AND_0*/
+		la->la_and0_disable = true;
+		/*AND_1~AND_7*/
+		adv->adv_trig_en = true;
+		/*AND_7*/
+		adv->la_and7_sel = LA_RX_TD_STATE;
+		adv->la_and7_inv = false;
+		adv->la_and7_val = 40; /*HE TB standby*/
+	} else {
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			 "Not Support\n");
+		return;
+	}
+	BB_TRACE("RTL Test Case Trigger: %d\n", test_case);
+	halbb_la_cr_dump(bb);
+	la->la_run_mode = LA_RUN_RTL_TEST;
+	la->la_count = la->la_count_max;
+	halbb_la_run(bb);
+	halbb_print_devider(bb, BB_DEVIDER_LEN_32, true);
+}
 
 void halbb_la_cmd_mac_trig(struct bb_info *bb, char input[][16], u32 *_used,
 			      char *output, u32 *_out_len)
@@ -1638,52 +1944,53 @@ void halbb_la_cmd_fast(struct bb_info *bb, char input[][16], u32 *_used,
 	struct bb_la_mode_info *la = &bb->bb_cmn_hooker->bb_la_mode_i;
 	struct la_adv_trig_info *adv = &la->adv_trig_i;
 	struct la_re_trig_info *re_trig = &la->la_re_trig_i;
+	struct la_dma_info	*dma = &la->la_dma_i;
 	u32 trig_time_cca = 0;
 	s32 val_sign32_tmp = 0;
 	u32 var[10] = {0};
 	enum channel_width bw = bb->hal_com->band[0].cur_chandef.bw;
+	u8 i = 0;
 
-	if (bw > 2) {
+	if (bw > CHANNEL_WIDTH_80) {
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			 "Not Support for BW > %dM\n", 20 << bw);
 		return;
 	}
-	HALBB_SCAN(input[2], DCMD_DECIMAL, &var[0]);
+
+	for (i = 0; i < 5; i++) {
+		HALBB_SCAN(input[2 + i], DCMD_DECIMAL, &var[i]);
+	}
 
 	trig_time_cca = ((la->la_string_i.smp_number_max >> (bw + 1)) / 10)
 			- (2 << (2 - bw)) - (2 - bw);
+
+	/*DMA SEL*/
+	dma->dma_hdr_sel_63 = LA_HDR_CCA;
+	dma->dma_hdr_sel_62 = LA_HDR_AGC_RDY;
+	dma->dma_hdr_sel_61 = LA_HDR_RXHE_FULLBAND;
+	dma->dma_hdr_sel_60 = LA_HDR_CRC_OK;
+
+	dma->dma_data_type = DMA03_NRML_2s_14b;
 
 	if (var[0] < 10) {
 	/*=== [Type: 0 ~ 10] : CCA P-edge trigger ==========================*/
 		/*--- Basic Trigger Setting --------------------------------*/
 		la->la_mac_cfg_i.la_trigger_time = trig_time_cca;
-		la->la_trigger_edge = 0;
-		la->la_smp_rate = 2 - bw;
-		la->la_count = 0;
+		la->la_trigger_edge = LA_P_EDGE;
+		la->la_smp_rate = LA_SMP_CLK_20 - bw;
 		la->la_trigger_cnt = 0;
 		if (var[0] == 0) { /*CCA*/
-			if (bb->ic_type == BB_RTL8852AA) {
-				la->la_and0_disable = true;
-				la->la_dbg_port = 0x10205;
-				halbb_la_bb_set_dma_type_reset(bb);
-				halbb_la_bb_set_adv_reset(bb);
-				halbb_la_mac_set_adv_reset(bb);
-				halbb_la_bb_set_re_trig_reset(bb);
-				adv->adv_trig_en = false;
-				BB_TRACE("[Fast trigger 0: CCA]\n");
-			} else if (bb->ic_type == BB_RTL8852A) {
-				la->la_and0_disable = true;
-				la->la_dbg_port = 0x10205;
-				halbb_la_bb_set_dma_type_reset(bb);
-				halbb_la_bb_set_adv_reset(bb);
-				halbb_la_mac_set_adv_reset(bb);
-				halbb_la_bb_set_re_trig_reset(bb);
-				adv->adv_trig_en = false;
-				adv->la_and5_sel = 2;
-				adv->la_and5_inv = false;
-				adv->la_and5_val = 0;
-				BB_TRACE("[Fast trigger 0: OFDM CCA]\n");
-			}
+			la->la_and0_disable = true;
+			la->la_dbg_port = 0x2002; /*dbg_rx_inner_state_2*/
+			halbb_la_bb_set_dma_type_reset(bb);
+			halbb_la_bb_set_adv_reset(bb);
+			halbb_la_mac_set_adv_reset(bb);
+			halbb_la_bb_set_re_trig_reset(bb);
+			adv->adv_trig_en = true;
+			adv->la_and5_sel = 2;
+			adv->la_and5_inv = false;
+			adv->la_and5_val = 0;
+			BB_TRACE("[Fast trigger 0: OFDM CCA]\n");
 		} else {
 			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "Not Support\n");
@@ -1695,302 +2002,10 @@ void halbb_la_cmd_fast(struct bb_info *bb, char input[][16], u32 *_used,
 			 "Not Support\n");
 		return;
 	}
-
-	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		 "[Basic-Trigger]\n");
-#if 0
-	struct bb_la_mode_info *la = &bb->bb_la_mode_i;
-	struct la_adv_trig_info *adv = &la->adv_trig_i;
-	enum bb_mode_type bb_mode;
-	const u8 ofdm_codeword[8] = {0xb, 0xf, 0xa, 0xe, 0x9, 0xd, 0x8, 0xc};
-	u32 codeword;
-	u8 rate_idx;
-	u32 trig_time_cca = 0;
-	s32 val_sign32_tmp = 0;
-	u32 var[10] = {0};
-	enum channel_width bw = bb->hal_com->band[0].cur_chandef.bw;
-
-	if (bw > 2) {
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			 "Not Support for BW > %dM\n", 20 << bw);
-		return;
-	}
-
-	HALBB_SCAN(input[2], DCMD_DECIMAL, &var[0]);
-	HALBB_SCAN(input[3], DCMD_DECIMAL, &var[1]);
-	HALBB_SCAN(input[4], DCMD_DECIMAL, &var[2]);
-
-	trig_time_cca = ((la->la_string_i.smp_number_max >> (bw + 1)) / 10)
-			- (2 << (2 - bw)) - (2 - bw);
-
-	if (var[0] < 10) {
-	/*=== [Type: 0 ~ 10] : CCA P-edge trigger ==========================*/
-		/*--- Basic Trigger Setting --------------------------------*/
-		la->la_and0_bit_sel = 2;
-		la->la_mac_cfg_i.la_trigger_time = trig_time_cca;
-		la->la_trigger_edge = 0;
-		la->la_smp_rate = 2 - bw;
-		la->la_count = 0;
-		if (var[0] == 0) { /*AGC*/
-			dma->dma_data_type = 5;
-			la->la_dbg_port = 0x870;
-		} else if (var[0] == 1) { /*EVM*/
-			dma->dma_data_type = 4;
-			la->la_dbg_port = 0x392;
-		} else if (var[0] == 2) { /*SNR*/
-			dma->dma_data_type = 4;
-			if (var[1] == 0)
-				la->la_dbg_port = 0x89e;
-			else
-				la->la_dbg_port = 0xa9e;
-		} else if (var[0] == 3) { /*CFO*/
-			dma->dma_data_type = 4;
-			if (var[1] == 0)
-				la->la_dbg_port = 0x88c;
-			else
-				la->la_dbg_port = 0xa8c;
-		}  else if (var[0] == 4) { /*ADC*/
-			if (var[1] == 0) {
-				dma->dma_data_type = 0;
-				la->la_dbg_port = 0x880;
-			} else {
-				dma->dma_data_type = 1;
-				la->la_dbg_port = 0xa80;
-			}
-		}
-		/*--- Adv-Trigger Setting------------------------------------*/
-		adv->adv_trig_en = false;
-	} else if (var[0] < 20) {
-	/*=== [Type: 10 ~ 19]: RX-EVM Trigger ===============================*/
-		/*--- Basic Trigger Setting ---------------------------------*/
-		la->la_and0_bit_sel = 0;
-		la->la_trigger_edge = 0;
-		la->la_smp_rate = 2 - bw;
-		la->la_count = 0;
-		dma->dma_data_type = 4;
-		la->la_dbg_port = 0x392;
-
-		/*--- Adv-Trigger Setting -----------------------------------*/
-		halbb_la_bb_set_adv_reset(bb);
-		adv->adv_trig_en = true;
-
-		/*And[0]*/
-		la->la_and0_disable = true;
-
-		/*And[1]*/
-		adv->la_and1_inv = 0;
-		adv->la_and1_sel = 4; /*RX-state*/
-		if (var[2] == 0) {
-			/*L-preamble 8+8+4 = 20*/
-			la->la_mac_cfg_i.la_trigger_time = trig_time_cca - 20;
-			/*Legacy Data*/
-			adv->la_and1_val = 5;
-		} else if (var[2] == 1) {
-			/*HT-preamble (8+8+4) + (8+4+4*Nrx) = 32 + Nrx * 4*/
-			la->la_mac_cfg_i.la_trigger_time = trig_time_cca - 32 -
-					       (bb->num_rf_path * 4);
-			/*HT Data*/
-			adv->la_and1_val = 18;
-		} else {
-			/*VHT-preamble (8+8+4) + (8+4+4*Nrx) +4 = 36 + Nrx * 4*/
-			la->la_mac_cfg_i.la_trigger_time = trig_time_cca - 36 -
-					       (bb->num_rf_path * 4);
-			/*VHT Data*/
-			adv->la_and1_val = 18;
-		}
-
-		/*And[2]*/
-		adv->la_and2_inv = 0;
-		adv->la_and2_sel = 0; /*Disable*/
-
-		/*And[3]*/
-		adv->la_and2_inv = 0;
-		adv->la_and3_sel = 0; /*Disable*/
-
-		/*And[4]*/
-		adv->la_and4_inv = 0;
-
-		if (var[0] == 11) {
-			/*[>= -X dB]*/
-			if (var[1] == 2) {
-				adv->la_and4_bitmap = 0;
-				adv->la_and4_mask = 0x1;
-			} else if (var[1] == 4) {
-				adv->la_and4_bitmap = 0;
-				adv->la_and4_mask = 0x3;
-			} else if (var[1] == 8) {
-				adv->la_and4_bitmap = 0;
-				adv->la_and4_mask = 0x7;
-			} else if (var[1] == 16) {
-				adv->la_and4_bitmap = 0;
-				adv->la_and4_mask = 0xf;
-			} else if (var[1] == 32) {
-				adv->la_and4_bitmap = 0;
-				adv->la_and4_mask = 0x1f;
-			} else if (var[1] == 64) {
-				adv->la_and4_bitmap = 0;
-				adv->la_and4_mask = 0x3f;
-			} else {
-				BB_DBG_CNSL(*_out_len, *_used, output + *_used,
-					 *_out_len - *_used,
-					 "Not Support >= -%d dB\n", var[1]);
-				return;
-			}
-		} else if (var[0] == 10) {
-			/*[<= -X dB]*/
-			if (var[1] == 2) {
-				adv->la_and4_bitmap = 0x7e;
-				adv->la_and4_mask = 0x7e;
-			} else if (var[1] == 4) {
-				adv->la_and4_bitmap = 0x7c;
-				adv->la_and4_mask = 0x7c;
-			} else if (var[1] == 8) {
-				adv->la_and4_bitmap = 0x78;
-				adv->la_and4_mask = 0x78;
-			} else if (var[1] == 16) {
-				adv->la_and4_bitmap = 0x70;
-				adv->la_and4_mask = 0x70;
-			} else if (var[1] == 32) {
-				adv->la_and4_bitmap = 0x60;
-				adv->la_and4_mask = 0x60;
-			} else if (var[1] == 64) {
-				adv->la_and4_bitmap = 0x40;
-				adv->la_and4_mask = 0x40;
-			} else {
-				BB_DBG_CNSL(*_out_len, *_used, output + *_used,
-					 *_out_len - *_used,
-					 "Not Support <= -%d dB\n", var[1]);
-				return;
-			}
-		} else if (var[0] == 12) {
-			/*[= -X dB]*/
-			val_sign32_tmp = 0 - (s32)var[1];
-			adv->la_and4_bitmap = (u32)(val_sign32_tmp & 0x7f);
-			adv->la_and4_mask = 0x7f;
-		}
-	} else if (var[0] < 30) {
-	/*=== [Type: 20 ~ 29]: RX-Rate Trigger ==============================*/
-		/*--- Basic Trigger Setting ---------------------------------*/
-		la->la_and0_bit_sel = 0;
-		la->la_trigger_edge = 0;
-		la->la_smp_rate = 2 - bw;
-		la->la_count = 0;
-		dma->dma_data_type = 4;
-
-		rate_idx = (u8)var[1];
-
-		/*--- Adv-Trigger Setting -----------------------------------*/
-		halbb_la_bb_set_adv_reset(bb);
-		adv->adv_trig_en = true;
-
-		/*And[0]*/
-		la->la_and0_disable = true;
-
-		/*And[1]*/
-		adv->la_and1_inv = 0;
-		adv->la_and1_sel = 4; /*RX-state*/
-
-		if (rate_idx <= BB_54M && rate_idx >= BB_06M) {
-			bb_mode = BB_LEGACY_MODE;
-			codeword = (u32)ofdm_codeword[rate_idx - BB_06M];
-			la->la_dbg_port = 0x3a9;
-			/*L-preamble 8+8 = 16*/
-			la->la_mac_cfg_i.la_trigger_time = trig_time_cca - 20;
-			/*Legacy Data*/
-			adv->la_and1_val = 5;
-		} else if (rate_idx <= BB_HT_MCS(31)) {
-			bb_mode = BB_HT_MODE;
-			codeword = (u32)(rate_idx - BB_HT_MCS(0));
-			la->la_dbg_port = 0x3aa;
-			/*HT-preamble (8+8+4) + (8+4+4*Nrx) = 32 + Nrx * 4*/
-			la->la_mac_cfg_i.la_trigger_time = trig_time_cca - 32 -
-					       (bb->num_rf_path * 4);
-			/*HT,VHT Data*/
-			adv->la_and1_val = 18;
-		} else if (rate_idx <= BB_VHT_4SS_MCS(9)) {
-			bb_mode = BB_VHT_MODE;
-			codeword = (u32)halbb_rate_order_compute(bb, rate_idx);
-			codeword--;
-			la->la_dbg_port = 0x3ab;
-			/*VHT-preamble (8+8+4) + (8+4+4*Nrx) = 36 + Nrx * 4*/
-			la->la_mac_cfg_i.la_trigger_time = trig_time_cca - 36 -
-					       (bb->num_rf_path * 4);
-			/*HT,VHT Data*/
-			adv->la_and1_val = 18;
-		} else {
-			BB_DBG_CNSL(*_out_len, *_used, output + *_used,
-				 *_out_len - *_used,
-				 "Not Support\n");
-			return;
-		}
-
-		/*And[2]*/
-		adv->la_and2_inv = 0;
-		adv->la_and2_sel = 0; /*Disable*/
-
-		/*And[3]*/
-		adv->la_and2_inv = 0;
-		adv->la_and3_sel = 0; /*Disable*/
-
-		/*And[4]*/
-		adv->la_and4_inv = 0;
-
-		if (var[0] == 20) {
-			if (bb_mode == BB_LEGACY_MODE) {
-				adv->la_and4_bitmap = codeword;
-				adv->la_and4_mask = 0x3000000f;
-			} else if (bb_mode == BB_HT_MODE) {
-				adv->la_and4_bitmap = (2 << 28) | codeword;
-				adv->la_and4_mask = 0x3000003f;
-			}  else { /* BB_VHT_MODE*/
-				adv->la_and4_bitmap = (1 << 28) |
-						      (codeword << 4);
-				adv->la_and4_mask = 0x300000f0;
-			}
-		} else {
-			BB_DBG_CNSL(*_out_len, *_used, output + *_used,
-				 *_out_len - *_used,
-				 "Not Support\n");
-			return;
-		}
-	} else {
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			 "Not Support\n");
-		return;
-	}
-	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		 "[Basic-Trigger]\n");
-	BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-		 "  *echo lamode 1 %d %d %d 0 %x %d %d %d\n\n",
-		 la->la_and0_bit_sel, dma->dma_data_type,
-		 la->la_mac_cfg_i.la_trigger_time,
-		 la->la_dbg_port, la->la_trigger_edge, la->la_smp_rate,
-		 la->la_count);
-	BB_TRACE("echo lamode 1 %d %d %d 0 %x %d %d %d\n\n",
-		 la->la_and0_bit_sel, dma->dma_data_type,
-		 la->la_mac_cfg_i.la_trigger_time,
-		 la->la_dbg_port, la->la_trigger_edge, la->la_smp_rate,
-		 la->la_count);
-
-	if (adv->adv_trig_en) {
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			 "[Adv-Trigger]\n");
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			 "  *And0 Disable=%d\n", la->la_and0_disable);
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			 "  *And1{sel,val,inv}={0x%x,0x%x,%d}\n  *And2{sel,val,inv}={0x%x,0x%x,%d}\n  *And3{sel,val,inv}={0x%x,0x%x,%d}\n",
-			 adv->la_and1_sel, adv->la_and1_val, adv->la_and1_inv,
-			 adv->la_and2_sel, adv->la_and2_val, adv->la_and2_inv,
-			 adv->la_and3_sel, adv->la_and3_val, adv->la_and3_inv);
-		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
-			 "  *And4{mask,bitmap,inv}={0x%x,0x%x,%d}\n",
-			 adv->la_and4_mask, adv->la_and4_bitmap,
-			 adv->la_and4_inv);
-	}
-#endif
+	la->la_run_mode = LA_RUN_FAST;
+	la->la_count = la->la_count_max;
 	halbb_la_run(bb);
 }
-
 
 void halbb_la_cmd_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *output,
 		  u32 *_out_len)
@@ -2001,64 +2016,60 @@ void halbb_la_cmd_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *ou
 	struct la_mac_cfg_info	*cfg = &la->la_mac_cfg_i;
 	struct la_string_info *buf = &la->la_string_i;
 	u32 val[10] = {0};
-	u32 used = *_used;
-	u32 out_len = *_out_len;
 	u8 i = 0;
 
-	HALBB_SCAN(input[1], DCMD_DECIMAL, &val[0]);
-
-	/*@dbg_print("echo cmd input_num = %d\n", input_num);*/
-
-	if ((_os_strcmp(input[1], "-h") == 0)) {
+	if (_os_strcmp(input[1], "-h") == 0) {
 		/*BB Basic Trigger*/
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "adv_help\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "BB_trig:  1 0 {DbgPort Bit} {DMA#} {TrigTime} {TrigCnt}\n\t {DbgPort} {Edge:P/N} {f_smp} {Cap_num}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "MAC_trig: 1 1 {0:cca,1:ok_pmac,2:er_pmac,3:ok,4:er} {DMA#} {TrigTime} {trig_cnt}\n\t {DbgPort} {Edge:0(P),1(N)} {f_smp} {Cpture num}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "fast\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "rtl_test {val}\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "cr_dump\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "buf {0~4: 64K/128K/192K/256K/320K}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "disable\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "show\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "reset\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "reset: reset all setting\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "trig\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "ptrn_chk {show(END), rst(END), {ptrn_idx:0~3} {smp_point} {msb32_mask(hex)} {val(hex)}\n");        
-#if 0
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "ptrn_chk {show(END), rst(END), {ptrn_idx:0~3} {smp_point} {msb32_mask(hex)} {val(hex)}\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "ptrn_chk max_num {val)}\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "max_num {val}\n");
+		#if 0
 		/*Fast Trigger*/
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			 "fast {0: CCA trig & AGC Dbg Port}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			 "fast {1: CCA trig & EVM Dbg Port}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "fast {2: CCA trig & SNR Dbg Port}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "fast {3: CCA trig & CFO Dbg Port}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "fast {4: CCA trig & ADC output Dbg Port}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "fast {10: EVM>=-X dB, 11: EVM<=-X dB} {X=2/4/8/16/32/64} {0:Lgcy, 1:HT}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "fast {12: EVM=-X dB} {X} {0:Lgcy, 1:HT}\n");
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			 "fast {20: RX-rate-idx=X} {X}\n");
-#endif
-		goto LA_END;
+		#endif
+
+		return;
 	}
 
-	if (_os_strcmp(input[1], "ptrn_chk") == 0) {
+	if (_os_strcmp(input[1], "adv_help") == 0 ||
+	    _os_strcmp(input[1], "show") == 0) {
+		halbb_la_cmd_bb_show_cfg(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "ptrn_chk") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[0]);
 		if (_os_strcmp(input[2], "show") == 0) {
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "[LA CHK Pattern] ===>\n");
+		} else if (_os_strcmp(input[2], "max_num") == 0) {
+			HALBB_SCAN(input[3], DCMD_DECIMAL, &val[0]);
+			la->la_count_max = val[0];
 		} else if (_os_strcmp(input[2], "rst") == 0) {
 			halbb_mem_set(bb, la->la_ptrn_chk_i, 0, sizeof(struct la_ptrn_chk_info) * LA_CHK_PTRN_NUM);
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			la->la_ptrn_chk_en = false;
+			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "ptrn_chk reset(Disable)\n");
 		} else if (val[0] < LA_CHK_PTRN_NUM) {
 			HALBB_SCAN(input[3], DCMD_DECIMAL, &val[1]);
@@ -2069,63 +2080,75 @@ void halbb_la_cmd_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *ou
 				la->la_ptrn_chk_i[val[0]].smp_point = val[1];
 				la->la_ptrn_chk_i[val[0]].la_ptrn_chk_mask = val[2];
 				la->la_ptrn_chk_i[val[0]].la_ptrn_chk_val = val[3];
+				la->la_ptrn_chk_en = true;
 			} else {
-				BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+				BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 					    "[Err] smp_number_max=%d\n", la->la_string_i.smp_number_max);
-				goto LA_END;
 			}
 		} else {
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "Set Err, idx=%d\n", val[0]);
-			goto LA_END;
 		}
 
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "ptrn_chk_en=%d, max_num = %d\n", la->la_ptrn_chk_en, la->la_count_max);
+
 		for (i = 0; i < LA_CHK_PTRN_NUM; i++) {
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "[%d] point=%05d, chk_mask=0x%08x, chk_val=0x%x\n",
 				    i, la->la_ptrn_chk_i[i].smp_point,
 				    la->la_ptrn_chk_i[i].la_ptrn_chk_mask,
 				    la->la_ptrn_chk_i[i].la_ptrn_chk_val);
 		}
-	} else if ((_os_strcmp(input[1], "fast") == 0)) {
-		halbb_la_cmd_fast(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "show") == 0)) {
-		halbb_la_cmd_bb_show_cfg(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "reset") == 0)) {
+	} else if (_os_strcmp(input[1], "fast") == 0) {
+		halbb_la_cmd_fast(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "rtl_test") == 0) {
+		halbb_la_cmd_rtl_test(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "max_num") == 0) {
+		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[0]);
+		la->la_count_max = val[0];
+		//la->la_count = la->la_count_max;
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "max_num = %d\n", la->la_count_max);
+	} else if (_os_strcmp(input[1], "cr_dump") == 0) {
+		halbb_la_cr_dump(bb);
+	} else if (_os_strcmp(input[1], "reset") == 0) {
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "Reset\n");
 		halbb_la_reset(bb);
-	} else if ((_os_strcmp(input[1], "trig") == 0)) {
+	} else if (_os_strcmp(input[1], "trig") == 0) {
+		la->la_run_mode = LA_RUN_MANUAL;
+		la->la_count = la->la_count_max;
 		halbb_la_run(bb);
-	} else if ((_os_strcmp(input[1], "cmn") == 0)) {
-		halbb_la_cmd_bb_cmn(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "dma") == 0)) {
-		halbb_la_cmd_bb_dma(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "bb") == 0)) {
-		halbb_la_cmd_bb_trig(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "mac") == 0)) {
-		halbb_la_cmd_mac_trig(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "tmac") == 0)) {
+	} else if (_os_strcmp(input[1], "cmn") == 0) {
+		halbb_la_cmd_bb_cmn(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "dma") == 0) {
+		halbb_la_cmd_bb_dma(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "bb") == 0) {
+		halbb_la_cmd_bb_trig(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "mac") == 0) {
+		halbb_la_cmd_mac_trig(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "tmac") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[1]);
 		HALBB_SCAN(input[3], DCMD_DECIMAL, &val[2]);
 		cfg->mac_la_timeout_en = (u8)val[1];
 		cfg->mac_la_timeout_val = (u8)val[2];
-	} else if ((_os_strcmp(input[1], "poll") == 0)) {
+	} else if (_os_strcmp(input[1], "poll") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[1]);
 		la->la_polling_cnt = (u8)val[1];
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "la_polling_cnt = %d, polling time = %d * 100ms\n",
 			    la->la_polling_cnt, la->la_polling_cnt);
-	} else if ((_os_strcmp(input[1], "get") == 0)) {
+	} else if (_os_strcmp(input[1], "get") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[1]);
 		HALBB_SCAN(input[3], DCMD_DECIMAL, &val[2]);
 		la->la_mode_state = LA_STATE_GET_DLE_BUF;
 		halbb_mem_set(bb, buf->octet, 0, buf->length);
 		halbb_la_rpt_buf_get(bb, (u16)val[1], (bool)val[2]);
 		halbb_la_stop(bb);
-	} else if ((_os_strcmp(input[1], "re") == 0)) {
-		halbb_la_cmd_bb_re_trig(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "buf") == 0)) {
+	} else if (_os_strcmp(input[1], "re") == 0) {
+		halbb_la_cmd_bb_re_trig(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "buf") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[1]);
 		la->la_mac_cfg_i.mac_la_buf_sel = (enum la_buff_mode_t)val[1];
 		la->la_mac_cfg_i.mac_alloc_success = halbb_la_mac_cfg_buf(bb, la->la_mac_cfg_i.mac_la_buf_sel);
@@ -2133,33 +2156,29 @@ void halbb_la_cmd_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *ou
 		if (!la->la_mac_cfg_i.mac_alloc_success)
 			halbb_la_stop(bb);
 
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "MAC_BUF_alloc_success=%d, Buff_mode=(%d)K\n",
 			    la->la_mac_cfg_i.mac_alloc_success,
 			    64 * (la->la_mac_cfg_i.mac_la_buf_sel + 1));
-	} else if ((_os_strcmp(input[1], "set") == 0)) {
+	} else if (_os_strcmp(input[1], "set") == 0) {
 		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[1]);
 
 		if (val[1] == 1) {
 			HALBB_SCAN(input[3], DCMD_DECIMAL, &val[2]);
 			la->not_stop_trig = (bool)val[2];
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				 "not_stop_trig=(%d)\n", la->not_stop_trig);
 		} else if (val[1] == 2) {
 			HALBB_SCAN(input[3], DCMD_DECIMAL, &val[2]);
 			la->la_print_i.is_la_print = (bool)val[2];
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				 "Auto print=(%d)\n", la->la_print_i.is_la_print);
 		}
-	} else if ((_os_strcmp(input[1], "print") == 0)) {
-		halbb_la_buffer_print(bb, input, &used, output, &out_len);
-	} else if ((_os_strcmp(input[1], "disable") == 0)) {
-		halbb_la_stop(bb);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
-			    "Disable LA mode\n");
-	} else if (val[0] == 1) {
+	} else if (_os_strcmp(input[1], "print") == 0) {
+		halbb_la_buffer_print(bb, input, _used, output, _out_len);
+	} else if (_os_strcmp(input[1], "1") == 0) {
 		if (!la->la_mac_cfg_i.mac_alloc_success) {
-			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "Need to set MAC CR(buf) first: echo bb lamode buf {val}\n");
 		}
 
@@ -2182,9 +2201,9 @@ void halbb_la_cmd_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *ou
 		la->la_mac_cfg_i.la_trigger_time = val[4]; /*unit: us*/
 		la->la_trigger_cnt= (u8)val[5];
 		la->la_dbg_port = val[6];
-		la->la_trigger_edge = (u8)val[7];
+		la->la_trigger_edge = (enum la_bb_trig_edge)val[7];
 		la->la_smp_rate = (enum la_bb_smp_clk)(val[8]);
-		la->la_count = val[9];
+		la->la_count_max = val[9];
 
 		if (la->la_basic_mode_sel == 0) {
 			dma->dma_data_type = (u8)val[3];
@@ -2201,33 +2220,34 @@ void halbb_la_cmd_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *ou
 			trig_mac->la_mac_and0_sel = (u8)val[3];
 		}
 
-		BB_TRACE("echo bb lamode %d %d %d %d %d %d %x %d %d %d\n\n",
-			 val[0], val[1], val[2], val[3], val[4],
+		BB_TRACE("echo bb lamode 1 %d %d %d %d %d %x %d %d %d\n\n",
+			 val[1], val[2], val[3], val[4],
 			 val[5], val[6], val[7], val[8], val[9]);
 
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "a.En= ((1)),  b.Mode = ((%d)), c.Trig_sel = ((0x%x)), d.Dma_type = ((%d))\n",
 			 la->la_and0_bit_sel, la->la_basic_mode_sel,
 			 dma->dma_data_type);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "e.Trig_time = ((%dus)), f.Trig_cnt = ((%d)), g.Dbg_port = ((0x%x))\n",
 			    la->la_mac_cfg_i.la_trigger_time, la->la_trigger_cnt,
 			    la->la_dbg_port);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "h.Trig_edge = ((%d)), i.La rate = ((%d MHz)), j.Cap_num = ((%d))\n\n",
 			    la->la_trigger_edge, (80 >> la->la_smp_rate),
-			    la->la_count);
-		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			    la->la_count_max);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			    "{And0_disable, adv_trig, re_trig, mac_trig}= {%d, %d, %d, %d}\n",
 			    la->la_and0_disable, la->adv_trig_i.adv_trig_en,
 			    la->la_re_trig_i.re_trig_en,
 			    trig_mac->la_mac_trig_en);
-
+		la->la_run_mode = LA_RUN_HERITAGE;
+		la->la_count = la->la_count_max;
 		halbb_la_run(bb);
+	} else {
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "Set Err\n");
 	}
-LA_END:
-	*_used = used;
-	*_out_len = out_len;
 }
 #endif
 

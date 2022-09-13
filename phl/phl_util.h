@@ -111,5 +111,13 @@ u8 pq_insert(void *d, struct phl_queue *q, enum lock_type type, void *priv, _os_
 u32 phl_get_passing_time_us(u32 start);
 u32 phl_get_passing_time_ms(u32 start);
 
+#define rtw_phl_is_ap_category(_type) (_type == PHL_RTYPE_AP ||\
+				       _type == PHL_RTYPE_P2P_GO ||\
+				       _type == PHL_RTYPE_VAP)
+#define rtw_phl_is_client_category(_type) (_type == PHL_RTYPE_STATION ||\
+					   _type == PHL_RTYPE_P2P_GC ||\
+					   _type == PHL_RTYPE_TDLS)
+#define rtw_phl_role_is_ap_category(_wrole) (rtw_phl_is_ap_category(_wrole->type))
+#define rtw_phl_role_is_client_category(_wrole) (rtw_phl_is_client_category(_wrole->type))
 #endif /*_PHL_UTIL_H_*/
 

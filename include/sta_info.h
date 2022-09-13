@@ -163,11 +163,11 @@ struct	stainfo_stats	{
 	u32 rxratecnt[128];	/* Read & Clear, in proc_get_rx_stat() */
 	u32 tx_ok_cnt;		/* Read & Clear, in proc_get_tx_stat() */
 	u32 tx_fail_cnt;	/* Read & Clear, in proc_get_tx_stat() */
+	u32 tx_fail_cnt_sum;	/* cumulative counts */
 	u32 tx_retry_cnt;	/* Read & Clear, in proc_get_tx_stat() */
-	#ifdef ROKU_PRIVATE
+	u32 tx_retry_cnt_sum;	/* cumulative counts */
 	u64 total_tx_retry_cnt;
 	u32 rx_retry_cnt;
-	#endif /* ROKU_PRIVATE */
 #ifdef CONFIG_RTW_MESH
 	u32 rx_hwmp_pkts;
 	u32 last_rx_hwmp_pkts;
@@ -538,8 +538,9 @@ struct sta_info {
 
 	struct st_ctl_t st_ctl;
 	u8 max_agg_num_minimal_record; /*keep minimal tx desc max_agg_num setting*/
-	u8 curr_rx_rate;
-	u8 curr_rx_rate_bmc;
+	u8 curr_rx_gi_ltf;
+	u16 curr_rx_rate;
+	u16 curr_rx_rate_bmc;
 #ifdef CONFIG_RTS_FULL_BW
 	bool vendor_8812;
 #endif

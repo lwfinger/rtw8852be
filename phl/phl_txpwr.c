@@ -41,3 +41,16 @@ enum rtw_phl_status rtw_phl_set_tx_power(void *phl, u8 band_idx)
 	return hstatus == RTW_HAL_STATUS_SUCCESS ? RTW_PHL_STATUS_SUCCESS : RTW_PHL_STATUS_FAILURE;
 }
 
+enum rtw_phl_status rtw_phl_get_txinfo_pwr(void *phl, s16 *pwr_dbm)
+{
+	struct phl_info_t *phl_info = phl;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
+	s16 power_dbm = 0;
+
+	hstatus = rtw_hal_get_txinfo_power(phl_info->hal, &power_dbm);
+	*pwr_dbm = power_dbm;
+
+	return hstatus == RTW_HAL_STATUS_SUCCESS ? RTW_PHL_STATUS_SUCCESS : RTW_PHL_STATUS_FAILURE;
+}
+
+

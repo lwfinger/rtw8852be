@@ -30,6 +30,10 @@
 #define CONF_OFLD_RESTORE 0
 #define CONF_OFLD_BACKUP 1
 
+#define SCAN_OP_STOP	0
+#define SCAN_OP_START	1
+#define SCAN_OP_SETPARM	2
+
 #define CMD_OFLD_SIZE sizeof(struct fwcmd_cmd_ofld)
 
 /* Generate 8-bit mask for a 4-byte alignment offset */
@@ -103,7 +107,92 @@ enum FW_OFLD_OP {
 	FW_OFLD_OP_READ_OFLD = 2,
 	FW_OFLD_OP_WRITE_OFLD = 3,
 	FW_OFLD_OP_CONF_OFLD = 4,
+	FW_OFLD_OP_CH_SWITCH = 5,
 	FW_OFLD_OP_MAX
+};
+
+/**
+ * @enum CHSW_BW
+ *
+ * @brief CHSW_BW
+ *
+ * @var CHSW_BW::CHSW_BW_20
+ * Please Place Description here.
+ * @var CHSW_BW::CHSW_BW_40
+ * Please Place Description here.
+ * @var CHSW_BW::CHSW_BW_80
+ * Please Place Description here.
+ * @var CHSW_BW::CHSW_BW_160
+ * Please Place Description here.
+ * @var CHSW_BW::CHSW_BW_80_80
+ * Please Place Description here.
+ * @var CHSW_BW::CHSW_BW_5
+ * Please Place Description here.
+ * @var CHSW_BW::CHSW_BW_10
+ * Please Place Description here.
+ * @var CHSW_BW::CHSW_BW_MAX
+ * Please Place Description here.
+ */
+enum CHSW_BW {
+	CHSW_BW_20 = 0,
+	CHSW_BW_40 = 1,
+	CHSW_BW_80 = 2,
+	CHSW_BW_160 = 3,
+	CHSW_BW_80_80 = 4,
+	CHSW_BW_5 = 5,
+	CHSW_BW_10 = 6,
+	CHSW_BW_MAX
+};
+
+/**
+ * @enum CHSW_CHBAND
+ *
+ * @brief CHSW_CHBAND
+ *
+ * @var CHSW_CHBAND::CHSW_CHBAND_24G
+ * Please Place Description here.
+ * @var CHSW_CHBAND::CHSW_CHBAND_5G
+ * Please Place Description here.
+ * @var CHSW_CHBAND::CHSW_CHBAND_6G
+ * Please Place Description here.
+ * @var CHSW_CHBAND::CHSW_CHBAND_MAX
+ * Please Place Description here.
+ */
+enum CHSW_CHBAND {
+	CHSW_CHBAND_24G = 0,
+	CHSW_CHBAND_5G = 1,
+	CHSW_CHBAND_6G = 2,
+	CHSW_CHBAND_MAX
+};
+
+/**
+ * @enum CHSW_STATUS_CODE
+ *
+ * @brief CHSW_STATUS_CODE
+ *
+ * @var CHSW_STATUS_CODE::CHSW_OK
+ * Please Place Description here.
+ * @var CHSW_STATUS_CODE::CHSW_NOT_COMPILED_ERR
+ * Please Place Description here.
+ * @var CHSW_STATUS_CODE::CHSW_STOPSER_FAIL_WARN
+ * Please Place Description here.
+ * @var CHSW_STATUS_CODE::CHSW_BB_CTRL_BW_CH_FAIL_ERR
+ * Please Place Description here.
+ * @var CHSW_STATUS_CODE::CHSW_RF_RELOAD_FAIL_WARN
+ * Please Place Description here.
+ * @var CHSW_STATUS_CODE::CHSW_STARTSER_FAIL_WARN
+ * Please Place Description here.
+ * @var CHSW_STATUS_CODE::CHSW_MAX
+ * Please Place Description here.
+ */
+enum CHSW_STATUS_CODE {
+	CHSW_OK = 0,
+	CHSW_NOT_COMPILED_ERR = 1,
+	CHSW_STOPSER_FAIL_WARN = 2,
+	CHSW_BB_CTRL_BW_CH_FAIL_ERR = 3,
+	CHSW_RF_RELOAD_FAIL_WARN = 4,
+	CHSW_STARTSER_FAIL_WARN = 5,
+	CHSW_MAX
 };
 
 /**
@@ -138,6 +227,37 @@ struct mac_ax_pkt_ofld_hdr {
 	u8 pkt_op:3;
 	u8 rsvd:5;
 	u16 pkt_len;
+};
+
+/**
+ * @struct scanofld_chinfo_node
+ * @brief scanofld_chinfo_node
+ *
+ * @var scanofld_chinfo_node::next
+ * Point to next node.
+ * @var scanofld_chinfo_node::chinfo
+ * Content of this node.
+ */
+struct scanofld_chinfo_node {
+	struct scanofld_chinfo_node *next;
+	struct mac_ax_scanofld_chinfo *chinfo;
+};
+
+/**
+ * @struct scan_chinfo_list
+ * @brief scan_chinfo_list
+ *
+ * @var scan_chinfo_head::head
+ * Point to first node.
+ * @var scan_chinfo_head::tail
+ * Point to last node.
+ * @var scan_chinfo_head::size
+ * Size of the list
+ */
+struct scan_chinfo_list {
+	struct scanofld_chinfo_node *head;
+	struct scanofld_chinfo_node *tail;
+	u8 size;
 };
 
 /**
@@ -621,4 +741,268 @@ u32 get_ccxrpt_event(struct mac_ax_adapter *adapter,
 		     struct rtw_c2h_info *c2h,
 		     enum phl_msg_evt_id *id, u8 *c2h_info);
 
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_scanofld_ch_list_clear
+ *
+ * Clear the scan list
+
+ * @param *adapter
+ * @param *list
+ * @return void
+ * @retval void
+ */
+void mac_scanofld_ch_list_clear(struct mac_ax_adapter *adapter,
+				struct scan_chinfo_list *list);
+
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_add_scanofld_ch
+ *
+ * Add a chinfo to scanlist.
+ * Note that the user-allocated chinfo must not be free.
+ * halmac will handle the free process
+ *
+ * @param *adapter
+ * @param *chinfo
+ * @param send_h2C send scanlist to fw after adding or not
+ * @param clear_after_send clear halmac scanlist after sending or not(available when sendH2C is set)
+ * @return 0 for success. Others are fail.
+ * @retval u32
+ */
+u32 mac_add_scanofld_ch(struct mac_ax_adapter *adapter, struct mac_ax_scanofld_chinfo *chinfo,
+			u8 send_h2C, u8 clear_after_send);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_scanofld
+ *
+ * Start scanofld
+ *
+ * @param *adapter
+ * @param *scanParam
+ * @return 0 for success. Others are fail.
+ * @retval u32
+ */
+void mac_scanofld_reset_state(struct mac_ax_adapter *adapter);
+
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_scanofld
+ *
+ * Start scanofld
+ *
+ * @param *adapter
+ * @param *scanParam
+ * @return 0 for success. Others are fail.
+ * @retval u32
+ */
+u32 mac_scanofld(struct mac_ax_adapter *adapter, struct mac_ax_scanofld_param *scanParam);
+
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_scanofld_fw_busy
+ *
+ * Check whether FW is scanning or not
+ *
+ * @param *adapter
+ * @return 0 for idle. Others are busy.
+ * @retval u32
+ */
+u32 mac_scanofld_fw_busy(struct mac_ax_adapter *adapter);
+
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_scanofld_chlist_busy
+ *
+ * check whether halmac chlist or fw chlist are busy or not
+ *
+ * @param *adapter
+ * @return 0 for idle. Others are busy.
+ * @retval u32
+ */
+u32 mac_scanofld_chlist_busy(struct mac_ax_adapter *adapter);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief ch_switch_ofld
+ *
+ * ch switch offload
+ *
+ * @param *adapter
+ * @param parm
+ * @return 0 for success.
+ * @retval ch switch offload h2c status
+ */
+u32 mac_ch_switch_ofld(struct mac_ax_adapter *adapter, struct mac_ax_ch_switch_parm parm);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_get_ch_switch_rpt
+ *
+ * get channel switch offload report
+ *
+ * @param *adapter
+ * @param parm
+ * @return 0 for success.
+ * @retval ch switch offload h2c status
+ */
+u32 mac_get_ch_switch_rpt(struct mac_ax_adapter *adapter, struct mac_ax_ch_switch_rpt *rpt);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_cfg_bcn_filter
+ *
+ * config bcn filter
+ *
+ * @param *adapter
+ * @param cfg
+ * @return 0 for success.
+ * @retval
+ */
+u32 mac_cfg_bcn_filter(struct mac_ax_adapter *adapter, struct mac_ax_bcn_fltr cfg);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_bcn_filter_rssi
+ *
+ * offload rssi to fw for bcn filter
+ *
+ * @param *adapter
+ * @param macid
+ * @param size
+ * @param rssi
+ * @return 0 for success.
+ * @retval
+ */
+u32 mac_bcn_filter_rssi(struct mac_ax_adapter *adapter, u8 macid, u8 size, u8 *rssi);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup FW_Offload
+ * @{
+ */
+
+/**
+ * @brief mac_bcn_filter_tp
+ *
+ * offload tp to fw for bcn filter
+ *
+ * @param *adapter
+ * @param macid
+ * @param tx
+ * @param rx
+ * @return 0 for success.
+ * @retval
+ */
+u32 mac_bcn_filter_tp(struct mac_ax_adapter *adapter, u8 macid, u16 tx, u16 rx);
+/**
+ * @}
+ * @}
+ */
 #endif

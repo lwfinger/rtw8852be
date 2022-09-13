@@ -431,10 +431,17 @@ void halbb_physts_detail_dump(struct bb_info *bb, u32 bitmap, u32 bitmap_mask)
 
 	BB_TRACE("[Hdr] rssi={%d}{%d,%d,%d,%d}\n",
 		 TRANS_2_RSSI(psts_h->rssi_avg),
-		 TRANS_2_RSSI(psts_h->rssi[0]),
-		 TRANS_2_RSSI(psts_h->rssi[1]),
-		 TRANS_2_RSSI(psts_h->rssi[2]),
-		 TRANS_2_RSSI(psts_h->rssi[3]));
+		 TRANS_2_RSSI(psts_h->rssi_td[0]),
+		 TRANS_2_RSSI(psts_h->rssi_td[1]),
+		 TRANS_2_RSSI(psts_h->rssi_td[2]),
+		 TRANS_2_RSSI(psts_h->rssi_td[3]));
+
+	BB_TRACE("[Hdr] RPL={%d}{%d,%d,%d,%d}\n",
+		 TRANS_2_RSSI(physts->rpl_avg),
+		 TRANS_2_RSSI(physts->rpl_path[0]),
+		 TRANS_2_RSSI(physts->rpl_path[1]),
+		 TRANS_2_RSSI(physts->rpl_path[2]),
+		 TRANS_2_RSSI(physts->rpl_path[3]));
 
 	if (bitmap == 0) {
 		BB_TRACE("Hdr only, empty IE\n");
@@ -887,6 +894,7 @@ bool halbb_physts_ie_00(struct bb_info *bb,
 	psts_0->pop_idx_cck = physts_ie_0->pop_idx;
 
 	halbb_mod_rssi_by_path_en(bb, psts_0->rx_path_en_cck);
+	physts->rpl_avg = (u8)(psts_0->rpl >> 1);
 
 	return true;
 }
@@ -954,6 +962,7 @@ bool halbb_physts_ie_01(struct bb_info *bb,
 	//BB_DBG(bb, DBG_CMN, "[1]cfo_avg=%d, evm_max=%d, evm_min=%d, cn_avg=%d\n",
 	//	psts_1->cfo_avg, psts_1->evm_max, psts_1->evm_min, psts_1->cn_avg);
 	halbb_mod_rssi_by_path_en(bb, psts_1->rx_path_en);
+	physts->rpl_avg = psts_1->rpl_fd;
 
 	return true;
 }
@@ -1193,6 +1202,11 @@ bool halbb_physts_ie_08(struct bb_info *bb,
 
 	#ifdef HALBB_CH_INFO_SUPPORT
 	if (ch_physts->ch_info_state == CH_RPT_START_TO_WAIT) {
+		if (!buf->octet)
+		{
+			BB_WARNING("[Warning] Memory is not allocated for CH_INFO\n");
+			return true;
+		}
 		halbb_mem_cpy(bb, buf->octet, (s16*)addr, buf->ch_info_buf_len);
 		ch_physts->ch_info_state = CH_RPT_GETTED;
 		ch_physts->ch_info_len = psts_8->ch_info_len;
@@ -2110,6 +2124,32 @@ bool halbb_physts_ie_31(struct bb_info *bb,
 	return true;
 }
 
+void halbb_physts_fd_rpl_2_rssi_cvrt(struct bb_info *bb)
+{
+	struct bb_physts_info	*physts = &bb->bb_physts_i;
+	struct bb_physts_rslt_hdr_info	*psts_h = &physts->bb_physts_rslt_hdr_i;
+	u8 i;
+
+	for (i = 0; i < 4; i++)
+		psts_h->rssi_td[i] = psts_h->rssi[i];
+	
+	/*Generate Per path RPL*/
+	for (i = 0; i < 4; i++) {
+		if (psts_h->rssi[i] == 0) {
+			physts->rpl_path[i] = 0;
+			continue;
+		}
+
+		physts->rpl_path[i] = physts->rpl_avg + psts_h->rssi[i] - psts_h->rssi_avg;
+	}
+
+	if (physts->rssi_cvrt_2_rpl_en) {
+		psts_h->rssi_avg = physts->rpl_avg;
+		for (i = 0; i < 4; i++)
+			psts_h->rssi[i] = physts->rpl_path[i];
+	}
+}
+
 void halbb_physts_rpt_gen(struct bb_info *bb, struct physts_result *rpt,
 			  bool physts_rpt_valid, struct physts_rxd *desc,
 			  bool is_cck_rate)
@@ -2273,6 +2313,7 @@ bool halbb_physts_parsing(struct bb_info *bb,
 	u8 i = 0;
 	u8 curr_ie = 0xff;
 	u8 *addr_in_bkp = addr;
+	enum bb_physts_bitmap_t ie_map_type = PHYSTS_BITMAP_NUM;
 	bool is_cck_rate = false;
 	bool is_valid = true;
 
@@ -2296,6 +2337,7 @@ bool halbb_physts_parsing(struct bb_info *bb,
 	/*---[Physts header parsing]------------------------------------------*/
 	ie_length_hdr = halbb_physts_ie_hdr(bb, addr, desc);
 	addr += PHYSTS_HDR_LEN;
+	ie_map_type = physts->bb_physts_rslt_hdr_i.ie_map_type;
 
 	if ((ie_length_hdr << 3) != physts_total_length) {
 		physts->bb_physts_cnt_i.err_len_cnt++;
@@ -2303,6 +2345,16 @@ bool halbb_physts_parsing(struct bb_info *bb,
 		is_valid = false;
 		//return false;
 		goto PARSING_END;
+	}
+
+	if ((ie_map_type <= DL_MU_SPOOFING) || (ie_map_type == UL_TB_SPOOFING)) {
+		desc->is_to_self = 0;
+		for (i = 0; i < desc->user_num; i++) {
+			desc->user_i[i].is_bcn = 0;
+			desc->user_i[i].is_ctrl = 0;
+			desc->user_i[i].is_data = 0;
+			desc->user_i[i].is_mgnt = 0;
+		}
 	}
 
 	if (!desc->is_to_self && !physts->show_phy_sts_all_pkt) {
@@ -2420,6 +2472,8 @@ bool halbb_physts_parsing(struct bb_info *bb,
 
 	/*===================================================================*/
 PARSING_END:
+	halbb_physts_fd_rpl_2_rssi_cvrt(bb);
+
 	halbb_physts_rpt_gen(bb, bb_rpt, is_valid, desc, is_cck_rate);
 	physts->is_valid = is_valid;
 
@@ -2567,6 +2621,7 @@ void halbb_physts_parsing_init(struct bb_info *bb)
 	physts->show_phy_sts_all_pkt = false;
 	physts->show_phy_sts_max_cnt = 5;
 	physts->show_phy_sts_cnt = 0;
+	physts->rssi_cvrt_2_rpl_en = false;
 }
 
 void halbb_physts_dbg(struct bb_info *bb, char input[][16], u32 *_used,
@@ -2590,10 +2645,17 @@ void halbb_physts_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			 "bitmap show\n");
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			 "bitmap set {idx, all, or} {hex_val}\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			 "rssi_src {0:td, 1:fd_rpl}\n");
 		return;
 	}
 
-	if (_os_strcmp(input[1], "bitmap") == 0) {
+	if (_os_strcmp(input[1], "rssi_src") == 0) {
+		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[0]);
+		physts->rssi_cvrt_2_rpl_en = (bool)(val[0]);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "rssi_cvrt_2_rpl_en=%d\n", physts->rssi_cvrt_2_rpl_en);
+	} else if (_os_strcmp(input[1], "bitmap") == 0) {
 		if (_os_strcmp(input[2], "show") == 0) {
 			BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 				    "Show all IE BITMAP\n");

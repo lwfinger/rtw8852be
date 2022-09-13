@@ -21,7 +21,7 @@ rtw_hal_download_fw(struct rtw_phl_com_t *phl_com, void *hal);
 enum rtw_hal_status
 rtw_hal_redownload_fw(struct rtw_phl_com_t *phl_com, void *hal);
 
-void rtw_hal_fw_dbg_dump(void *hal, u8 is_low_power);
+void rtw_hal_fw_dbg_dump(void *hal);
 
 enum rtw_hal_status
 rtw_hal_fw_log_cfg(void *hal, u8 op, u8 type, u32 value);

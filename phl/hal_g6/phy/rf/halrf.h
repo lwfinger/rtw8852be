@@ -256,6 +256,7 @@ struct rf_info {
 	u8	pre_ther_idx;
 	/* [Check NCTL Done status Read Times] */
 	u32 nctl_ck_times[2];  /* 0xbff8 0x80fc*/
+	u32	fw_ofld_enable;
 	
 	/*@=== [HALRF Structure] ============================================*/
 	struct halrf_pwr_track_info	pwr_track;
@@ -270,7 +271,7 @@ struct rf_info {
 	struct halrf_radio_info	radio_info;
 	struct halrf_fem_info	fem;
 	struct rf_dbg_cmd_info	rf_dbg_cmd_i;
-	struct halrf_rx_gain_k_info	rx_gain_k;
+	struct halrf_kfree_info	kfree_info;
 	struct halrf_psd_data	psd;
 	struct rfk_location		iqk_loc[2];	/*S0/S1*/
 	struct rfk_location		dpk_loc[2];	/*S0/S1*/

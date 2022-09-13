@@ -21,4 +21,6 @@ bool rtw_phl_get_pwr_lmt_en(void *phl, u8 band_idx);
 
 enum rtw_phl_status rtw_phl_set_tx_power(void *phl, u8 band_idx);
 
+enum rtw_phl_status rtw_phl_get_txinfo_pwr(void *phl, s16 *pwr_dbm);
+
 #endif /*_PHL_TXPWR_H_*/

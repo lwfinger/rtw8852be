@@ -19,7 +19,7 @@
 #define C2H_MEM_SZ (16*1024)
 
 
-#define MAX_CMDSZ	1024
+#define MAX_CMDSZ	1536
 #define MAX_RSPSZ	512
 #define MAX_EVTSZ	1024
 

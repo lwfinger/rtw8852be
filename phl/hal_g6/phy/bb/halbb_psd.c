@@ -389,7 +389,9 @@ void halbb_psd_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	} else if (var1[0] == 0) {
 
 		for (i = 1; i < 10; i++) {
-			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			if (input[i + 1])
+				HALBB_SCAN(input[i + 1], DCMD_DECIMAL,
+					   &var1[i]);
 		}
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			    "sw_avg_time=((%d)), hw_avg_time=((%d)), IQ=((%d)), fft=((%d)), path=((%d)), input =((%d)) ch=((%d)), bw=((%d))\n",

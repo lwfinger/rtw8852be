@@ -725,6 +725,9 @@ enum rtw_hal_status halrf_gapk_trigger(void *rf_void,
 	if (!(rf->support_ability & HAL_RF_TXGAPK))
 		return RTW_HAL_STATUS_SUCCESS;
 
+	halrf_btc_rfk_ntfy(rf, (BIT(phy_idx) << 4), RF_BTC_TXGAPK, RFK_START);
+	halrf_tmac_tx_pause(rf, phy_idx, true);
+
 	rf->rfk_is_processing = true;
 	
 	start_time = _os_get_cur_time_us();
@@ -750,6 +753,9 @@ enum rtw_hal_status halrf_gapk_trigger(void *rf_void,
 	rf->rfk_is_processing = false;
 
 	finish_time = _os_get_cur_time_us();
+
+	halrf_tmac_tx_pause(rf, phy_idx, false);
+	halrf_btc_rfk_ntfy(rf, (BIT(phy_idx) << 4), RF_BTC_TXGAPK, RFK_STOP);
 	
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK] %s processing time = %d.%dms\n",
 		__func__,
@@ -2231,6 +2237,37 @@ u32 halrf_get_radio_reg_ver(struct rf_info *rf)
 	if (hal_com->chip_id == CHIP_WIFI6_8852B)
 		return halrf_get_8852b_radio_reg_ver();
 #endif
+	return 0;
+}
+
+u32 halrf_get_radio_ver_from_reg(struct rf_info *rf)
+{
+	struct rtw_hal_com_t *hal_com = rf->hal_com;
+
+#ifdef RF_8852A_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8852A)
+		return halrf_rrf(rf, RF_PATH_A, 0x67, 0xfff);
+#endif
+#ifdef RF_8852B_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8852B)
+		return halrf_rrf(rf, RF_PATH_A, 0x9F, 0xfff);
+#endif
+#ifdef RF_8852C_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8852C)
+		return halrf_rrf(rf, RF_PATH_A, 0xFE, 0xfff);
+#endif
+
+#if 0 /* TBD */
+#ifdef RF_8832BR_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8832BR)
+		return halrf_rrf(rf, RF_PATH_A, 0xFE, 0xfff);
+#endif
+#ifdef RF_8192XB_SUPPORT
+	if (hal_com->chip_id == CHIP_WIFI6_8192XB)
+		return halrf_rrf(rf, RF_PATH_A, 0xFE, 0xfff);
+#endif
+#endif
+
 	return 0;
 }
 

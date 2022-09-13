@@ -593,6 +593,27 @@ struct next_pid_info {
  */
 
 /**
+ * @brief deq_enq_all
+ *
+ * @param *adapter
+ * @param *info
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 deq_enq_all(struct mac_ax_adapter *adapter, struct deq_enq_info *info);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup Firmware
+ * @{
+ * @addtogroup CPU_IO
+ * @{
+ */
+
+/**
  * @brief mac_dle_buf_req_wd
  *
  * @param *adapter

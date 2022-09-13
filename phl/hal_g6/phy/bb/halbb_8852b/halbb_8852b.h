@@ -36,6 +36,7 @@ void halbb_set_pmac_tx_8852b(struct bb_info *bb, struct halbb_pmac_info *tx_info
 
 void halbb_set_tmac_tx_8852b(struct bb_info *bb, enum phl_phy_idx phy_idx);
 void halbb_ic_hw_setting_init_8852b(struct bb_info *bb);
+void halbb_ic_hw_setting_8852b(struct bb_info *bb);
 
 bool halbb_set_pd_lower_bound_8852b(struct bb_info *bb, u8 bound,
 				      enum channel_width bw,

@@ -29,4 +29,5 @@ struct phl_tid_ampdu_rx *phl_tid_ampdu_rx_alloc(struct phl_info_t *phl_info,
                                                 struct rtw_phl_stainfo_t *sta,
                                                 u16 timeout, u16 ssn, u16 tid,
                                                 u16 buf_size);
+void phl_notify_reorder_sleep(void *phl, struct rtw_phl_stainfo_t *sta);
 #endif /*_PHL_RX_AGG_H_*/

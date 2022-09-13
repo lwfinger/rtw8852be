@@ -163,5 +163,8 @@ enum rtw_phl_status
 phl_cmd_alloc_stainfo_hdl(struct phl_info_t *phl_info, u8 *param);
 #endif /* CONFIG_CMD_DISP */
 
-#endif  /*_PHL_STA_H_*/
+bool phl_self_stainfo_chk(struct phl_info_t *phl_info,
+                          struct rtw_wifi_role_t *wrole,
+                          struct rtw_phl_stainfo_t *sta);
 
+#endif  /*_PHL_STA_H_*/

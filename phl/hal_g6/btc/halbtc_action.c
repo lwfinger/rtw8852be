@@ -208,8 +208,10 @@ static void _set_rf_trx_para(struct btc_t *btc)
 	_set_bt_tx_power(btc, para.bt_tx_power);
 	_set_bt_rx_gain(btc, para.bt_rx_gain);
 
-	if (bt->enable.now == 0 || wl->status.map.rf_off == 1 ||
-	    wl->status.map.lps)
+	if (!bt->enable.now || dm->wl_only || wl->status.map.rf_off ||
+	    wl->status.map.lps == BTC_LPS_RF_OFF ||
+	    wl->role_info.link_mode == BTC_WLINK_5G ||
+	    wl->role_info.link_mode == BTC_WLINK_NOLINK)
 	    wl_stb_chg = 0;
 	else
 	    wl_stb_chg = 1;
@@ -498,14 +500,42 @@ static void _set_halmac_tx_limit(struct btc_t *btc)
 	struct btc_bt_hid_desc *hid = &b->hid_desc;
 	struct btc_wl_role_info *wl_rinfo = &wl->role_info;
 	struct btc_wl_link_info *plink = NULL;
-	u8 mode = wl_rinfo->link_mode, i;
-	u8 tx_retry = 0;
+	u8 mode = wl_rinfo->link_mode, i, tx_1ss_limit = 0, tx_1ss_en = 0;
+	u8 tx_retry = 0, enable = 0, reenable = 0;
 	u32 tx_time = 0;
-	u16 enable = 0;
-	bool reenable = false;
 
 	if (btc->ctrl.manual)
 		return;
+
+	if (mode == BTC_WLINK_2G_GO ||
+	    mode == BTC_WLINK_2G_GC ||
+	    mode == BTC_WLINK_2G_SCC ||
+	    mode == BTC_WLINK_2G_MCC ||
+	    mode == BTC_WLINK_25G_MCC) {
+		if (hfp->exist || hid->exist)
+			tx_1ss_limit = 1;
+		else
+			tx_1ss_limit = 0;
+	} else {
+		tx_1ss_limit = 0;
+	}
+
+	dm->wl_tx_limit.tx_1ss = tx_1ss_limit;
+
+	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
+
+		plink = &wl->link_info[i];
+
+		if  (plink->connected == MLME_LINKED &&
+		     plink->chdef.band == BAND_ON_24G)
+			tx_1ss_en = tx_1ss_limit;
+		else
+			tx_1ss_en = false;
+
+		if (tx_1ss_en != plink->stat.traffic.tx_1ss_limit)
+			rtw_hal_btc_cfg_tx_1ss(btc->hal, btc->phl,
+				               i, tx_1ss_en);
+	}
 
 	if (btc->dm.freerun || btc->ctrl.igno_bt || b->profile_cnt.now == 0 ||
 	    mode == BTC_WLINK_5G || mode == BTC_WLINK_NOLINK) {
@@ -526,19 +556,20 @@ static void _set_halmac_tx_limit(struct btc_t *btc)
 		tx_retry = BTC_MAX_TX_RETRY_DEF;
 	}
 
-	if (dm->wl_tx_limit.enable == enable &&
+	if (dm->wl_tx_limit.en == enable &&
 	    dm->wl_tx_limit.tx_time == tx_time &&
 	    dm->wl_tx_limit.tx_retry == tx_retry)
 		return;
 
-	if (!dm->wl_tx_limit.enable && enable)
-		reenable = true;
+	if (!dm->wl_tx_limit.en && enable)
+		reenable = 1;
 
-	dm->wl_tx_limit.enable = enable;
+	dm->wl_tx_limit.en = enable;
 	dm->wl_tx_limit.tx_time = tx_time;
 	dm->wl_tx_limit.tx_retry = tx_retry;
 
 	for (i = 0; i < MAX_WIFI_ROLE_NUMBER; i++) {
+
 		plink = &wl->link_info[i];
 
 		if (!plink->connected)
@@ -1241,7 +1272,7 @@ void _action_wl_off(struct btc_t *btc)
 	/* don't set PTA control if LPS */
 	if (wl->status.map.rf_off || btc->dm.bt_only) {
 		_set_ant(btc, NM_EXEC, BTC_PHY_ALL, BTC_ANT_WOFF);
-	} else if (wl->status.map.lps == 2) {
+	} else if (wl->status.map.lps == BTC_LPS_RF_ON) {
 		if (wl->role_info.link_mode == BTC_WLINK_5G)
 			_set_ant(btc, FC_EXEC, BTC_PHY_ALL, BTC_ANT_W5G);
 		else
@@ -1250,7 +1281,7 @@ void _action_wl_off(struct btc_t *btc)
 
 	if (wl->role_info.link_mode == BTC_WLINK_5G) {
 		_set_policy(btc, BTC_CXP_OFF_EQ0, __func__);
-	} else if (wl->status.map.lps == 2) {
+	} else if (wl->status.map.lps == BTC_LPS_RF_ON) {
 		if (btc->cx.bt.link_info.a2dp_desc.active)
 			_set_policy(btc, BTC_CXP_OFF_BT, __func__);
 		else

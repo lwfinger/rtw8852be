@@ -233,10 +233,36 @@ rtw_hal_redownload_fw(struct rtw_phl_com_t *phl_com, void *hal)
 	return hal_status;
 }
 
-void rtw_hal_fw_dbg_dump(void *hal, u8 is_low_power)
+void rtw_hal_fw_dbg_dump(void *hal)
 {
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 
-	rtw_hal_mac_fw_dbg_dump(hal_info, is_low_power);
+	rtw_hal_mac_fw_dbg_dump(hal_info);
 }
 
+enum rtw_fw_status rtw_hal_get_fw_status(void *h)
+{
+	struct hal_info_t *hal = (struct hal_info_t *)h;
+	struct mac_ax_adapter *mac = hal_to_mac(hal);
+	struct mac_ax_ops *hal_mac_ops = mac->ops;
+	u32 mac_fw_sts;
+
+	mac_fw_sts = hal_mac_ops->get_fw_status(mac);
+
+	switch (mac_fw_sts) {
+	case MACSUCCESS:
+		return RTW_FW_STATUS_OK;
+	case MACNOFW:
+		return RTW_FW_STATUS_NOFW;
+	case MACFWASSERT:
+		return RTW_FW_STATUS_ASSERT;
+	case MACFWEXCEP:
+		return RTW_FW_STATUS_EXCEP;
+	case MACFWRXI300:
+		return RTW_FW_STATUS_RXI300;
+	case MACFWPCHANG:
+		return RTW_FW_STATUS_HANG;
+	default:
+		return RTW_FW_STATUS_OK;
+	}
+}
