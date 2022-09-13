@@ -1201,6 +1201,7 @@ rtw_phl_trx_alloc(void *phl)
 		goto error_datapath;
 	}
 
+#ifdef CONFIG_PHL_TEST_SUITE
 	phl_status = phl_trx_test_init(phl);
 	if (phl_status != RTW_PHL_STATUS_SUCCESS) {
 		PHL_ERR("phl_trx_test_init failed\n");
@@ -1211,6 +1212,7 @@ rtw_phl_trx_alloc(void *phl)
 
 error_trx_test:
 	phl_datapath_deinit(phl_info);
+#endif
 error_datapath:
 	return phl_status;
 }

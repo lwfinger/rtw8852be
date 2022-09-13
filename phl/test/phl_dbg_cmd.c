@@ -165,7 +165,6 @@ rtw_phl_dbg_core_cmd(struct phl_info_t *phl_info,
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
-#ifdef CONFIG_PHL_TEST_SUITE
 bool
 _is_hex_digit(char ch_tmp)
 {
@@ -233,6 +232,7 @@ _get_hex_from_string(char *szstr, u32 *val)
 	return true;
 }
 
+#ifdef CONFIG_PHL_TEST_SUITE
 void
 _phl_dbg_cmd_switch_chbw(struct phl_info_t *phl_info, char input[][MAX_ARGV],
 			 u32 input_num, char *output, u32 out_len)

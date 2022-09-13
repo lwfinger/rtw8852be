@@ -91,11 +91,11 @@ rtw_phl_dbg_proc_cmd(struct phl_info_t *phl_info,
 		     struct rtw_proc_cmd *incmd,
 		     char *output,
 		     u32 out_len);
-bool
-_get_hex_from_string(char *szstr, u32 *val);
 #else
 
 #define rtw_phl_dbg_proc_cmd(_phl_info, _incmd, _output, _out_len) RTW_HAL_STATUS_SUCCESS
 
 #endif
+bool
+_get_hex_from_string(char *szstr, u32 *val);
 #endif
