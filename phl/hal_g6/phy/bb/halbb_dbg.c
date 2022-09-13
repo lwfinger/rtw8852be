@@ -1468,7 +1468,7 @@ void halbb_dump_bb_reg(struct bb_info *bb, u32 *_used, char *output,
 
 	#ifdef BB_8852B_SUPPORT
 	case BB_RTL8852B:
-		halbb_dump_bb_reg_8852b(bb, _used, output, _out_len, dump_2_buff);
+//		halbb_dump_bb_reg_8852b(bb, _used, output, _out_len, dump_2_buff);
 		break;
 	#endif
 
