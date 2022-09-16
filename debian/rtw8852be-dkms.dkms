@@ -1,0 +1,9 @@
+PACKAGE_NAME="rtw8852be"
+PACKAGE_VERSION="#MODULE_VERSION#"
+BUILT_MODULE_NAME[0]="8852be"
+MAKE="'make' -j$(grep -c "^processor" /proc/cpuinfo) all"
+CLEAN="'make' clean"
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+AUTOINSTALL="YES"
+# Set the acceptable kernel values - 4.14+
+BUILD_EXCLUSIVE_KERNEL="^(4.1[4-9]\.|4.[2-9][0-9]\.|5\.[0-9]+\.|6.[0-9]+\.)"
