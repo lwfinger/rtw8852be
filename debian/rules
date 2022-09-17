@@ -3,7 +3,7 @@
 include /usr/share/dpkg/pkg-info.mk
 
 %:
-	dh $@ --with dkms
+	dh $@ --with dkms,modaliases
 
 override_dh_install:
 	dh_install core phl include os_dep platform Makefile common.mk usr/src/rtw8852be-$(DEB_VERSION_UPSTREAM)/
