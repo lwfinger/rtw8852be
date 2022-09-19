@@ -23,7 +23,7 @@
 #endif
 
 #define MAX_CMD_REQ_NUM (8)
-#define MODL_MASK_LEN (PHL_BK_MDL_END/8)
+#define MODL_MASK_LEN DIV_ROUND_UP(PHL_MDL_ID_MAX, 8)
 
 #define GEN_VALID_HDL(_idx) ((u32)(BIT31 | (u32)(_idx)))
 #define IS_HDL_VALID(_hdl) ((_hdl) & BIT31)
