@@ -560,8 +560,6 @@ void set_msg_bitmap(struct cmd_dispatcher *obj, struct phl_dispr_msg_ex *ex, u8 
 	/* ensure mandatory & wifi role module recv all msg*/
 	_os_mem_cpy(d, ex->premap, obj->bitmap, MODL_MASK_LEN);
 	_os_mem_cpy(d, ex->postmap, obj->bitmap, MODL_MASK_LEN);
-	if (mdl_id % 8 >= 16)
-		return;
 	if(_chk_bitmap_bit(obj->bitmap, mdl_id)) {
 		_add_bitmap_bit(ex->premap, &mdl_id, 1);
 		_add_bitmap_bit(ex->postmap, &mdl_id, 1);
@@ -585,8 +583,6 @@ void set_msg_custom_bitmap(struct cmd_dispatcher *obj, struct phl_dispr_msg_ex *
 		_add_bitmap_bit(ex->premap, id_arr, len);
 		_add_bitmap_bit(ex->postmap, id_arr, len);
 	}
-	if (mdl_id % 8 >= 16)
-		return;
 	if(_chk_bitmap_bit(obj->bitmap, mdl_id)) {
 		_add_bitmap_bit(ex->premap, &mdl_id, 1);
 		_add_bitmap_bit(ex->postmap, &mdl_id, 1);
@@ -1313,8 +1309,6 @@ u8 get_module_by_id(struct cmd_dispatcher *obj, enum phl_module_id id,
 		return true;
 	}
 
-	if (id % 8 >= 16)
-		return false;
 	if (!_chk_bitmap_bit(obj->bitmap, id))
 		return false;
 
