@@ -1289,9 +1289,12 @@ void rtw_cfg80211_indicate_disconnect(_adapter *padapter, u16 reason, u8 locally
 			rtw_cfg80211_connect_result(pwdev, NULL, NULL, 0, NULL, 0,
 				reason?reason:WLAN_STATUS_UNSPECIFIED_FAILURE,
 				GFP_ATOMIC);
+//			if (reason != WLAN_STATUS_UNSPECIFIED_FAILURE)
+//				pr_info("rtw8852be: Connected\n");
 		} else if (pwdev->sme_state == CFG80211_SME_CONNECTED) {
 			RTW_INFO(FUNC_ADPT_FMT" call cfg80211_disconnected, reason:%d\n", FUNC_ADPT_ARG(padapter), reason);
 			rtw_cfg80211_disconnected(pwdev, reason, NULL, 0, locally_generated, GFP_ATOMIC);
+			pr_info("rtw8852be: Connection disconnected for reason %d\n", reason);
 		}
 
 		RTW_INFO("pwdev->sme_state(a)=%d\n", pwdev->sme_state);
@@ -1304,6 +1307,7 @@ void rtw_cfg80211_indicate_disconnect(_adapter *padapter, u16 reason, u8 locally
 		} else {
 			RTW_INFO(FUNC_ADPT_FMT" call cfg80211_disconnected, reason:%d\n", FUNC_ADPT_ARG(padapter), reason);
 			rtw_cfg80211_disconnected(pwdev, reason, NULL, 0, locally_generated, GFP_ATOMIC);
+			pr_info("rtw8852be: Connection disconnected for reason %d\n", reason);
 		}
 		#endif
 	}
@@ -9314,6 +9318,7 @@ int	cfg80211_rtw_resume(struct wiphy *wiphy) {
 		int PNOWakeupScanWaitCnt = 0;
 
 		rtw_cfg80211_disconnected(padapter->rtw_wdev, 0, NULL, 0, 1, GFP_ATOMIC);
+		pr_info("rtw8852be: Connection disconnected for reason %d\n", reason);
 
 		rtw_init_sitesurvey_parm(padapter, &parm);
 		for (i=0;i<wow_nlo->num_of_networks && i < RTW_SSID_SCAN_AMOUNT; i++) {

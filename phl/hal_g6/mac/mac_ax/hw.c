@@ -2211,7 +2211,10 @@ u32 mac_write_msk_pwr_reg(struct mac_ax_adapter *adapter, u8 band,
 	if (mask != 0xffffffff) {
 		shift = shift_mask(mask);
 		ori_val = MAC_REG_R32(offset);
-		val = ((ori_val) & (~mask)) | (((val << shift)) & mask);
+		if (shift < 32)
+			val = ((ori_val) & (~mask)) | (((val << shift)) & mask);
+		else
+			val = ori_val & ~mask;
 	}
 	MAC_REG_W32(offset, val);
 

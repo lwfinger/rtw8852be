@@ -891,7 +891,7 @@ static int rtw_dev_probe(struct pci_dev *pdev, const struct pci_device_id *pdid)
 	_adapter *padapter = NULL;
 	struct dvobj_priv *dvobj;
 
-	RTW_INFO("+%s\n", __func__);
+	pr_info("rtw8852be driver loaded\n");
 
 	/* step 0. */
 	disable_ht_for_spec_devid(pdid);
@@ -1044,7 +1044,7 @@ static void rtw_dev_remove(struct pci_dev *pdev)
 	devobj_trx_resource_deinit(dvobj);
 	pci_dvobj_deinit(pdev);
 
-	RTW_INFO("-%s done\n", __func__);
+	pr_info("rtw8852be driver unloaded\n");
 	return;
 }
 
