@@ -1,0 +1,6 @@
+files
+*.debhelper
+*.substvars
+*stamp
+*.log
+rtw8852be-dkms/
