@@ -745,6 +745,11 @@ void halbb_sdagc_follow_pagc_config(struct bb_info *bb, bool set_en)
 	if (bb_dig->p_cur_dig_unit->sdagc_follow_pagc_en == set_en)
 		return;
 
+	if (cr->path0_p20_follow_by_pagcugc_en_a == 0 && cr->path0_p20_follow_by_pagcugc_en_a_m == 0) {
+		pr_warn_once("%s: skipped because path0_p20_follow_by_pagcugc_en not defined\n", __func__);
+		return;
+	}
+
 	bb_dig->p_cur_dig_unit->sdagc_follow_pagc_en = set_en;
 
 	halbb_set_reg_cmn(bb, cr->path0_p20_follow_by_pagcugc_en_a,
@@ -841,6 +846,12 @@ void halbb_dig_gain_para_init(struct bb_info *bb)
 	struct bb_dig_cr_info *cr = &bb_dig->bb_dig_cr_i;
 	s8 *gain_arr = NULL;
 	u32 tmp_val, i = 0;
+
+	if (cr->path0_ib_pkpwr == 0 &&
+	    cr->path0_ib_pkpwr_m == 0) {
+		pr_warn_once("%s: skipped because ib_pbk not defined\n", __func__);
+		return;
+	}
 
 	tmp_val = halbb_get_reg_cmn(bb, cr->path0_ib_pkpwr,
 				    cr->path0_ib_pkpwr_m, bb->bb_phy_idx);
