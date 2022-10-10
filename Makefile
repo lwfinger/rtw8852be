@@ -631,6 +631,20 @@ export CONFIG_RTL8852BE = m
 all: modules
 
 modules:
+	$(info )
+	$(info )
+	$(info *******************)
+	$(info )
+	$(info IMPORTANT MESSAGE TO ALL USERS)
+	$(info )
+	$(info The RTW8852BE driver in https://github.com/lwfinger/rtw89.git is now functional as of 10-OCT-2022)
+	$(info )
+	$(info THIS REPO IS REDUNDANT AND WILL BE REMOVED 1-DEC-2022.)
+	$(info )
+	$(info *******************)
+	$(info )
+	$(info )
+
 	#rm -f .symvers.$(MODULE_NAME)
 
 	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(shell pwd)  modules
