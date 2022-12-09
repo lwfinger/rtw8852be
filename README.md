@@ -1,4 +1,5 @@
-# rtw8852be
+# This driver is deprecated. For a supported driver, see https://github.com/lwfinger/rtw89
+
 Linux driver for RTW8852BE PCIe card
 
 ---
