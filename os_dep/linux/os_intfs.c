@@ -653,6 +653,11 @@ int rtw_os_ndev_register(_adapter *adapter, const char *name)
 	_rtw_memcpy(ndev->dev_addr, adapter_mac_addr(adapter), ETH_ALEN);
 #endif
 
+	// fix(set_wiphy_netns) - CONFIG_NET_NS
+	#ifdef CONFIG_NET_NS
+		dev_net_set(ndev, wiphy_net(adapter_to_wiphy(adapter)));
+	#endif
+
 	/* Tell the network stack we exist */
 
 	if (rtnl_lock_needed)

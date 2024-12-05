@@ -40,6 +40,7 @@ CONFIG_PCI_HCI = y
 CONFIG_SDIO_HCI = n
 CONFIG_GSPI_HCI = n
 ########################## Features ###########################
+CONFIG_NET_NS = y
 CONFIG_MP_INCLUDED = n
 CONFIG_CONCURRENT_MODE = n
 CONFIG_POWER_SAVING = n

@@ -897,6 +897,12 @@ struct cfg80211_bss *rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_net
 		return bss;
 	}
 
+	// fix(set_wiphy_netns) - CONFIG_NET_NS
+	#ifdef CONFIG_NET_NS
+		wiphy->flags |= WIPHY_FLAG_NETNS_OK;
+	#endif
+
+
 	/* RTW_INFO("%s\n", __func__); */
 
 	bssinf_len = pnetwork->network.IELength + sizeof(struct rtw_ieee80211_hdr_3addr);
