@@ -19,7 +19,7 @@ You will need to install "make", "gcc", "kernel headers", "kernel build essentia
 For **Ubuntu**: You can install them with the following command
 ```bash
 sudo apt-get update
-sudo apt-get install make gcc linux-headers-$(uname -r) build-essential git
+sudo apt-get install make gcc linux-headers-$(uname -r) build-essential git bc
 ```
 For **Fedora**: You can install them with the following command
 ```bash
