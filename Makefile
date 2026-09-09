@@ -619,6 +619,11 @@ endif
 
 include $(src)/phl/phl.mk
 
+# Kbuild stopped consuming EXTRA_CFLAGS in Linux 6.15. Transfer the vendor
+# options once, then clear the legacy variable to avoid duplicate flags on
+# older kernels whose Makefile.lib still appends it to ccflags-y.
+ccflags-y := $(ccflags-y) $(EXTRA_CFLAGS)
+EXTRA_CFLAGS :=
 
 obj-$(CONFIG_RTL8852BE) := $(MODULE_NAME).o
 obj-$(CPTCFG_RTL8852AE) := $(MODULE_NAME).o
